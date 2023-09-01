@@ -1,7 +1,7 @@
 $global:TableauRestApiVer = '3.6'
 $global:TableauRestApiChunkSize = 2097152	   ## 2MB or 2048KB
 
-function Get-TS-ServerInfo
+function Get-TSServerInfo
 {
  try
   {
@@ -18,7 +18,7 @@ function Get-TS-ServerInfo
    }
 }
 
-function Invoke-TS-SignIn
+function Invoke-TSSignIn
 {
 
  param(
@@ -33,7 +33,7 @@ function Invoke-TS-SignIn
  $global:protocol = $protocol
  $global:username = $username
  $global:password = $password
- Invoke-TS-ServerInfo
+ Invoke-TSServerInfo
 
  # generate body for sign in
  $signin_body = ('<tsRequest>
@@ -61,7 +61,7 @@ function Invoke-TS-SignIn
 }
 
 
-function Invoke-TS-SignOut
+function Invoke-TSSignOut
 {
  try
  {
@@ -72,6 +72,6 @@ function Invoke-TS-SignOut
   {"Unable to Sign out from Tableau Server: " + ${protocol}+"://"+$server}
 }
 
-Export-ModuleMember -Function Get-TS-ServerInfo
-Export-ModuleMember -Function Invoke-TS-SignIn
-Export-ModuleMember -Function Invoke-TS-SignOut
+Export-ModuleMember -Function Get-TSServerInfo
+Export-ModuleMember -Function Invoke-TSSignIn
+Export-ModuleMember -Function Invoke-TSSignOut
