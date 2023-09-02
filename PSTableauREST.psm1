@@ -5,11 +5,11 @@ function Get-TSServerInfo
 {
  try
   {
-   $response = Invoke-RestMethod -Uri ${protocol}://$server/api/$TableauRestApiVer/serverinfo -Method Get
+   $response = Invoke-RestMethod -Uri $server/api/$TableauRestApiVer/serverinfo -Method Get
    $api_ver = $response.tsResponse.ServerInfo.restApiVersion
    $ProductVersion = $response.tsResponse.ServerInfo.ProductVersion.build
-   "API Version: " + $api_ver
-   "Tableau Version: " + $ProductVersion
+  #  "API Version: " + $api_ver
+  #  "Tableau Version: " + $ProductVersion
    $global:TableauRestApiVer = $api_ver
   }
   catch
@@ -25,15 +25,13 @@ function Invoke-TSSignIn
  [string[]] $server,
  [string[]] $username,
  [string[]] $password,
- [validateset('http','https')][string[]] $protocol = 'http',
  [string[]] $siteID = ""
  )
 
  $global:server = $server
- $global:protocol = $protocol
  $global:username = $username
  $global:password = $password
- Invoke-TSServerInfo
+ Get-TSServerInfo
 
  # generate body for sign in
  $signin_body = ('<tsRequest>
@@ -44,7 +42,7 @@ function Invoke-TSSignIn
 
  try
   {
-   $response = Invoke-RestMethod -Uri ${protocol}://$server/api/$TableauRestApiVer/auth/signin -Body $signin_body -Method Post
+   $response = Invoke-RestMethod -Uri $server/api/$TableauRestApiVer/auth/signin -Body $signin_body -Method Post
    # get the auth token, site id and my user id
    $global:authToken = $response.tsResponse.credentials.token
    $global:siteID = $response.tsResponse.credentials.site.id
@@ -54,10 +52,10 @@ function Invoke-TSSignIn
    $global:headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
    # add X-Tableau-Auth header with our auth tokents-
    $headers.Add("X-Tableau-Auth", $authToken)
-   "Signed In Successfully to Server: "  + ${protocol}+"://"+$server
+   "Signed In Successfully"
   }
 
- catch {throw "Unable to Sign-In to Tableau Server: " + ${protocol}+"://"+$server}
+ catch {throw "Unable to Sign-In to Tableau Server: " + $server}
 }
 
 
@@ -65,11 +63,11 @@ function Invoke-TSSignOut
 {
  try
  {
-  $response = Invoke-RestMethod -Uri ${protocol}://$server/api/$TableauRestApiVer/auth/signout -Headers $headers -Method Post
-  "Signed Out Successfully from: " + ${protocol}+ "://"+$server
+  $response = Invoke-RestMethod -Uri $server/api/$TableauRestApiVer/auth/signout -Headers $headers -Method Post
+  "Signed Out Successfully from: " + $server
   }
  catch
-  {"Unable to Sign out from Tableau Server: " + ${protocol}+"://"+$server}
+  {throw "Unable to Sign out from Tableau Server: " + $server}
 }
 
 Export-ModuleMember -Function Get-TSServerInfo
