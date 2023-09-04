@@ -1,12 +1,12 @@
 BeforeDiscovery {
-    $script:ModuleDir = (Get-Item $PSCommandPath).Directory.Parent.FullName
+    $script:ParentDir = (Get-Item $PSCommandPath).Directory.Parent.FullName
     $script:ModuleName = (Split-Path -Leaf $PSCommandPath) -Replace ".Module.Tests.ps1"
-    $script:ModuleFile =     "$ModuleDir/$ModuleName.psm1"
-    $script:ModuleManifest = "$ModuleDir/$ModuleName.psd1"
+    $script:ModuleFile =     "$ParentDir/$ModuleName/$ModuleName.psm1"
+    $script:ModuleManifest = "$ParentDir/$ModuleName/$ModuleName.psd1"
 }
 
 Describe "Module Structure and Validation Tests" -Tag Module -WarningAction SilentlyContinue {
-    $CodeFiles = Get-ChildItem -Path "$ModuleDir" -Filter *.ps1 -Recurse
+    $CodeFiles = Get-ChildItem -Path "$ParentDir" -Filter *.ps1 -Recurse
     $ScriptAnalyzerRules = Get-ScriptAnalyzerRule
     $ScriptAnalyzerResults = Invoke-ScriptAnalyzer -Path $ModuleFile -ExcludeRule PSUseBOMForUnicodeEncodedFile,PSReviewUnusedParameter
 
