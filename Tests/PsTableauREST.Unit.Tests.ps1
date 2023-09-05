@@ -1,7 +1,10 @@
-BeforeDiscovery {
+BeforeAll {
     Get-Module PSTableauREST | Remove-Module -Force
     Import-Module ./PSTableauREST/PSTableauREST.psm1 -Force
+    Get-Module Microsoft.PowerShell.SecretManagement | Remove-Module -Force
+    Import-Module Microsoft.PowerShell.SecretManagement
     $script:ConfigFiles = Get-ChildItem -Path "Tests/Config" -Filter "test_*.json" -Recurse
+    . ./Tests/Test.Functions.ps1
 }
 
 Describe "Unit Tests for PSTableauREST" -Tag Unit {
@@ -13,14 +16,10 @@ Describe "Unit Tests for PSTableauREST" -Tag Unit {
             $ConfigFile.server | Should -Not -BeNullOrEmpty
             # $ConfigFile.site | Should -Not -BeNullOrEmpty
             $ConfigFile.username | Should -Not -BeNullOrEmpty
-            $ConfigFile.password | Should -Not -BeNullOrEmpty
         }
-        It "Perform sign-in for <ConfigFile.server>" -Skip {
-            $result = Invoke-TSSignIn -server $ConfigFile.server -siteID $ConfigFile.site -username $ConfigFile.username -password $ConfigFile.password
-            $result | Should -Contain "Signed In Successfully"
-        }
-        It "Perform sign-out for <ConfigFile.server>" -Skip {
-            {Invoke-TSSignOut} | Should -Not -Throw
+        It "Password for <ConfigFile.server> should be available" {
+            $ConfigFile | Add-Member -MemberType NoteProperty -Name "securePw" -Value (Test-GetSecurePassword -Namespace $ConfigFile.server -Username $ConfigFile.username)
+            $ConfigFile.securePw | Should -Not -BeNullOrEmpty
         }
     }
 }
