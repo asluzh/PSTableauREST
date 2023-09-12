@@ -4,6 +4,8 @@ BeforeDiscovery {
     # Get-Module Microsoft.PowerShell.SecretManagement | Remove-Module -Force
     Import-Module Microsoft.PowerShell.SecretManagement -Force
     $script:ConfigFiles = Get-ChildItem -Path "Tests/Config" -Filter "test_*.json" -Recurse
+}
+BeforeAll {
     . ./Tests/Test.Functions.ps1
 }
 
