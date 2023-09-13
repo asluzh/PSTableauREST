@@ -1,8 +1,8 @@
-BeforeAll {
-    Get-Module PSTableauREST | Remove-Module -Force
+BeforeDiscovery {
+    # Get-Module PSTableauREST | Remove-Module -Force
     Import-Module ./PSTableauREST/PSTableauREST.psm1 -Force
-    Get-Module Microsoft.PowerShell.SecretManagement | Remove-Module -Force
-    Import-Module Microsoft.PowerShell.SecretManagement
+    # Get-Module Microsoft.PowerShell.SecretManagement | Remove-Module -Force
+    Import-Module Microsoft.PowerShell.SecretManagement -Force
     $script:ConfigFiles = Get-ChildItem -Path "Tests/Config" -Filter "test_*.json" -Recurse
     . ./Tests/Test.Functions.ps1
 }
