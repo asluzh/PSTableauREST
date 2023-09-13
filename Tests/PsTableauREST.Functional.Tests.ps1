@@ -20,5 +20,14 @@ Describe "Functional Tests for PSTableauREST" -Tag Unit {
         It "Perform sign-out for <ConfigFile.server>" {
             {Invoke-TSSignOut} | Should -Not -Throw
         }
+        It "Invoke PAT sign-in for <ConfigFile.server>" {
+            if (-not $ConfigFile.pat_name) {
+                Set-ItResult -Skipped
+            }
+            $response = Invoke-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
+            $response.tsResponse.credentials.user.id | Should -BeOfType String
+            $response = Invoke-TSSignOut
+            $response | Should -BeOfType "String"
+        }
     }
 }
