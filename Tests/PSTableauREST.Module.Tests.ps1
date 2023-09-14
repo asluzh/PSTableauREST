@@ -6,9 +6,11 @@ BeforeDiscovery {
 }
 
 Describe "Module Structure and Validation Tests" -Tag Module -WarningAction SilentlyContinue {
-    $CodeFiles = Get-ChildItem -Path "$ParentDir" -Filter *.ps1 -Recurse
-    $ScriptAnalyzerRules = Get-ScriptAnalyzerRule
-    $ScriptAnalyzerResults = Invoke-ScriptAnalyzer -Path $ModuleFile -ExcludeRule PSUseBOMForUnicodeEncodedFile,PSReviewUnusedParameter
+    BeforeAll {
+        $script:CodeFiles = Get-ChildItem -Path "$ParentDir" -Filter *.ps1 -Recurse
+        $script:ScriptAnalyzerRules = Get-ScriptAnalyzerRule
+        $script:ScriptAnalyzerResults = Invoke-ScriptAnalyzer -Path $ModuleFile -ExcludeRule PSUseBOMForUnicodeEncodedFile -Severity Error,Warning
+    }
 
     Context "Module File <ModuleFile>" {
         It "has the root module <ModuleName>" {
@@ -46,7 +48,7 @@ Describe "Module Structure and Validation Tests" -Tag Module -WarningAction Sile
         BeforeAll {
             Get-ScriptAnalyzerRule | Where-Object RuleName -eq $_ | Select-Object -ExpandProperty CommonName -OutVariable commonName
         }
-        It "should pass rule '<commonName>'" {
+        It "should pass rule '<_> (<commonName>)'" {
             If ($ScriptAnalyzerResults.RuleName -contains $_) {
                 $ScriptAnalyzerResults | Where-Object RuleName -eq $_ | Select-Object Message -OutVariable err
                 $err.Message | Should -BeNullOrEmpty
