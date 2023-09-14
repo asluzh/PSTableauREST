@@ -59,6 +59,11 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional {
                 $response.tsResponse.project.id | Should -Be $projectId
                 $response.tsResponse.project.name | Should -Be $projectNewName
             }
+            It "Retrieve project on <ConfigFile.server>" {
+                $projects = Get-TSProject
+                $projects.length | Should -BeGreaterThan 0
+                $projects | Where-Object id -eq $projectId | Should -Not -BeNullOrEmpty
+            }
             It "Delete a dummy project on <ConfigFile.server>" {
                 $response = Remove-TSProject -ProjectId $projectId
                 $response | Should -BeOfType String

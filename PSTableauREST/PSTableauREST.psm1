@@ -5,7 +5,7 @@ $TSRestApiVersion = '2.4' # minimum supported version
 function Get-TSServerInfo {
     [OutputType([PSCustomObject])]
     Param(
-        [Parameter(Mandatory=$false)][string] $ServerUrl
+        [Parameter()][string] $ServerUrl
     )
     try {
         if ($ServerUrl) {
@@ -21,7 +21,7 @@ function Get-TSServerInfo {
 function Get-TSRequestHeaderDict {
     [OutputType([System.Collections.Generic.Dictionary[string,string]])]
     Param(
-        [Parameter(Mandatory=$false)][string] $ContentType
+        [Parameter()][string] $ContentType
     )
     $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
     if ($script:TSAuthToken) {
@@ -35,8 +35,8 @@ function Get-TSRequestHeaderDict {
 
 function Get-TSRequestUri {
     Param(
-        [validateset('Auth','Project')][string] $Endpoint,
-        [Parameter(Mandatory=$false)][string] $Param
+        [Parameter(Mandatory)][validateset('Auth','Project')][string] $Endpoint,
+        [Parameter()][string] $Param
     )
     $Uri = "$script:TSServerUrl/api/$script:TSRestApiVersion/"
     switch($Endpoint) {
@@ -52,13 +52,13 @@ function Get-TSRequestUri {
 function Invoke-TSSignIn {
     [OutputType([PSCustomObject])]
     Param(
-        [Parameter(Mandatory=$true)][string] $ServerUrl,
-        [Parameter(Mandatory=$false)][string] $Username,
-        [Parameter(Mandatory=$false)][securestring] $SecurePassword,
-        [Parameter(Mandatory=$false)][string] $PersonalAccessTokenName,
-        [Parameter(Mandatory=$false)][string] $PersonalAccessTokenSecret,
-        [Parameter(Mandatory=$false)][string] $Site = "",
-        [Parameter(Mandatory=$false)][boolean] $UseServerVersion = $True
+        [Parameter(Mandatory)][string] $ServerUrl,
+        [Parameter()][string] $Username,
+        [Parameter()][securestring] $SecurePassword,
+        [Parameter()][string] $PersonalAccessTokenName,
+        [Parameter()][string] $PersonalAccessTokenSecret,
+        [Parameter()][string] $Site = "",
+        [Parameter()][boolean] $UseServerVersion = $True
     )
 
     $script:TSServerUrl = $ServerUrl
@@ -109,7 +109,7 @@ function Invoke-TSSignIn {
 function Invoke-TSSwitchSite {
     [OutputType([PSCustomObject])]
     Param(
-        [Parameter(Mandatory=$true)][string] $Site
+        [Parameter(Mandatory)][string] $Site
     )
     # generate xml request
     $xml = New-Object System.Xml.XmlDocument
@@ -149,9 +149,21 @@ function Invoke-TSSignOut {
 }
 
 function Get-TSProject {
-    Param()
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+    )
     try {
-        # TODO GET
+        $PageSize = 100
+        $pageNumber = 0
+        do {
+            $pageNumber += 1
+            $uri = Get-TSRequestUri -Endpoint Project
+            $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+            $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+            $totalAvailable = $response.tsResponse.pagination.totalAvailable
+            $response.tsResponse.Projects.project
+        } until ($PageSize*$pageNumber -gt $totalAvailable)
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
     }
@@ -160,10 +172,10 @@ function Get-TSProject {
 function New-TSProject {
     [CmdletBinding(SupportsShouldProcess)]
     Param(
-        [Parameter(Mandatory=$true)][string] $Name,
-        [Parameter(Mandatory=$false)][string] $Description,
-        [validateset('ManagedByOwner','LockedToProject','LockedToProjectWithoutNested')][string] $ContentPermissions,
-        [Parameter(Mandatory=$false)][string] $ParentProjectId
+        [Parameter(Mandatory)][string] $Name,
+        [Parameter()][string] $Description,
+        [Parameter()][ValidateSet('ManagedByOwner','LockedToProject','LockedToProjectWithoutNested')][string] $ContentPermissions,
+        [Parameter()][string] $ParentProjectId
         )
     # generate xml request
     $xml = New-Object System.Xml.XmlDocument
@@ -192,11 +204,11 @@ function New-TSProject {
 function Update-TSProject {
     [CmdletBinding(SupportsShouldProcess)]
     Param(
-        [Parameter(Mandatory=$true)][string] $ProjectId,
-        [Parameter(Mandatory=$false)][string] $Name,
-        [Parameter(Mandatory=$false)][string] $Description,
-        [validateset('ManagedByOwner','LockedToProject','LockedToProjectWithoutNested')][string] $ContentPermissions,
-        [Parameter(Mandatory=$false)][string] $ParentProjectId
+        [Parameter(Mandatory)][string] $ProjectId,
+        [Parameter()][string] $Name,
+        [Parameter()][string] $Description,
+        [Parameter()][ValidateSet('ManagedByOwner','LockedToProject','LockedToProjectWithoutNested')][string] $ContentPermissions,
+        [Parameter()][string] $ParentProjectId
     )
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -226,7 +238,7 @@ function Update-TSProject {
 function Remove-TSProject {
     [CmdletBinding(SupportsShouldProcess)]
     Param(
-        [Parameter(Mandatory=$true)][string] $ProjectId
+        [Parameter(Mandatory)][string] $ProjectId
     )
     try {
         if ($PSCmdlet.ShouldProcess($ProjectId)){
