@@ -1,5 +1,5 @@
 # Module variables
-$TSRestApiVersion = '3.6'
+$TSRestApiVersion = '2.4' # minimum supported version
 #$TSRestApiChunkSize = 2097152	   ## 2MB or 2048KB
 
 function Get-TSServerInfo {
@@ -12,17 +12,41 @@ function Get-TSServerInfo {
             $script:TSServerUrl = $ServerUrl
         }
         return Invoke-RestMethod -Uri $script:TSServerUrl/api/$script:TSRestApiVersion/serverinfo -Method Get
-    }
-    catch {
+    } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
     }
 }
 
-# set up headers IDictionary with auth token
-function Get-TSRequestHeaders {
+# set up headers IDictionary with auth token (and optionally other headers)
+function Get-TSRequestHeaderDict {
+    [OutputType([System.Collections.Generic.Dictionary[string,string]])]
+    Param(
+        [Parameter(Mandatory=$false)][string] $ContentType
+    )
     $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-    $headers.Add("X-Tableau-Auth", $script:TSAuthToken)
+    if ($script:TSAuthToken) {
+        $headers.Add("X-Tableau-Auth", $script:TSAuthToken)
+    }
+    if ($ContentType) {
+        $headers.Add("Content-Type", $ContentType)
+    }
     return $headers
+}
+
+function Get-TSRequestUri {
+    Param(
+        [validateset('Auth','Project')][string] $Endpoint,
+        [Parameter(Mandatory=$false)][string] $Param
+    )
+    $Uri = "$script:TSServerUrl/api/$script:TSRestApiVersion/"
+    switch($Endpoint) {
+        "Auth" { $Uri += "auth/$Param" }
+        "Project" {
+            $Uri += "sites/$script:TSSiteId/projects"
+            if ($Param) { $Uri += "/$Param" }
+        }
+    }
+    return $Uri
 }
 
 function Invoke-TSSignIn {
@@ -33,15 +57,20 @@ function Invoke-TSSignIn {
         [Parameter(Mandatory=$false)][securestring] $SecurePassword,
         [Parameter(Mandatory=$false)][string] $PersonalAccessTokenName,
         [Parameter(Mandatory=$false)][string] $PersonalAccessTokenSecret,
-        [Parameter(Mandatory=$false)][string] $Site = ""
+        [Parameter(Mandatory=$false)][string] $Site = "",
+        [Parameter(Mandatory=$false)][boolean] $UseServerVersion = $True
     )
 
     $script:TSServerUrl = $ServerUrl
     $response = Get-TSServerInfo
+    if ($UseServerVersion) {
+        $script:TSRestApiVersion = $response.tsResponse.serverInfo.restApiVersion
+        $script:TSProductVersion = $response.tsResponse.serverInfo.productVersion.InnerText
+        $script:TSProductVersionBuild = $response.tsResponse.serverInfo.productVersion.build
     # $response.tsResponse.serverInfo.productVersion.build
     # $response.tsResponse.serverInfo.productVersion.#text
     # $response.tsResponse.serverInfo.prepConductorVersion
-    # $script:TSRestApiVersion = $response.tsResponse.serverInfo.restApiVersion
+    }
 
     $xml = New-Object System.Xml.XmlDocument
 
@@ -66,14 +95,13 @@ function Invoke-TSSignIn {
     }
 
     try {
-        $response = Invoke-RestMethod -Uri "$script:TSServerUrl/api/$script:TSRestApiVersion/auth/signin" -Body $xml.OuterXml -Method Post
+        $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Auth -Param signin) -Body $xml.OuterXml -Method Post
         # get the auth token, site id and my user id
         $script:TSAuthToken = $response.tsResponse.credentials.token
         $script:TSSiteId = $response.tsResponse.credentials.site.id
         $script:TSUserId = $response.tsResponse.credentials.user.id
         return $response
-    }
-    catch {
+    } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
     }
 }
@@ -90,13 +118,12 @@ function Invoke-TSSwitchSite {
     $el_site.SetAttribute("contentUrl", $Site)
 
     try {
-        $response = Invoke-RestMethod -Uri "$script:TSServerUrl/api/$script:TSRestApiVersion/auth/switchSite" -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaders)
+        $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Auth -Param switchSite) -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
         $script:TSAuthToken = $response.tsResponse.credentials.token
         $script:TSSiteId = $response.tsResponse.credentials.site.id
         $script:TSUserId = $response.tsResponse.credentials.user.id
         return $response
-    }
-    catch {
+    } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
     }
 }
@@ -107,7 +134,7 @@ function Invoke-TSSignOut {
     try {
         $response = $Null
         if ($Null -ne $script:TSServerUrl -and $Null -ne $script:TSAuthToken) {
-            $response = Invoke-RestMethod -Uri "$script:TSServerUrl/api/$script:TSRestApiVersion/auth/signout" -Method Post -Headers (Get-TSRequestHeaders)
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Auth -Param signout) -Method Post -Headers (Get-TSRequestHeaderDict)
             $script:TSServerUrl = $Null
             $script:TSAuthToken = $Null
             $script:TSSiteId = $Null
@@ -116,8 +143,97 @@ function Invoke-TSSignOut {
             Write-Warning "Currently not signed in."
         }
         return $response
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
     }
-    catch {
+}
+
+function Get-TSProject {
+    Param()
+    try {
+        # TODO GET
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function New-TSProject {
+    [CmdletBinding(SupportsShouldProcess)]
+    Param(
+        [Parameter(Mandatory=$true)][string] $Name,
+        [Parameter(Mandatory=$false)][string] $Description,
+        [validateset('ManagedByOwner','LockedToProject','LockedToProjectWithoutNested')][string] $ContentPermissions,
+        [Parameter(Mandatory=$false)][string] $ParentProjectId
+        )
+    # generate xml request
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_project = $tsRequest.AppendChild($xml.CreateElement("project"))
+    $el_project.SetAttribute("name", $Name)
+    if ($Description) {
+        $el_project.SetAttribute("description", $Description)
+    }
+    if ($ContentPermissions) {
+        $el_project.SetAttribute("contentPermissions", $ContentPermissions)
+    }
+    if ($ParentProjectId) {
+        $el_project.SetAttribute("parentProjectId", $ParentProjectId)
+    }
+    try {
+        if ($PSCmdlet.ShouldProcess($Name)){
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Project) -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+            return $response
+        }
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function Update-TSProject {
+    [CmdletBinding(SupportsShouldProcess)]
+    Param(
+        [Parameter(Mandatory=$true)][string] $ProjectId,
+        [Parameter(Mandatory=$false)][string] $Name,
+        [Parameter(Mandatory=$false)][string] $Description,
+        [validateset('ManagedByOwner','LockedToProject','LockedToProjectWithoutNested')][string] $ContentPermissions,
+        [Parameter(Mandatory=$false)][string] $ParentProjectId
+    )
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_project = $tsRequest.AppendChild($xml.CreateElement("project"))
+    if ($Name) {
+        $el_project.SetAttribute("name", $Name)
+    }
+    if ($Description) {
+        $el_project.SetAttribute("description", $Description)
+    }
+    if ($ContentPermissions) {
+        $el_project.SetAttribute("contentPermissions", $ContentPermissions)
+    }
+    if ($ParentProjectId) {
+        $el_project.SetAttribute("parentProjectId", $ParentProjectId)
+    }
+    try {
+        if ($PSCmdlet.ShouldProcess($ProjectId)){
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Project -Param $ProjectId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            return $response
+        }
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function Remove-TSProject {
+    [CmdletBinding(SupportsShouldProcess)]
+    Param(
+        [Parameter(Mandatory=$true)][string] $ProjectId
+    )
+    try {
+        if ($PSCmdlet.ShouldProcess($ProjectId)){
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Project -Param $ProjectId) -Method Delete -Headers (Get-TSRequestHeaderDict)
+            return $response
+        }
+    } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
     }
 }
@@ -126,3 +242,8 @@ Export-ModuleMember -Function Get-TSServerInfo
 Export-ModuleMember -Function Invoke-TSSignIn
 Export-ModuleMember -Function Invoke-TSSignOut
 Export-ModuleMember -Function Invoke-TSSwitchSite
+
+Export-ModuleMember -Function Get-TSProject
+Export-ModuleMember -Function New-TSProject
+Export-ModuleMember -Function Update-TSProject
+Export-ModuleMember -Function Remove-TSProject

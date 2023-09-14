@@ -36,5 +36,34 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional {
             $response = Invoke-TSSignOut
             $response | Should -BeOfType "String"
         }
+        Context "Project handling" {
+            BeforeAll {
+                Invoke-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
+                $script:projectId = $null
+            }
+            AfterAll {
+                if ($projectId) {
+                    Remove-TSProject -ProjectId $projectId
+                }
+                Invoke-TSSignOut
+            }
+            It "Create a dummy project on <ConfigFile.server>" {
+                $projectName = New-Guid
+                $response = New-TSProject -Name $projectName
+                $response.tsResponse.project.id | Should -BeOfType String
+                $script:projectId = $response.tsResponse.project.id
+            }
+            It "Update a dummy project <projectId> on <ConfigFile.server>" {
+                $projectNewName = New-Guid
+                $response = Update-TSProject -ProjectId $projectId -Name $projectNewName
+                $response.tsResponse.project.id | Should -Be $projectId
+                $response.tsResponse.project.name | Should -Be $projectNewName
+            }
+            It "Delete a dummy project on <ConfigFile.server>" {
+                $response = Remove-TSProject -ProjectId $projectId
+                $response | Should -BeOfType String
+                $script:projectId = $null
+            }
+        }
     }
 }
