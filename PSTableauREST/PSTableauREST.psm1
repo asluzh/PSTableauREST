@@ -29,8 +29,10 @@ function Invoke-TSSignIn {
     [OutputType([PSCustomObject])]
     Param(
         [Parameter(Mandatory=$true)][string] $ServerUrl,
-        [Parameter(Mandatory=$true)][string] $Username,
-        [Parameter(Mandatory=$true)][securestring] $SecurePassword,
+        [Parameter(Mandatory=$false)][string] $Username,
+        [Parameter(Mandatory=$false)][securestring] $SecurePassword,
+        [Parameter(Mandatory=$false)][string] $PersonalAccessTokenName,
+        [Parameter(Mandatory=$false)][string] $PersonalAccessTokenSecret,
         [Parameter(Mandatory=$false)][string] $Site = ""
     )
 
@@ -41,16 +43,27 @@ function Invoke-TSSignIn {
     # $response.tsResponse.serverInfo.prepConductorVersion
     # $script:TSRestApiVersion = $response.tsResponse.serverInfo.restApiVersion
 
-    $Password = [System.Net.NetworkCredential]::new("", $SecurePassword).Password
-
-    # generate xml request
     $xml = New-Object System.Xml.XmlDocument
-    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
-    $el_credentials = $tsRequest.AppendChild($xml.CreateElement("credentials"))
-    $el_site = $el_credentials.AppendChild($xml.CreateElement("site"))
-    $el_credentials.SetAttribute("name", $Username)
-    $el_credentials.SetAttribute("password", $Password)
-    $el_site.SetAttribute("contentUrl", $Site)
+
+    if ($Username -and $SecurePassword) {
+        $Password = [System.Net.NetworkCredential]::new("", $SecurePassword).Password
+        $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+        $el_credentials = $tsRequest.AppendChild($xml.CreateElement("credentials"))
+        $el_site = $el_credentials.AppendChild($xml.CreateElement("site"))
+        $el_credentials.SetAttribute("name", $Username)
+        $el_credentials.SetAttribute("password", $Password)
+        $el_site.SetAttribute("contentUrl", $Site)
+    } elseif ($PersonalAccessTokenName -and $PersonalAccessTokenSecret) {
+        $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+        $el_credentials = $tsRequest.AppendChild($xml.CreateElement("credentials"))
+        $el_site = $el_credentials.AppendChild($xml.CreateElement("site"))
+        $el_credentials.SetAttribute("personalAccessTokenName", $PersonalAccessTokenName)
+        $el_credentials.SetAttribute("personalAccessTokenSecret", $PersonalAccessTokenSecret)
+        $el_site.SetAttribute("contentUrl", $Site)
+    } else {
+        Write-Error -Exception "Sign-in parameters not provided (username/password or PAT)."
+        return $null
+    }
 
     try {
         $response = Invoke-RestMethod -Uri "$script:TSServerUrl/api/$script:TSRestApiVersion/auth/signin" -Body $xml.OuterXml -Method Post
