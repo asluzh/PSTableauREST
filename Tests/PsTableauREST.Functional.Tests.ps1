@@ -12,11 +12,14 @@ BeforeAll {
 Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFiles {
     BeforeAll {
         $script:ConfigFile = Get-Content $_ | ConvertFrom-Json
-        $ConfigFile | Add-Member -MemberType NoteProperty -Name "securePw" -Value (Test-GetSecurePassword -Namespace $ConfigFile.server -Username $ConfigFile.username)
+        $ConfigFile | Add-Member -MemberType NoteProperty -Name "secure_password" -Value (Test-GetSecurePassword -Namespace $ConfigFile.server -Username $ConfigFile.username)
+        if ($ConfigFile.pat_name) {
+            $ConfigFile | Add-Member -MemberType NoteProperty -Name "pat_secret" -Value (Test-GetSecurePassword -Namespace $ConfigFile.server -Username $ConfigFile.pat_name)
+        }
     }
     Context "Auth operations" -Tag Auth {
         It "Invoke auth sign-in for <ConfigFile.server>" {
-            $response = Invoke-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.securePw
+            $response = Invoke-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
             $response.tsResponse.credentials.user.id | Should -BeOfType String
         }
         It "Invoke switch site to <ConfigFile.switch_site> for <ConfigFile.server>" {
@@ -42,7 +45,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             if ($ConfigFile.pat_name) {
                 Invoke-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
             } else {
-                Invoke-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.securePw
+                Invoke-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
             }
             $script:testProjectId = $null
         }
@@ -55,30 +58,6 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 Remove-TSSite -SiteId $testSiteId
             }
             Invoke-TSSignOut
-        }
-        Context "Project operations" -Tag Project {
-            It "Create new project on <ConfigFile.server>" {
-                $projectName = New-Guid
-                $response = New-TSProject -Name $projectName
-                $response.tsResponse.project.id | Should -BeOfType String
-                $script:testProjectId = $response.tsResponse.project.id
-            }
-            It "Update the project <testProjectId> on <ConfigFile.server>" {
-                $projectNewName = New-Guid
-                $response = Update-TSProject -ProjectId $script:testProjectId -Name $projectNewName
-                $response.tsResponse.project.id | Should -Be $script:testProjectId
-                $response.tsResponse.project.name | Should -Be $projectNewName
-            }
-            It "Query projects on <ConfigFile.server>" {
-                $projects = Get-TSProject
-                $projects.length | Should -BeGreaterThan 0
-                $projects | Where-Object id -eq $script:testProjectId | Should -Not -BeNullOrEmpty
-            }
-            It "Delete the project <testProjectId> on <ConfigFile.server>" {
-                $response = Remove-TSProject -ProjectId $script:testProjectId
-                $response | Should -BeOfType String
-                $script:testProjectId = $null
-            }
         }
         Context "Site operations" -Tag Site {
             It "Create a new site on <ConfigFile.server>" {
@@ -139,9 +118,40 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     if ($ConfigFile.pat_name) {
                         Invoke-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
                     } else {
-                        Invoke-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.securePw
+                        Invoke-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
                     }
                 }
+            }
+        }
+        Context "Project operations" -Tag Project {
+            It "Create new project on <ConfigFile.server>" {
+                $projectName = New-Guid
+                $response = New-TSProject -Name $projectName
+                $response.tsResponse.project.id | Should -BeOfType String
+                $script:testProjectId = $response.tsResponse.project.id
+            }
+            It "Update the project <testProjectId> on <ConfigFile.server>" {
+                $projectNewName = New-Guid
+                $response = Update-TSProject -ProjectId $script:testProjectId -Name $projectNewName
+                $response.tsResponse.project.id | Should -Be $script:testProjectId
+                $response.tsResponse.project.name | Should -Be $projectNewName
+            }
+            It "Query projects on <ConfigFile.server>" {
+                $projects = Get-TSProject
+                $projects.length | Should -BeGreaterThan 0
+                $projects | Where-Object id -eq $script:testProjectId | Should -Not -BeNullOrEmpty
+            }
+            It "Delete the project <testProjectId> on <ConfigFile.server>" {
+                $response = Remove-TSProject -ProjectId $script:testProjectId
+                $response | Should -BeOfType String
+                $script:testProjectId = $null
+            }
+            It "Create new project with samples on <ConfigFile.server>" -Skip {
+                $projectName = New-Guid
+                $response = New-TSProject -Name $projectName
+                $response.tsResponse.project.id | Should -BeOfType String
+                $script:testProjectId = $response.tsResponse.project.id
+                $response = Update-TSProject -ProjectId $script:testProjectId -Name $projectName -PublishSamples $True
             }
         }
     }

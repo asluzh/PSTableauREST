@@ -61,7 +61,7 @@ function Invoke-TSSignIn {
         [Parameter()][string] $Username,
         [Parameter()][securestring] $SecurePassword,
         [Parameter()][string] $PersonalAccessTokenName,
-        [Parameter()][string] $PersonalAccessTokenSecret,
+        [Parameter()][securestring] $PersonalAccessTokenSecret,
         [Parameter()][string] $Site = "",
         [Parameter()][boolean] $UseServerVersion = $True
     )
@@ -80,19 +80,20 @@ function Invoke-TSSignIn {
     $xml = New-Object System.Xml.XmlDocument
 
     if ($Username -and $SecurePassword) {
-        $Password = [System.Net.NetworkCredential]::new("", $SecurePassword).Password
+        $private:PlainPassword = [System.Net.NetworkCredential]::new("", $SecurePassword).Password
         $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
         $el_credentials = $tsRequest.AppendChild($xml.CreateElement("credentials"))
         $el_site = $el_credentials.AppendChild($xml.CreateElement("site"))
         $el_credentials.SetAttribute("name", $Username)
-        $el_credentials.SetAttribute("password", $Password)
+        $el_credentials.SetAttribute("password", $private:PlainPassword)
         $el_site.SetAttribute("contentUrl", $Site)
     } elseif ($PersonalAccessTokenName -and $PersonalAccessTokenSecret) {
+        $private:PlainSecret = [System.Net.NetworkCredential]::new("", $PersonalAccessTokenSecret).Password
         $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
         $el_credentials = $tsRequest.AppendChild($xml.CreateElement("credentials"))
         $el_site = $el_credentials.AppendChild($xml.CreateElement("site"))
         $el_credentials.SetAttribute("personalAccessTokenName", $PersonalAccessTokenName)
-        $el_credentials.SetAttribute("personalAccessTokenSecret", $PersonalAccessTokenSecret)
+        $el_credentials.SetAttribute("personalAccessTokenSecret", $private:PlainSecret)
         $el_site.SetAttribute("contentUrl", $Site)
     } else {
         Write-Error -Exception "Sign-in parameters not provided (username/password or PAT)."
@@ -148,105 +149,6 @@ function Invoke-TSSignOut {
             Write-Warning "Currently not signed in."
         }
         return $response
-    } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
-    }
-}
-
-function Get-TSProject {
-    [OutputType([PSCustomObject[]])]
-    Param(
-        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
-    )
-    try {
-        $PageSize = 100
-        $pageNumber = 0
-        do {
-            $pageNumber += 1
-            $uri = Get-TSRequestUri -Endpoint Project
-            $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-            $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
-            $totalAvailable = $response.tsResponse.pagination.totalAvailable
-            $response.tsResponse.projects.project
-        } until ($PageSize*$pageNumber -gt $totalAvailable)
-    } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
-    }
-}
-
-function New-TSProject {
-    [CmdletBinding(SupportsShouldProcess)]
-    Param(
-        [Parameter(Mandatory)][string] $Name,
-        [Parameter()][string] $Description,
-        [Parameter()][ValidateSet('ManagedByOwner','LockedToProject','LockedToProjectWithoutNested')][string] $ContentPermissions,
-        [Parameter()][string] $ParentProjectId
-        )
-    # generate xml request
-    $xml = New-Object System.Xml.XmlDocument
-    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
-    $el_project = $tsRequest.AppendChild($xml.CreateElement("project"))
-    $el_project.SetAttribute("name", $Name)
-    if ($Description) {
-        $el_project.SetAttribute("description", $Description)
-    }
-    if ($ContentPermissions) {
-        $el_project.SetAttribute("contentPermissions", $ContentPermissions)
-    }
-    if ($ParentProjectId) {
-        $el_project.SetAttribute("parentProjectId", $ParentProjectId)
-    }
-    try {
-        if ($PSCmdlet.ShouldProcess($Name)) {
-            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Project) -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
-        }
-    } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
-    }
-}
-
-function Update-TSProject {
-    [CmdletBinding(SupportsShouldProcess)]
-    Param(
-        [Parameter(Mandatory)][string] $ProjectId,
-        [Parameter()][string] $Name,
-        [Parameter()][string] $Description,
-        [Parameter()][ValidateSet('ManagedByOwner','LockedToProject','LockedToProjectWithoutNested')][string] $ContentPermissions,
-        [Parameter()][string] $ParentProjectId
-    )
-    $xml = New-Object System.Xml.XmlDocument
-    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
-    $el_project = $tsRequest.AppendChild($xml.CreateElement("project"))
-    if ($Name) {
-        $el_project.SetAttribute("name", $Name)
-    }
-    if ($Description) {
-        $el_project.SetAttribute("description", $Description)
-    }
-    if ($ContentPermissions) {
-        $el_project.SetAttribute("contentPermissions", $ContentPermissions)
-    }
-    if ($ParentProjectId) {
-        $el_project.SetAttribute("parentProjectId", $ParentProjectId)
-    }
-    try {
-        if ($PSCmdlet.ShouldProcess($ProjectId)) {
-            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Project -Param $ProjectId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
-        }
-    } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
-    }
-}
-
-function Remove-TSProject {
-    [CmdletBinding(SupportsShouldProcess)]
-    Param(
-        [Parameter(Mandatory)][string] $ProjectId
-    )
-    try {
-        if ($PSCmdlet.ShouldProcess($ProjectId)) {
-            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Project -Param $ProjectId) -Method Delete -Headers (Get-TSRequestHeaderDict)
-        }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
     }
@@ -364,17 +266,132 @@ function Remove-TSSite {
     }
 }
 
+function Get-TSProject {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+    )
+    try {
+        $PageSize = 100
+        $pageNumber = 0
+        do {
+            $pageNumber += 1
+            $uri = Get-TSRequestUri -Endpoint Project
+            $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+            $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+            $totalAvailable = $response.tsResponse.pagination.totalAvailable
+            $response.tsResponse.projects.project
+        } until ($PageSize*$pageNumber -gt $totalAvailable)
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function New-TSProject {
+    [CmdletBinding(SupportsShouldProcess)]
+    Param(
+        [Parameter(Mandatory)][string] $Name,
+        [Parameter()][string] $Description,
+        [Parameter()][ValidateSet('ManagedByOwner','LockedToProject','LockedToProjectWithoutNested')][string] $ContentPermissions,
+        [Parameter()][string] $ParentProjectId
+        )
+    # generate xml request
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_project = $tsRequest.AppendChild($xml.CreateElement("project"))
+    $el_project.SetAttribute("name", $Name)
+    if ($Description) {
+        $el_project.SetAttribute("description", $Description)
+    }
+    if ($ContentPermissions) {
+        $el_project.SetAttribute("contentPermissions", $ContentPermissions)
+    }
+    if ($ParentProjectId) {
+        $el_project.SetAttribute("parentProjectId", $ParentProjectId)
+    }
+    try {
+        if ($PSCmdlet.ShouldProcess($Name)) {
+            $uri = Get-TSRequestUri -Endpoint Project -Param $ProjectId
+            # FIXME POST request with this uri returns 400 Bad RequestDeserialization problem: Content is not allowed in prolog.
+            # if ($PublishSamples) {
+            #     $uri += "?publishSamples=true"
+            # }
+            Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+        }
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function Update-TSProject {
+    [CmdletBinding(SupportsShouldProcess)]
+    Param(
+        [Parameter(Mandatory)][string] $ProjectId,
+        [Parameter()][string] $Name,
+        [Parameter()][string] $Description,
+        [Parameter()][ValidateSet('ManagedByOwner','LockedToProject','LockedToProjectWithoutNested')][string] $ContentPermissions,
+        [Parameter()][string] $ParentProjectId,
+        [Parameter()][boolean] $PublishSamples
+    )
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_project = $tsRequest.AppendChild($xml.CreateElement("project"))
+    if ($Name) {
+        $el_project.SetAttribute("name", $Name)
+    }
+    if ($Description) {
+        $el_project.SetAttribute("description", $Description)
+    }
+    if ($ContentPermissions) {
+        $el_project.SetAttribute("contentPermissions", $ContentPermissions)
+    }
+    if ($ParentProjectId) {
+        $el_project.SetAttribute("parentProjectId", $ParentProjectId)
+    }
+    try {
+        if ($PSCmdlet.ShouldProcess($ProjectId)) {
+            $uri = Get-TSRequestUri -Endpoint Project -Param $ProjectId
+            if ($PublishSamples) {
+                $uri += "?publishSamples=true"
+            }
+            Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+        }
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function Remove-TSProject {
+    [CmdletBinding(SupportsShouldProcess)]
+    Param(
+        [Parameter(Mandatory)][string] $ProjectId
+    )
+    try {
+        if ($PSCmdlet.ShouldProcess($ProjectId)) {
+            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Project -Param $ProjectId) -Method Delete -Headers (Get-TSRequestHeaderDict)
+        }
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
 Export-ModuleMember -Function Get-TSServerInfo
 Export-ModuleMember -Function Invoke-TSSignIn
 Export-ModuleMember -Function Invoke-TSSignOut
 Export-ModuleMember -Function Invoke-TSSwitchSite
 
-Export-ModuleMember -Function Get-TSProject
-Export-ModuleMember -Function New-TSProject
-Export-ModuleMember -Function Update-TSProject
-Export-ModuleMember -Function Remove-TSProject
-
 Export-ModuleMember -Function Get-TSSite
 Export-ModuleMember -Function New-TSSite
 Export-ModuleMember -Function Update-TSSite
 Export-ModuleMember -Function Remove-TSSite
+# other Site methods:
+# Get Data Acceleration Report for a Site
+# Get Embedding Settings for a Site
+# Get Recently Viewed for Site
+# Query Views for Site
+# Update Embedding Settings for Site
+
+Export-ModuleMember -Function Get-TSProject
+Export-ModuleMember -Function New-TSProject
+Export-ModuleMember -Function Update-TSProject
+Export-ModuleMember -Function Remove-TSProject
