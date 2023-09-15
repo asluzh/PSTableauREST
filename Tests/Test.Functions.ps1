@@ -1,9 +1,9 @@
 function Test-GetSecurePassword {
-    [OutputType([SecureString])]
+    [OutputType([securestring])]
     Param
     (
-        [Parameter(Mandatory = $true)][String]$Namespace,
-        [Parameter(Mandatory = $true)][String]$Username
+        [Parameter(Mandatory)][string]$Namespace,
+        [Parameter(Mandatory)][string]$Username
     )
     $securePw = Get-Secret -Name "$Namespace|$Username" -Vault KeyChain -ErrorAction Ignore
     if (!$securePw) {

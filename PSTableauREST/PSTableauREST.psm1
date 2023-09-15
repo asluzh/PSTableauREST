@@ -1,5 +1,6 @@
 # Module variables
 $TSRestApiVersion = '2.4' # minimum supported version
+$TSRestApiMinVersion = '2.4' # supported version for initial sign-in calls
 #$TSRestApiChunkSize = 2097152	   ## 2MB or 2048KB
 
 function Get-TSServerInfo {
@@ -11,7 +12,7 @@ function Get-TSServerInfo {
         if ($ServerUrl) {
             $script:TSServerUrl = $ServerUrl
         }
-        return Invoke-RestMethod -Uri $script:TSServerUrl/api/$script:TSRestApiVersion/serverinfo -Method Get
+        return Invoke-RestMethod -Uri $script:TSServerUrl/api/$script:TSRestApiMinVersion/serverinfo -Method Get
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
     }
@@ -35,7 +36,7 @@ function Get-TSRequestHeaderDict {
 
 function Get-TSRequestUri {
     Param(
-        [Parameter(Mandatory)][validateset('Auth','Project')][string] $Endpoint,
+        [Parameter(Mandatory)][ValidateSet('Auth','Site','Project')][string] $Endpoint,
         [Parameter()][string] $Param
     )
     $Uri = "$script:TSServerUrl/api/$script:TSRestApiVersion/"
@@ -67,13 +68,13 @@ function Invoke-TSSignIn {
 
     $script:TSServerUrl = $ServerUrl
     $response = Get-TSServerInfo
+    $script:TSProductVersion = $response.tsResponse.serverInfo.productVersion.InnerText
+    $script:TSProductVersionBuild = $response.tsResponse.serverInfo.productVersion.build
+    # $response.tsResponse.serverInfo.prepConductorVersion
     if ($UseServerVersion) {
         $script:TSRestApiVersion = $response.tsResponse.serverInfo.restApiVersion
-        $script:TSProductVersion = $response.tsResponse.serverInfo.productVersion.InnerText
-        $script:TSProductVersionBuild = $response.tsResponse.serverInfo.productVersion.build
-    # $response.tsResponse.serverInfo.productVersion.build
-    # $response.tsResponse.serverInfo.productVersion.#text
-    # $response.tsResponse.serverInfo.prepConductorVersion
+    } else {
+        $script:TSRestApiVersion = $script:TSRestApiMinVersion
     }
 
     $xml = New-Object System.Xml.XmlDocument
@@ -113,7 +114,7 @@ function Invoke-TSSignIn {
 function Invoke-TSSwitchSite {
     [OutputType([PSCustomObject])]
     Param(
-        [Parameter(Mandatory)][string] $Site
+        [Parameter()][string] $Site = ""
     )
     # generate xml request
     $xml = New-Object System.Xml.XmlDocument
@@ -166,7 +167,7 @@ function Get-TSProject {
             $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
             $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
-            $response.tsResponse.Projects.project
+            $response.tsResponse.projects.project
         } until ($PageSize*$pageNumber -gt $totalAvailable)
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -254,19 +255,26 @@ function Remove-TSProject {
 function Get-TSSite {
     [OutputType([PSCustomObject[]])]
     Param(
+        [Parameter()][switch] $Current,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
     try {
-        $PageSize = 100
-        $pageNumber = 0
-        do {
-            $pageNumber += 1
-            $uri = Get-TSRequestUri -Endpoint Site
-            $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+        if ($Current) { # get single (current) site
+            $uri = Get-TSRequestUri -Endpoint Site -Param $script:TSSiteId
             $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
-            $totalAvailable = $response.tsResponse.pagination.totalAvailable
-            $response.tsResponse.Sites.site
-        } until ($PageSize*$pageNumber -gt $totalAvailable)
+            return $response.tsResponse.site
+        } else { # get all sites
+            $PageSize = 100
+            $pageNumber = 0
+            do {
+                $pageNumber += 1
+                $uri = Get-TSRequestUri -Endpoint Site
+                $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+                $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+                $totalAvailable = $response.tsResponse.pagination.totalAvailable
+                $response.tsResponse.sites.site
+            } until ($PageSize*$pageNumber -gt $totalAvailable)
+        }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
     }
@@ -289,6 +297,9 @@ function New-TSSite {
         # sheetImageEnabled, catalogingEnabled, derivedPermissionsEnabled, userVisibilityMode, useDefaultTimeZone, timeZone
         # autoSuspendRefreshEnabled, autoSuspendRefreshInactivityWindow
     )
+    if ($SiteParams.Keys -contains 'adminMode' -and $SiteParams.Keys -contains 'userQuota' -and $SiteParams["adminMode"] -eq "ContentOnly") {
+        Write-Error -Exception "You cannot set admin_mode to ContentOnly and also set a user quota."
+    }
     # generate xml request
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -313,6 +324,9 @@ function Update-TSSite {
         [Parameter(Mandatory)][string] $SiteId,
         [Parameter()][hashtable] $SiteParams
     )
+    if ($SiteParams.Keys -contains 'adminMode' -and $SiteParams.Keys -contains 'userQuota' -and $SiteParams["adminMode"] -eq "ContentOnly") {
+        Write-Error -Exception "You cannot set admin_mode to ContentOnly and also set a user quota."
+    }
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_site = $tsRequest.AppendChild($xml.CreateElement("site"))
@@ -339,11 +353,11 @@ function Remove-TSSite {
     )
     try {
         if ($PSCmdlet.ShouldProcess($SiteId)) {
-            if ($SiteId -eq $script:TSSiteId) {
+            # if ($SiteId -eq $script:TSSiteId) {
                 Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Site -Param $SiteId) -Method Delete -Headers (Get-TSRequestHeaderDict)
-            } else {
-                Write-Error -Exception "You can only remove the site for which you are currently authenticated."
-            }
+            # } else {
+            #     Write-Error -Exception "You can only remove the site for which you are currently authenticated."
+            # }
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
