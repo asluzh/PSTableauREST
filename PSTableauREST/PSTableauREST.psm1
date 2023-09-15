@@ -41,6 +41,10 @@ function Get-TSRequestUri {
     $Uri = "$script:TSServerUrl/api/$script:TSRestApiVersion/"
     switch($Endpoint) {
         "Auth" { $Uri += "auth/$Param" }
+        "Site" {
+            $Uri += "sites"
+            if ($Param) { $Uri += "/$Param" }
+        }
         "Project" {
             $Uri += "sites/$script:TSSiteId/projects"
             if ($Param) { $Uri += "/$Param" }
@@ -192,9 +196,8 @@ function New-TSProject {
         $el_project.SetAttribute("parentProjectId", $ParentProjectId)
     }
     try {
-        if ($PSCmdlet.ShouldProcess($Name)){
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Project) -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
-            return $response
+        if ($PSCmdlet.ShouldProcess($Name)) {
+            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Project) -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -226,9 +229,8 @@ function Update-TSProject {
         $el_project.SetAttribute("parentProjectId", $ParentProjectId)
     }
     try {
-        if ($PSCmdlet.ShouldProcess($ProjectId)){
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Project -Param $ProjectId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
-            return $response
+        if ($PSCmdlet.ShouldProcess($ProjectId)) {
+            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Project -Param $ProjectId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -241,9 +243,107 @@ function Remove-TSProject {
         [Parameter(Mandatory)][string] $ProjectId
     )
     try {
-        if ($PSCmdlet.ShouldProcess($ProjectId)){
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Project -Param $ProjectId) -Method Delete -Headers (Get-TSRequestHeaderDict)
-            return $response
+        if ($PSCmdlet.ShouldProcess($ProjectId)) {
+            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Project -Param $ProjectId) -Method Delete -Headers (Get-TSRequestHeaderDict)
+        }
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function Get-TSSite {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+    )
+    try {
+        $PageSize = 100
+        $pageNumber = 0
+        do {
+            $pageNumber += 1
+            $uri = Get-TSRequestUri -Endpoint Site
+            $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+            $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+            $totalAvailable = $response.tsResponse.pagination.totalAvailable
+            $response.tsResponse.Sites.site
+        } until ($PageSize*$pageNumber -gt $totalAvailable)
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function New-TSSite {
+    [CmdletBinding(SupportsShouldProcess)]
+    Param(
+        [Parameter(Mandatory)][string] $Name,
+        [Parameter(Mandatory)][string] $ContentUrl,
+        [Parameter()][hashtable] $SiteParams
+        # supported params: adminMode, userQuota, storageQuota, disableSubscriptions, subscribeOthersEnabled
+        # revisionLimit, dataAccelerationMode
+        # set_versioned_flow_attributes(flows_all, flows_edit, flows_schedule, parent_srv, site_element, site_item)
+        # allowSubscriptionAttachments, guestAccessEnabled, cacheWarmupEnabled, commentingEnabled, revisionHistoryEnabled
+        # extractEncryptionMode, requestAccessEnabled, runNowEnabled, tierCreatorCapacity, tierExplorerCapacity, tierViewerCapacity
+        # dataAlertsEnabled, commentingMentionsEnabled, catalogObfuscationEnabled, flowAutoSaveEnabled, webExtractionEnabled
+        # metricsContentTypeEnabled, notifySiteAdminsOnThrottle, authoringEnabled, customSubscriptionEmailEnabled, customSubscriptionEmail
+        # customSubscriptionFooterEnabled, customSubscriptionFooter, askDataMode, namedSharingEnabled, mobileBiometricsEnabled
+        # sheetImageEnabled, catalogingEnabled, derivedPermissionsEnabled, userVisibilityMode, useDefaultTimeZone, timeZone
+        # autoSuspendRefreshEnabled, autoSuspendRefreshInactivityWindow
+    )
+    # generate xml request
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_site = $tsRequest.AppendChild($xml.CreateElement("site"))
+    $el_site.SetAttribute("name", $Name)
+    $el_site.SetAttribute("contentUrl", $ContentUrl)
+    foreach ($param in $SiteParams.Keys) {
+        $el_site.SetAttribute($param, $SiteParams[$param])
+    }
+    try {
+        if ($PSCmdlet.ShouldProcess($Name)) {
+            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Site) -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+        }
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function Update-TSSite {
+    [CmdletBinding(SupportsShouldProcess)]
+    Param(
+        [Parameter(Mandatory)][string] $SiteId,
+        [Parameter()][hashtable] $SiteParams
+    )
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_site = $tsRequest.AppendChild($xml.CreateElement("site"))
+    foreach ($param in $SiteParams.Keys) {
+        $el_site.SetAttribute($param, $SiteParams[$param])
+    }
+    try {
+        if ($PSCmdlet.ShouldProcess($SiteId)) {
+            if ($SiteId -eq $script:TSSiteId) {
+                Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Site -Param $SiteId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            } else {
+                Write-Error -Exception "You can only update the site for which you are currently authenticated."
+            }
+        }
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function Remove-TSSite {
+    [CmdletBinding(SupportsShouldProcess)]
+    Param(
+        [Parameter(Mandatory)][string] $SiteId
+    )
+    try {
+        if ($PSCmdlet.ShouldProcess($SiteId)) {
+            if ($SiteId -eq $script:TSSiteId) {
+                Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Site -Param $SiteId) -Method Delete -Headers (Get-TSRequestHeaderDict)
+            } else {
+                Write-Error -Exception "You can only remove the site for which you are currently authenticated."
+            }
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -259,3 +359,8 @@ Export-ModuleMember -Function Get-TSProject
 Export-ModuleMember -Function New-TSProject
 Export-ModuleMember -Function Update-TSProject
 Export-ModuleMember -Function Remove-TSProject
+
+Export-ModuleMember -Function Get-TSSite
+Export-ModuleMember -Function New-TSSite
+Export-ModuleMember -Function Update-TSSite
+Export-ModuleMember -Function Remove-TSSite
