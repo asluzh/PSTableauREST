@@ -12,7 +12,9 @@ BeforeAll {
 Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFiles {
     BeforeAll {
         $script:ConfigFile = Get-Content $_ | ConvertFrom-Json
-        $ConfigFile | Add-Member -MemberType NoteProperty -Name "secure_password" -Value (Test-GetSecurePassword -Namespace $ConfigFile.server -Username $ConfigFile.username)
+        if ($ConfigFile.username) {
+            $ConfigFile | Add-Member -MemberType NoteProperty -Name "secure_password" -Value (Test-GetSecurePassword -Namespace $ConfigFile.server -Username $ConfigFile.username)
+        }
         if ($ConfigFile.pat_name) {
             $ConfigFile | Add-Member -MemberType NoteProperty -Name "pat_secret" -Value (Test-GetSecurePassword -Namespace $ConfigFile.server -Username $ConfigFile.pat_name)
         }
@@ -39,6 +41,15 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             $response = Invoke-TSSignOut
             $response | Should -BeOfType "String"
         }
+        It "Impersonate user sign-in for <ConfigFile.server>" {
+            if (-not $ConfigFile.impersonate_user_id) {
+                Set-ItResult -Skipped
+            }
+            $response = Invoke-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password -ImpersonateUserId $ConfigFile.impersonate_user_id
+            $response.tsResponse.credentials.user.id | Should -Be $ConfigFile.impersonate_user_id
+            $response = Invoke-TSSignOut
+            $response | Should -BeOfType "String"
+        }
     }
     Context "Content operations" -Tag Content {
         BeforeAll {
@@ -53,7 +64,13 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             if ($script:testProjectId) {
                 Remove-TSProject -ProjectId $testProjectId
             }
-            if ($script:testSiteId -and $script:testSite) {
+            if ($script:testUserId) {
+                Remove-TSUser -ProjectId $testUserId
+            }
+            if ($script:testGroupId) {
+                Remove-TSGroup -ProjectId $testGroupId
+            }
+            if ($script:testSiteId -and $script:testSite) { # Note: this should be the last cleanup step (session is killed by removing the site)
                 Invoke-TSSwitchSite -Site $testSite
                 Remove-TSSite -SiteId $testSiteId
             }
@@ -147,11 +164,12 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 $script:testProjectId = $null
             }
             It "Create new project with samples on <ConfigFile.server>" -Skip {
-                $projectName = New-Guid
-                $response = New-TSProject -Name $projectName
+                $projectNameSamples = New-Guid
+                $response = New-TSProject -Name $projectNameSamples # TODO -PublishSamples $True
                 $response.tsResponse.project.id | Should -BeOfType String
                 $script:testProjectId = $response.tsResponse.project.id
-                $response = Update-TSProject -ProjectId $script:testProjectId -Name $projectName -PublishSamples $True
+                $response = Update-TSProject -ProjectId $script:testProjectId -Name $projectNameSamples -PublishSamples $True
+                $response.tsResponse.project.id | Should -BeOfType String
             }
         }
     }
