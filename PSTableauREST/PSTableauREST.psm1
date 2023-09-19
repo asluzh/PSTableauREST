@@ -288,15 +288,20 @@ function Update-TSSite {
 function Remove-TSSite {
     [CmdletBinding(SupportsShouldProcess)]
     Param(
-        [Parameter(Mandatory)][string] $SiteId
+        [Parameter(Mandatory)][string] $SiteId,
+        [Parameter()][switch] $BackgroundTask
     )
     try {
         if ($PSCmdlet.ShouldProcess($SiteId)) {
-            # if ($SiteId -eq $script:TSSiteId) {
-                Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Site -Param $SiteId) -Method Delete -Headers (Get-TSRequestHeaderDict)
-            # } else {
-            #     Write-Error -Exception "You can only remove the site for which you are currently authenticated."
-            # }
+            if ($SiteId -eq $script:TSSiteId) {
+                $uri = Get-TSRequestUri -Endpoint Site -Param $SiteId
+                if ($BackgroundTask) { # TODO check $script:TSRestApiVersion >= 3.18
+                    $uri += "?asJob=true"
+                }
+                Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
+            } else {
+                Write-Error -Exception "You can only remove the site for which you are currently authenticated."
+            }
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -544,7 +549,8 @@ function New-TSGroup {
         [Parameter(Mandatory)][string] $Name,
         [Parameter()][ValidateSet('Creator','Explorer','ExplorerCanPublish','SiteAdministratorExplorer','SiteAdministratorCreator','Viewer','Unlicensed')][string] $MinimumSiteRole,
         [Parameter()][string] $DomainName,
-        [Parameter()][ValidateSet('onLogin','onSync')][string] $GrantLicenseMode
+        [Parameter()][ValidateSet('onLogin','onSync')][string] $GrantLicenseMode,
+        [Parameter()][switch] $BackgroundTask
     )
     # generate xml request
     $xml = New-Object System.Xml.XmlDocument
@@ -567,6 +573,9 @@ function New-TSGroup {
     try {
         if ($PSCmdlet.ShouldProcess($Name)) {
             $uri = Get-TSRequestUri -Endpoint Group
+            if ($BackgroundTask) {
+                $uri += "?asJob=true"
+            }
             Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
         }
     } catch {
@@ -581,7 +590,8 @@ function Update-TSGroup {
         [Parameter()][string] $Name,
         [Parameter()][ValidateSet('Creator','Explorer','ExplorerCanPublish','SiteAdministratorExplorer','SiteAdministratorCreator','Viewer','Unlicensed')][string] $MinimumSiteRole,
         [Parameter()][string] $DomainName,
-        [Parameter()][ValidateSet('onLogin','onSync')][string] $GrantLicenseMode
+        [Parameter()][ValidateSet('onLogin','onSync')][string] $GrantLicenseMode,
+        [Parameter()][switch] $BackgroundTask
     )
     # generate xml request
     $xml = New-Object System.Xml.XmlDocument
@@ -604,6 +614,9 @@ function Update-TSGroup {
     try {
         if ($PSCmdlet.ShouldProcess($UserId)) {
             $uri = Get-TSRequestUri -Endpoint Group -Param $GroupId
+            if ($BackgroundTask) {
+                $uri += "?asJob=true"
+            }
             Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
         }
     } catch {

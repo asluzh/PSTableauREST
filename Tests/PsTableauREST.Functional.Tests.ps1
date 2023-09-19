@@ -139,6 +139,23 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     }
                 }
             }
+            It "Delete the site <testSite> on <ConfigFile.server> asynchronously" {
+                if ($ConfigFile.test_site_name) {
+                    $tempSiteName = New-Guid # get UUID for site name and content URL
+                    $response = New-TSSite -Name $tempSiteName -ContentUrl $tempSiteName
+                    $response.tsResponse.site.id | Should -BeOfType String
+                    $tempSiteId = $response.tsResponse.site.id
+                    {Invoke-TSSwitchSite -Site $tempSiteName} | Should -Not -Throw
+                    $response = Remove-TSSite -SiteId $tempSiteId -BackgroundTask
+                    $response | Should -BeOfType String
+                    # because we've just deleted the current site, we need to sign-in again
+                    if ($ConfigFile.pat_name) {
+                        Invoke-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
+                    } else {
+                        Invoke-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
+                    }
+                }
+            }
         }
         Context "Project operations" -Tag Project {
             It "Create new project on <ConfigFile.server>" {
