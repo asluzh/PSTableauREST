@@ -1,3 +1,31 @@
+# Legacy code
+# [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+# $Source = @"
+# using System.Net;
+# public class ExtendedWebClient : WebClient
+# {
+# public int Timeout;
+# public bool KeepAlive;
+# protected override WebRequest GetWebRequest(System.Uri address)
+# {
+# HttpWebRequest request = (HttpWebRequest)base.GetWebRequest(address);
+# if (request != null)
+# {
+# request.Timeout = Timeout;
+# request.KeepAlive = KeepAlive;
+# request.Proxy = null;
+# }
+# return request;
+# }
+# public ExtendedWebClient()
+# {
+# Timeout = 600000; // Timeout value by default
+# KeepAlive = false;
+# }
+# }
+# "@;
+# Add-Type -TypeDefinition $Source -Language CSharp
+
 # Module variables
 $TSRestApiVersion = '2.4' # minimum supported version
 $TSRestApiMinVersion = '2.4' # supported version for initial sign-in calls
@@ -36,7 +64,7 @@ function Get-TSRequestHeaderDict {
 
 function Get-TSRequestUri {
     Param(
-        [Parameter(Mandatory)][ValidateSet('Auth','Site','Project')][string] $Endpoint,
+        [Parameter(Mandatory)][ValidateSet('Auth','Site','Project','User','Group')][string] $Endpoint,
         [Parameter()][string] $Param
     )
     $Uri = "$script:TSServerUrl/api/$script:TSRestApiVersion/"
@@ -48,6 +76,14 @@ function Get-TSRequestUri {
         }
         "Project" {
             $Uri += "sites/$script:TSSiteId/projects"
+            if ($Param) { $Uri += "/$Param" }
+        }
+        "User" {
+            $Uri += "sites/$script:TSSiteId/users"
+            if ($Param) { $Uri += "/$Param" }
+        }
+        "Group" {
+            $Uri += "sites/$script:TSSiteId/groups"
             if ($Param) { $Uri += "/$Param" }
         }
     }
@@ -63,6 +99,7 @@ function Invoke-TSSignIn {
         [Parameter()][string] $PersonalAccessTokenName,
         [Parameter()][securestring] $PersonalAccessTokenSecret,
         [Parameter()][string] $Site = "",
+        [Parameter()][string] $ImpersonateUserId,
         [Parameter()][boolean] $UseServerVersion = $True
     )
 
@@ -79,22 +116,22 @@ function Invoke-TSSignIn {
 
     $xml = New-Object System.Xml.XmlDocument
 
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_credentials = $tsRequest.AppendChild($xml.CreateElement("credentials"))
+    $el_site = $el_credentials.AppendChild($xml.CreateElement("site"))
+    $el_site.SetAttribute("contentUrl", $Site)
+    if ($ImpersonateUserId) {
+        $el_user = $el_credentials.AppendChild($xml.CreateElement("user"))
+        $el_user.SetAttribute("id", $ImpersonateUserId)
+    }
     if ($Username -and $SecurePassword) {
         $private:PlainPassword = [System.Net.NetworkCredential]::new("", $SecurePassword).Password
-        $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
-        $el_credentials = $tsRequest.AppendChild($xml.CreateElement("credentials"))
-        $el_site = $el_credentials.AppendChild($xml.CreateElement("site"))
         $el_credentials.SetAttribute("name", $Username)
         $el_credentials.SetAttribute("password", $private:PlainPassword)
-        $el_site.SetAttribute("contentUrl", $Site)
     } elseif ($PersonalAccessTokenName -and $PersonalAccessTokenSecret) {
         $private:PlainSecret = [System.Net.NetworkCredential]::new("", $PersonalAccessTokenSecret).Password
-        $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
-        $el_credentials = $tsRequest.AppendChild($xml.CreateElement("credentials"))
-        $el_site = $el_credentials.AppendChild($xml.CreateElement("site"))
         $el_credentials.SetAttribute("personalAccessTokenName", $PersonalAccessTokenName)
         $el_credentials.SetAttribute("personalAccessTokenSecret", $private:PlainSecret)
-        $el_site.SetAttribute("contentUrl", $Site)
     } else {
         Write-Error -Exception "Sign-in parameters not provided (username/password or PAT)."
         return $null
@@ -293,8 +330,9 @@ function New-TSProject {
         [Parameter(Mandatory)][string] $Name,
         [Parameter()][string] $Description,
         [Parameter()][ValidateSet('ManagedByOwner','LockedToProject','LockedToProjectWithoutNested')][string] $ContentPermissions,
-        [Parameter()][string] $ParentProjectId
-        )
+        [Parameter()][string] $ParentProjectId,
+        [Parameter()][boolean] $PublishSamples
+    )
     # generate xml request
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -311,7 +349,7 @@ function New-TSProject {
     }
     try {
         if ($PSCmdlet.ShouldProcess($Name)) {
-            $uri = Get-TSRequestUri -Endpoint Project -Param $ProjectId
+            $uri = Get-TSRequestUri -Endpoint Project # -Param $ProjectId
             # FIXME POST request with this uri returns 400 Bad RequestDeserialization problem: Content is not allowed in prolog.
             # if ($PublishSamples) {
             #     $uri += "?publishSamples=true"
@@ -375,6 +413,218 @@ function Remove-TSProject {
     }
 }
 
+function Get-TSUser {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+    )
+    try {
+        $PageSize = 100
+        $pageNumber = 0
+        do {
+            $pageNumber += 1
+            $uri = Get-TSRequestUri -Endpoint User
+            $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+            $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+            $totalAvailable = $response.tsResponse.pagination.totalAvailable
+            $response.tsResponse.users.user
+        } until ($PageSize*$pageNumber -gt $totalAvailable)
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function New-TSUser {
+    [CmdletBinding(SupportsShouldProcess)]
+    Param(
+        [Parameter(Mandatory)][string] $Name,
+        [Parameter(Mandatory)][ValidateSet('Creator','Explorer','ExplorerCanPublish','SiteAdministratorExplorer','SiteAdministratorCreator','Viewer','Unlicensed')][string] $SiteRole,
+        [Parameter()][string] $AuthSetting
+        )
+    # generate xml request
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_user = $tsRequest.AppendChild($xml.CreateElement("user"))
+    $el_user.SetAttribute("name", $Name)
+    $el_user.SetAttribute("siteRole", $SiteRole)
+    if ($AuthSetting) {
+        $el_user.SetAttribute("authSetting", $AuthSetting)
+    }
+    try {
+        if ($PSCmdlet.ShouldProcess($Name)) {
+            $uri = Get-TSRequestUri -Endpoint User
+            Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+        }
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function Update-TSUser {
+    [CmdletBinding(SupportsShouldProcess)]
+    Param(
+        [Parameter(Mandatory)][string] $UserId,
+        [Parameter()][string] $FullName,
+        [Parameter()][string] $Email,
+        [Parameter()][securestring] $SecurePassword,
+        [Parameter()][ValidateSet('Creator','Explorer','ExplorerCanPublish','ServerAdministrator','SiteAdministratorExplorer','SiteAdministratorCreator','Viewer','Unlicensed')][string] $SiteRole,
+        [Parameter()][string] $AuthSetting
+    )
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_user = $tsRequest.AppendChild($xml.CreateElement("user"))
+    if ($FullName) {
+        $el_user.SetAttribute("fullName", $FullName)
+    }
+    if ($Email) {
+        $el_user.SetAttribute("email", $Email)
+    }
+    if ($SecurePassword) {
+        $private:PlainPassword = [System.Net.NetworkCredential]::new("", $SecurePassword).Password
+        $el_user.SetAttribute("password", $private:PlainPassword)
+    }
+    if ($SiteRole) {
+        $el_user.SetAttribute("siteRole", $SiteRole)
+    }
+    if ($AuthSetting) {
+        $el_user.SetAttribute("authSetting", $AuthSetting)
+    }
+    try {
+        if ($PSCmdlet.ShouldProcess($UserId)) {
+            $uri = Get-TSRequestUri -Endpoint User -Param $UserId
+            Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+        }
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function Remove-TSUser {
+    [CmdletBinding(SupportsShouldProcess)]
+    Param(
+        [Parameter(Mandatory)][string] $UserId,
+        [Parameter()][string] $MapAssetsToUserId
+    )
+    try {
+        if ($PSCmdlet.ShouldProcess($UserId)) {
+            if ($PublishSMapAssetsToUserIdamples) {
+                $uri += "?mapAssetsTo=$PublishSMapAssetsToUserIdamples"
+            }
+            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint User -Param $UserId) -Method Delete -Headers (Get-TSRequestHeaderDict)
+        }
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function Get-TSGroup {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+    )
+    try {
+        $PageSize = 100
+        $pageNumber = 0
+        do {
+            $pageNumber += 1
+            $uri = Get-TSRequestUri -Endpoint Group
+            $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+            $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+            $totalAvailable = $response.tsResponse.pagination.totalAvailable
+            $response.tsResponse.groups.group
+        } until ($PageSize*$pageNumber -gt $totalAvailable)
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function New-TSGroup {
+    [CmdletBinding(SupportsShouldProcess)]
+    Param(
+        [Parameter(Mandatory)][string] $Name,
+        [Parameter()][ValidateSet('Creator','Explorer','ExplorerCanPublish','SiteAdministratorExplorer','SiteAdministratorCreator','Viewer','Unlicensed')][string] $MinimumSiteRole,
+        [Parameter()][string] $DomainName,
+        [Parameter()][ValidateSet('onLogin','onSync')][string] $GrantLicenseMode
+    )
+    # generate xml request
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_group = $tsRequest.AppendChild($xml.CreateElement("group"))
+    $el_group.SetAttribute("name", $Name)
+    if ($DomainName) { # Importing a group from Active Directory
+        $el_import = $el_group.AppendChild($xml.CreateElement("import"))
+        $el_import.SetAttribute("source", "ActiveDirectory")
+        $el_import.SetAttribute("domainName", $DomainName)
+        if ($GrantLicenseMode) {
+            $el_import.SetAttribute("grantLicenseMode", $GrantLicenseMode)
+            $el_import.SetAttribute("siteRole", $MinimumSiteRole)
+        }
+    } else { # Creating a local group
+        if ($MinimumSiteRole) {
+            $el_group.SetAttribute("minimumSiteRole", $MinimumSiteRole)
+        }
+    }
+    try {
+        if ($PSCmdlet.ShouldProcess($Name)) {
+            $uri = Get-TSRequestUri -Endpoint Group
+            Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+        }
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function Update-TSGroup {
+    [CmdletBinding(SupportsShouldProcess)]
+    Param(
+        [Parameter(Mandatory)][string] $GroupId,
+        [Parameter()][string] $Name,
+        [Parameter()][ValidateSet('Creator','Explorer','ExplorerCanPublish','SiteAdministratorExplorer','SiteAdministratorCreator','Viewer','Unlicensed')][string] $MinimumSiteRole,
+        [Parameter()][string] $DomainName,
+        [Parameter()][ValidateSet('onLogin','onSync')][string] $GrantLicenseMode
+    )
+    # generate xml request
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_group = $tsRequest.AppendChild($xml.CreateElement("group"))
+    $el_group.SetAttribute("name", $Name)
+    if ($DomainName) { # Importing a group from Active Directory
+        $el_import = $el_group.AppendChild($xml.CreateElement("import"))
+        $el_import.SetAttribute("source", "ActiveDirectory")
+        $el_import.SetAttribute("domainName", $DomainName)
+        if ($GrantLicenseMode) {
+            $el_import.SetAttribute("grantLicenseMode", $GrantLicenseMode)
+            $el_import.SetAttribute("siteRole", $MinimumSiteRole)
+        }
+    } else { # Creating a local group
+        if ($MinimumSiteRole) {
+            $el_group.SetAttribute("minimumSiteRole", $MinimumSiteRole)
+        }
+    }
+    try {
+        if ($PSCmdlet.ShouldProcess($UserId)) {
+            $uri = Get-TSRequestUri -Endpoint Group -Param $GroupId
+            Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+        }
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function Remove-TSGroup {
+    [CmdletBinding(SupportsShouldProcess)]
+    Param(
+        [Parameter(Mandatory)][string] $GroupId
+    )
+    try {
+        if ($PSCmdlet.ShouldProcess($GroupId)) {
+            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Group -Param $GroupId) -Method Delete -Headers (Get-TSRequestHeaderDict)
+        }
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
 Export-ModuleMember -Function Get-TSServerInfo
 Export-ModuleMember -Function Invoke-TSSignIn
 Export-ModuleMember -Function Invoke-TSSignOut
@@ -384,7 +634,6 @@ Export-ModuleMember -Function Get-TSSite
 Export-ModuleMember -Function New-TSSite
 Export-ModuleMember -Function Update-TSSite
 Export-ModuleMember -Function Remove-TSSite
-# other Site methods:
 # Get Data Acceleration Report for a Site
 # Get Embedding Settings for a Site
 # Get Recently Viewed for Site
@@ -395,3 +644,22 @@ Export-ModuleMember -Function Get-TSProject
 Export-ModuleMember -Function New-TSProject
 Export-ModuleMember -Function Update-TSProject
 Export-ModuleMember -Function Remove-TSProject
+
+Export-ModuleMember -Function Get-TSUser
+Export-ModuleMember -Function New-TSUser
+Export-ModuleMember -Function Update-TSUser
+Export-ModuleMember -Function Remove-TSUser
+Export-ModuleMember -Function Get-TSGroup
+Export-ModuleMember -Function New-TSGroup
+Export-ModuleMember -Function Update-TSGroup
+Export-ModuleMember -Function Remove-TSGroup
+# Add User to Group
+# Add User to Site
+# Import Users to Site from CSV
+# Delete Users from Site with CSV
+# Get Groups for a User
+# Get Users in Group
+# Get Users on Site
+# Query User On Site
+# Remove User from Site
+# Remove User from Group
