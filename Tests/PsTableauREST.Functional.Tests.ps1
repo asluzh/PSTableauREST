@@ -62,22 +62,22 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
         }
         AfterAll {
             if ($script:testProjectId) {
-                Remove-TSProject -ProjectId $testProjectId
+                Remove-TSProject -ProjectId $script:testProjectId
             }
             if ($script:testUserId) {
-                Remove-TSUser -ProjectId $testUserId
+                Remove-TSUser -UserId $script:testUserId
             }
             if ($script:testGroupId) {
-                Remove-TSGroup -ProjectId $testGroupId
+                Remove-TSGroup -GroupId $script:testGroupId
             }
             if ($script:testSiteId -and $script:testSite) { # Note: this should be the last cleanup step (session is killed by removing the site)
-                Invoke-TSSwitchSite -Site $testSite
-                Remove-TSSite -SiteId $testSiteId
+                Invoke-TSSwitchSite -Site $script:testSite
+                Remove-TSSite -SiteId $script:testSiteId
             }
             Invoke-TSSignOut
         }
         Context "Site operations" -Tag Site {
-            It "Create a new site on <ConfigFile.server>" {
+            It "Create new site on <ConfigFile.server>" {
                 if ($ConfigFile.test_site_name) {
                     $response = New-TSSite -Name $ConfigFile.test_site_name -ContentUrl $ConfigFile.test_site_contenturl -SiteParams @{
                         adminMode = "ContentOnly"
@@ -89,7 +89,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $script:testSite = $response.tsResponse.site.contentUrl
                 }
             }
-            It "Update the site <testSite> on <ConfigFile.server>" {
+            It "Update site <testSite> on <ConfigFile.server>" {
                 if ($ConfigFile.test_site_name) {
                     {Invoke-TSSwitchSite -Site $testSite} | Should -Not -Throw
                     $siteNewName = New-Guid
@@ -124,7 +124,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $sites | Where-Object contentUrl -eq $script:testSite | Should -Not -BeNullOrEmpty
                 }
             }
-            It "Delete the site <testSite> on <ConfigFile.server>" {
+            It "Delete site <testSite> on <ConfigFile.server>" {
                 if ($ConfigFile.test_site_name) {
                     {Invoke-TSSwitchSite -Site $testSite} | Should -Not -Throw
                     $response = Remove-TSSite -SiteId $testSiteId
@@ -139,7 +139,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     }
                 }
             }
-            It "Delete the site <testSite> on <ConfigFile.server> asynchronously" {
+            It "Delete site <testSite> on <ConfigFile.server> asynchronously" {
                 if ($ConfigFile.test_site_name) {
                     $tempSiteName = New-Guid # get UUID for site name and content URL
                     $response = New-TSSite -Name $tempSiteName -ContentUrl $tempSiteName
@@ -164,7 +164,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 $response.tsResponse.project.id | Should -BeOfType String
                 $script:testProjectId = $response.tsResponse.project.id
             }
-            It "Update the project <testProjectId> on <ConfigFile.server>" {
+            It "Update project <testProjectId> on <ConfigFile.server>" {
                 $projectNewName = New-Guid
                 $response = Update-TSProject -ProjectId $script:testProjectId -Name $projectNewName
                 $response.tsResponse.project.id | Should -Be $script:testProjectId
@@ -175,18 +175,113 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 $projects.length | Should -BeGreaterThan 0
                 $projects | Where-Object id -eq $script:testProjectId | Should -Not -BeNullOrEmpty
             }
-            It "Delete the project <testProjectId> on <ConfigFile.server>" {
+            It "Delete project <testProjectId> on <ConfigFile.server>" {
                 $response = Remove-TSProject -ProjectId $script:testProjectId
                 $response | Should -BeOfType String
                 $script:testProjectId = $null
             }
-            It "Create new project with samples on <ConfigFile.server>" -Skip {
+            It "Create/update new project with samples on <ConfigFile.server>" -Skip {
                 $projectNameSamples = New-Guid
-                $response = New-TSProject -Name $projectNameSamples # TODO -PublishSamples $True
+                $response = New-TSProject -Name $projectNameSamples
                 $response.tsResponse.project.id | Should -BeOfType String
                 $script:testProjectId = $response.tsResponse.project.id
-                $response = Update-TSProject -ProjectId $script:testProjectId -Name $projectNameSamples -PublishSamples $True
+                $response = Update-TSProject -ProjectId $script:testProjectId -Name $projectNameSamples -PublishSamples
                 $response.tsResponse.project.id | Should -BeOfType String
+            }
+        }
+        Context "User operations" -Tag User {
+            It "Add new user on <ConfigFile.server>" {
+                if ($ConfigFile.test_username) {
+                    $userName = $ConfigFile.test_username
+                } else {
+                    $userName = New-Guid
+                }
+                $response = New-TSUser -Name $userName -SiteRole Unlicensed
+                $response.tsResponse.user.id | Should -BeOfType String
+                $script:testUserId = $response.tsResponse.user.id
+            }
+            It "Update user <testUserId> on <ConfigFile.server>" {
+                $response = Update-TSUser -UserId $script:testUserId -SiteRole Viewer
+                $response.tsResponse.user.siteRole | Should -Be "Viewer"
+                if ($ConfigFile.test_password) {
+                    $fullName = New-Guid
+                    $response = Update-TSUser -UserId $script:testUserId -SiteRole Viewer -FullName $fullName -SecurePassword (ConvertTo-SecureString $ConfigFile.test_password -AsPlainText -Force)
+                    $response.tsResponse.user.siteRole | Should -Be "Viewer"
+                    $response.tsResponse.user.fullName | Should -Be $fullName
+                }
+            }
+            It "Query users on <ConfigFile.server>" {
+                $users = Get-TSUser
+                $users.length | Should -BeGreaterThan 0
+                $users | Where-Object id -eq $script:testUserId | Should -Not -BeNullOrEmpty
+                $response = Get-TSUser -UserId $script:testUserId
+                $response.id | Should -Be $script:testUserId
+            }
+            It "Remove user <testUserId> on <ConfigFile.server>" {
+                $response = Remove-TSUser -UserId $script:testUserId
+                $response | Should -BeOfType String
+                $script:testUserId = $null
+            }
+        }
+        Context "Group operations" -Tag Group {
+            It "Add new group on <ConfigFile.server>" {
+                $groupName = New-Guid
+                $response = New-TSGroup -Name $groupName -MinimumSiteRole Viewer
+                $response.tsResponse.group.id | Should -BeOfType String
+                $script:testGroupId = $response.tsResponse.group.id
+            }
+            It "Update group <testGroupId> on <ConfigFile.server>" {
+                $groupName = New-Guid
+                $response = Update-TSGroup -GroupId $script:testGroupId -Name $groupName
+                $response.tsResponse.group.id | Should -Be $script:testGroupId
+                $response.tsResponse.group.name | Should -Be $groupName
+            }
+            It "Query groups on <ConfigFile.server>" {
+                $groups = Get-TSGroup
+                $groups.length | Should -BeGreaterThan 0
+                $groups | Where-Object id -eq $script:testGroupId | Should -Not -BeNullOrEmpty
+            }
+            It "Remove group <testGroupId> on <ConfigFile.server>" {
+                $response = Remove-TSGroup -GroupId $script:testGroupId
+                $response | Should -BeOfType String
+                $script:testGroupId = $null
+            }
+        }
+        Context "User/Group operations" -Tag UserGroup {
+            It "Add new user/group on <ConfigFile.server>" {
+                if ($ConfigFile.test_username) {
+                    $userName = $ConfigFile.test_username
+                } else {
+                    $userName = New-Guid
+                }
+                $response = New-TSUser -Name $userName -SiteRole Unlicensed -AuthSetting "ServerDefault"
+                $response.tsResponse.user.id | Should -BeOfType String
+                $script:testUserId = $response.tsResponse.user.id
+                $groupName = New-Guid
+                $response = New-TSGroup -Name $groupName -MinimumSiteRole Viewer -GrantLicenseMode onLogin
+                $response.tsResponse.group.id | Should -BeOfType String
+                $script:testGroupId = $response.tsResponse.group.id
+            }
+            It "Add user to group on <ConfigFile.server>" {
+                $response = Add-TSUserToGroup -UserId $script:testUserId -GroupId $script:testGroupId
+                $response.tsResponse.user.id | Should -Be $script:testUserId
+                # $response.tsResponse.user.siteRole | Should -Be "Viewer" # doesn't work on Tableau Cloud
+            }
+            It "Query groups for user on <ConfigFile.server>" {
+                $groups = Get-TSGroupsForUser -UserId $script:testUserId
+                $groups.length | Should -BeGreaterThan 0
+                $groups | Where-Object id -eq $script:testGroupId | Should -Not -BeNullOrEmpty
+            }
+            It "Query users in group on <ConfigFile.server>" {
+                $users = Get-TSUsersInGroup -GroupId $script:testGroupId
+                $users.length | Should -BeGreaterThan 0
+                $users | Where-Object id -eq $script:testUserId | Should -Not -BeNullOrEmpty
+            }
+            It "Remove user from group on <ConfigFile.server>" {
+                $response = Remove-TSUserFromGroup -UserId $script:testUserId -GroupId $script:testGroupId
+                $response | Should -BeOfType String
+                $users = Get-TSUsersInGroup -GroupId $script:testGroupId
+                $users.length | Should -Be 0
             }
         }
     }

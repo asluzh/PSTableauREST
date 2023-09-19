@@ -333,8 +333,7 @@ function New-TSProject {
         [Parameter(Mandatory)][string] $Name,
         [Parameter()][string] $Description,
         [Parameter()][ValidateSet('ManagedByOwner','LockedToProject','LockedToProjectWithoutNested')][string] $ContentPermissions,
-        [Parameter()][string] $ParentProjectId,
-        [Parameter()][boolean] $PublishSamples
+        [Parameter()][string] $ParentProjectId
     )
     # generate xml request
     $xml = New-Object System.Xml.XmlDocument
@@ -353,10 +352,6 @@ function New-TSProject {
     try {
         if ($PSCmdlet.ShouldProcess($Name)) {
             $uri = Get-TSRequestUri -Endpoint Project # -Param $ProjectId
-            # FIXME POST request with this uri returns 400 Bad RequestDeserialization problem: Content is not allowed in prolog.
-            # if ($PublishSamples) {
-            #     $uri += "?publishSamples=true"
-            # }
             Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
         }
     } catch {
@@ -372,7 +367,7 @@ function Update-TSProject {
         [Parameter()][string] $Description,
         [Parameter()][ValidateSet('ManagedByOwner','LockedToProject','LockedToProjectWithoutNested')][string] $ContentPermissions,
         [Parameter()][string] $ParentProjectId,
-        [Parameter()][boolean] $PublishSamples
+        [Parameter()][switch] $PublishSamples
     )
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -458,10 +453,10 @@ function New-TSUser {
     if ($AuthSetting) {
         $el_user.SetAttribute("authSetting", $AuthSetting)
     }
+    $xml.OuterXml | Set-Content "debug.xml"
     try {
         if ($PSCmdlet.ShouldProcess($Name)) {
-            $uri = Get-TSRequestUri -Endpoint User
-            Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint User) -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -475,7 +470,7 @@ function Update-TSUser {
         [Parameter()][string] $FullName,
         [Parameter()][string] $Email,
         [Parameter()][securestring] $SecurePassword,
-        [Parameter()][ValidateSet('Creator','Explorer','ExplorerCanPublish','ServerAdministrator','SiteAdministratorExplorer','SiteAdministratorCreator','Viewer','Unlicensed')][string] $SiteRole,
+        [Parameter()][ValidateSet('Creator','Explorer','ExplorerCanPublish','SiteAdministratorExplorer','SiteAdministratorCreator','Viewer','Unlicensed')][string] $SiteRole,
         [Parameter()][string] $AuthSetting
     )
     $xml = New-Object System.Xml.XmlDocument
@@ -499,8 +494,7 @@ function Update-TSUser {
     }
     try {
         if ($PSCmdlet.ShouldProcess($UserId)) {
-            $uri = Get-TSRequestUri -Endpoint User -Param $UserId
-            Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint User -Param $UserId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -515,10 +509,11 @@ function Remove-TSUser {
     )
     try {
         if ($PSCmdlet.ShouldProcess($UserId)) {
+            $uri = Get-TSRequestUri -Endpoint User -Param $UserId
             if ($PublishSMapAssetsToUserIdamples) {
                 $uri += "?mapAssetsTo=$PublishSMapAssetsToUserIdamples"
             }
-            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint User -Param $UserId) -Method Delete -Headers (Get-TSRequestHeaderDict)
+            Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
