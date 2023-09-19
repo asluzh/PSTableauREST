@@ -1,4 +1,5 @@
-Tests/Config/*.json
+Tests/Config/
+Tests/Assets/
 
 Tableau-REST/
 server-client-python-master/

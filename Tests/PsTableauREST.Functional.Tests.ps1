@@ -1,7 +1,5 @@
 BeforeDiscovery {
-    # Get-Module PSTableauREST | Remove-Module -Force
     Import-Module ./PSTableauREST/PSTableauREST.psm1 -Force
-    # Get-Module Microsoft.PowerShell.SecretManagement | Remove-Module -Force
     Import-Module Microsoft.PowerShell.SecretManagement -Force
     $script:ConfigFiles = Get-ChildItem -Path "Tests/Config" -Filter "test_*.json" -Recurse
 }
@@ -282,6 +280,48 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 $response | Should -BeOfType String
                 $users = Get-TSUsersInGroup -GroupId $script:testGroupId
                 $users.length | Should -Be 0
+            }
+        }
+        Context "Metadata operations" -Tag Metadata {
+            It "Query databases on <ConfigFile.server>" {
+                $databases = Get-TSDatabase
+                $databases.length | Should -BeGreaterThan 0
+                $databases[0].id | Should -BeOfType String
+                $databaseId = $databases[0].id
+                $database = Get-TSDatabase -DatabaseId $databaseId
+                $database.id | Should -Be $databaseId
+            }
+            It "Query tables on <ConfigFile.server>" {
+                $tables = Get-TSTable
+                $tables.length | Should -BeGreaterThan 0
+                $tables[0].id | Should -BeOfType String
+                $script:tableId = $tables[0].id
+                $table = Get-TSTable -TableId $script:tableId
+                $table.id | Should -Be $script:tableId
+            }
+            It "Query columns in <tableId> on <ConfigFile.server>" {
+                $columns = Get-TSTableColumn -TableId $script:tableId
+                $columns.length | Should -BeGreaterThan 0
+                $columns[0].id | Should -BeOfType String
+                $columnId = $columns[0].id
+                $column = Get-TSTableColumn -TableId $script:tableId -ColumnId $columnId
+                $column.id | Should -Be $columnId
+            }
+            It "Simple GraphQL queries on <ConfigFile.server>" {
+                $query = Get-Content "Tests/Assets/workbooks.graphql" | Out-String
+                $data = Get-TSGraphQL -Query $query
+                $data | Should -BeOfType PSCustomObject
+                $entity = $data.PSObject.Properties | Select-Object -First 1 -ExpandProperty Name
+                $data.$entity.length | Should -BeGreaterThan 0
+            }
+            It "Paginated GraphQL query on <ConfigFile.server>" {
+                $query = Get-Content "Tests/Assets/fields-paginated.graphql" | Out-String
+                $data = Get-TSGraphQL -Query $query -PaginatedEntity "fieldsConnection" #-PageSize 100
+                $data.nodes.length | Should -BeGreaterThan 100
+                $data = Get-TSGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 1000
+                $data.nodes.length | Should -BeGreaterThan 100
+                $data = Get-TSGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 20000
+                $data.nodes.length | Should -BeGreaterThan 100
             }
         }
     }

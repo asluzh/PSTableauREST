@@ -64,26 +64,25 @@ function Get-TSRequestHeaderDict {
 
 function Get-TSRequestUri {
     Param(
-        [Parameter(Mandatory)][ValidateSet('Auth','Site','Project','User','Group')][string] $Endpoint,
+        [Parameter(Mandatory)][ValidateSet('Auth','Site','Project','User','Group','Database','Table','GraphQL')][string] $Endpoint,
         [Parameter()][string] $Param
     )
     $Uri = "$script:TSServerUrl/api/$script:TSRestApiVersion/"
     switch($Endpoint) {
         "Auth" { $Uri += "auth/$Param" }
+        "GraphQL" {
+            $Uri = "$script:TSServerUrl/api/metadata/graphql"
+        }
         "Site" {
             $Uri += "sites"
-            if ($Param) { $Uri += "/$Param" }
-        }
-        "Project" {
-            $Uri += "sites/$script:TSSiteId/projects"
             if ($Param) { $Uri += "/$Param" }
         }
         "User" {
             $Uri += "sites/$script:TSSiteId/users"
             if ($Param) { $Uri += "/$Param" }
         }
-        "Group" {
-            $Uri += "sites/$script:TSSiteId/groups"
+        default {
+            $Uri += "sites/$script:TSSiteId/" + $Endpoint.ToLower() + "s" # User -> users, etc.
             if ($Param) { $Uri += "/$Param" }
         }
     }
@@ -453,7 +452,6 @@ function New-TSUser {
     if ($AuthSetting) {
         $el_user.SetAttribute("authSetting", $AuthSetting)
     }
-    $xml.OuterXml | Set-Content "debug.xml"
     try {
         if ($PSCmdlet.ShouldProcess($Name)) {
             Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint User) -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
@@ -712,6 +710,134 @@ function Get-TSGroupsForUser {
     }
 }
 
+function Get-TSDatabase {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter()][string] $DatabaseId,
+        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+    )
+    try {
+        if ($DatabaseId) {
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Database -Param $DatabaseId) -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response.tsResponse.database
+        } else {
+            $pageNumber = 0
+            do {
+                $pageNumber += 1
+                $uri = Get-TSRequestUri -Endpoint Database
+                $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+                $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+                $totalAvailable = $response.tsResponse.pagination.totalAvailable
+                $response.tsResponse.databases.database
+            } until ($PageSize*$pageNumber -gt $totalAvailable)
+        }
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function Get-TSTable {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter()][string] $TableId,
+        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+    )
+    try {
+        if ($TableId) {
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Table -Param $TableId) -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response.tsResponse.table
+        } else {
+            $pageNumber = 0
+            do {
+                $pageNumber += 1
+                $uri = Get-TSRequestUri -Endpoint Table
+                $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+                $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+                $totalAvailable = $response.tsResponse.pagination.totalAvailable
+                $response.tsResponse.tables.table
+            } until ($PageSize*$pageNumber -gt $totalAvailable)
+        }
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function Get-TSTableColumn {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter(Mandatory)][string] $TableId,
+        [Parameter()][string] $ColumnId,
+        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+    )
+    try {
+        if ($ColumnId) {
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Table -Param "$TableId/columns/$ColumnId") -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response.tsResponse.column
+        } else {
+            $pageNumber = 0
+            do {
+                $pageNumber += 1
+                $uri = Get-TSRequestUri -Endpoint Table -Param "$TableId/columns"
+                $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+                $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+                $totalAvailable = $response.tsResponse.pagination.totalAvailable
+                $response.tsResponse.columns.column
+            } until ($PageSize*$pageNumber -gt $totalAvailable)
+        }
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function Get-TSGraphQL {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter(Mandatory)][string] $Query,
+        [Parameter()][string] $PaginatedEntity,
+        [Parameter()][ValidateRange(1,20000)][int] $PageSize = 100
+    )
+    try {
+        $uri = Get-TSRequestUri -Endpoint GraphQL
+        if ($PaginatedEntity) {
+            # $pageNumber = 0
+            $nodesCount = 0
+            $endCursor = $null
+            $hasNextPage = $true
+            while ($hasNextPage) {
+                # $pageNumber += 1
+                if ($endCursor) {
+                    $queryPage = $Query -Replace $PaginatedEntity, "$PaginatedEntity(first: $PageSize, after: ""$endCursor"")"
+                } else {
+                    $queryPage = $Query -Replace $PaginatedEntity, "$PaginatedEntity(first: $PageSize)"
+                }
+                $jsonQuery = @{
+                    query = $queryPage
+                    # variables = $null
+                } | ConvertTo-Json
+                $response = Invoke-RestMethod -Uri $uri -Body $jsonQuery -Method Post -Headers (Get-TSRequestHeaderDict -ContentType 'application/json')
+                $endCursor = $response.data.$PaginatedEntity.pageInfo.endCursor
+                $hasNextPage = $response.data.$PaginatedEntity.pageInfo.hasNextPage
+                $totalCount = $response.data.$PaginatedEntity.totalCount
+                $response.data.$PaginatedEntity.nodes
+                $nodesCount += $response.data.$PaginatedEntity.nodes.length
+                # TODO add progress indicator
+            }
+            if ($nodesCount -ne $totalCount) {
+                throw "Nodes count ($nodesCount) is not equal to totalCount ($totalCount)"
+            }
+        } else {
+            $jsonQuery = @{
+                query = $Query
+                # variables = $null
+            } | ConvertTo-Json
+            $response = Invoke-RestMethod -Uri $uri -Body $jsonQuery -Method Post -Headers (Get-TSRequestHeaderDict -ContentType 'application/json')
+            $response.data
+        }
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
 Export-ModuleMember -Function Get-TSServerInfo
 Export-ModuleMember -Function Invoke-TSSignIn
 Export-ModuleMember -Function Invoke-TSSignOut
@@ -746,3 +872,64 @@ Export-ModuleMember -Function Get-TSUsersInGroup
 Export-ModuleMember -Function Get-TSGroupsForUser
 # Import Users to Site from CSV
 # Delete Users from Site with CSV
+
+Export-ModuleMember -Function Get-TSDatabase
+Export-ModuleMember -Function Get-TSTable
+Export-ModuleMember -Function Get-TSTableColumn
+Export-ModuleMember -Function Get-TSGraphQL
+# Query Data Quality Warning by ID
+# Query Data Quality Warning by Content
+# Query Data Quality Certification by ID
+# Query Data Quality Certifications by Content
+# Query Quality Warning Trigger
+# Query All Quality Warning Triggers by Content
+# Query Database Permissions
+# Query Default Database Permissions
+# Query Table Permissions
+# Add Database Permissions
+# Add Default Database Permissions
+# Add Data Quality Warning
+# Batch Add or Update Data Quality Warnings
+# Batch Add or Update Data Quality Certifications
+# Add (or Update) Quality Warning Trigger
+# Add Table Permissions
+# Add Tags to Column
+# Add Tags to Database
+# Add Tags to Table
+# Batch Add Tags
+# Create or Update labelValue
+# Delete Database Permissions
+# Delete Default Database Permissions
+# Delete Data Quality Warning by ID
+# Delete Data Quality Warning by Content
+# Batch Delete Data Quality Warnings
+# Delete Data Quality Certification by ID
+# Delete Data Quality Certifications by Content
+# Delete Quality Warning Trigger by ID
+# Delete Quality Warning Triggers by Content
+# Delete Label
+# Delete Labels
+# Delete labelValue
+# Delete Table Permissions
+# Delete Tag from Column
+# Delete Tag from Database
+# Delete Tag from Table
+# Batch Delete Tags
+# Get Label
+# Get Labels
+# Get labelValue
+# Get Databases and Tables from Connection
+# List labelValues on Site
+# Move Database
+# Move Table
+# Remove Column
+# Remove Database
+# Remove Table
+# Update Column
+# Update Database
+# Update Data Quality Warning
+# Update Quality Warning Trigger
+# Update Label
+# Update Labels
+# Update labelValue
+# Update Table
