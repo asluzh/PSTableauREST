@@ -203,7 +203,6 @@ function Get-TSSite {
             $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
             return $response.tsResponse.site
         } else { # get all sites
-            $PageSize = 100
             $pageNumber = 0
             do {
                 $pageNumber += 1
@@ -314,7 +313,6 @@ function Get-TSProject {
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
     try {
-        $PageSize = 100
         $pageNumber = 0
         do {
             $pageNumber += 1
@@ -421,19 +419,24 @@ function Remove-TSProject {
 function Get-TSUser {
     [OutputType([PSCustomObject[]])]
     Param(
+        [Parameter()][string] $UserId,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
     try {
-        $PageSize = 100
-        $pageNumber = 0
-        do {
-            $pageNumber += 1
-            $uri = Get-TSRequestUri -Endpoint User
-            $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-            $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
-            $totalAvailable = $response.tsResponse.pagination.totalAvailable
-            $response.tsResponse.users.user
-        } until ($PageSize*$pageNumber -gt $totalAvailable)
+        if ($UserId) { # Query User On Site
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint User -Param $UserId) -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response.tsResponse.user
+        } else { # Get Users on Site
+            $pageNumber = 0
+            do {
+                $pageNumber += 1
+                $uri = Get-TSRequestUri -Endpoint User
+                $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+                $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+                $totalAvailable = $response.tsResponse.pagination.totalAvailable
+                $response.tsResponse.users.user
+            } until ($PageSize*$pageNumber -gt $totalAvailable)
+        }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
     }
@@ -528,7 +531,6 @@ function Get-TSGroup {
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
     try {
-        $PageSize = 100
         $pageNumber = 0
         do {
             $pageNumber += 1
@@ -638,6 +640,83 @@ function Remove-TSGroup {
     }
 }
 
+function Add-TSUserToGroup {
+    [CmdletBinding(SupportsShouldProcess)]
+    Param(
+        [Parameter(Mandatory)][string] $UserId,
+        [Parameter(Mandatory)][string] $GroupId
+    )
+    # generate xml request
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_user = $tsRequest.AppendChild($xml.CreateElement("user"))
+    $el_user.SetAttribute("id", $UserId)
+    try {
+        if ($PSCmdlet.ShouldProcess("add user $UserId into group $GroupId")) {
+            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Group -Param "$GroupId/users") -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+        }
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function Remove-TSUserFromGroup {
+    [CmdletBinding(SupportsShouldProcess)]
+    Param(
+        [Parameter(Mandatory)][string] $UserId,
+        [Parameter(Mandatory)][string] $GroupId
+    )
+    try {
+        if ($PSCmdlet.ShouldProcess("remove user $UserId from group $GroupId")) {
+            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Group -Param "$GroupId/users/$UserId") -Method Delete -Headers (Get-TSRequestHeaderDict)
+        }
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function Get-TSUsersInGroup {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter(Mandatory)][string] $GroupId,
+        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+    )
+    try {
+        $pageNumber = 0
+        do {
+            $pageNumber += 1
+            $uri = Get-TSRequestUri -Endpoint Group -Param "$GroupId/users"
+            $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+            $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+            $totalAvailable = $response.tsResponse.pagination.totalAvailable
+            $response.tsResponse.users.user
+        } until ($PageSize*$pageNumber -gt $totalAvailable)
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function Get-TSGroupsForUser {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter(Mandatory)][string] $UserId,
+        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+    )
+    try {
+        $pageNumber = 0
+        do {
+            $pageNumber += 1
+            $uri = Get-TSRequestUri -Endpoint User -Param "$UserId/groups"
+            $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+            $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+            $totalAvailable = $response.tsResponse.pagination.totalAvailable
+            $response.tsResponse.groups.group
+        } until ($PageSize*$pageNumber -gt $totalAvailable)
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
 Export-ModuleMember -Function Get-TSServerInfo
 Export-ModuleMember -Function Invoke-TSSignIn
 Export-ModuleMember -Function Invoke-TSSignOut
@@ -666,13 +745,9 @@ Export-ModuleMember -Function Get-TSGroup
 Export-ModuleMember -Function New-TSGroup
 Export-ModuleMember -Function Update-TSGroup
 Export-ModuleMember -Function Remove-TSGroup
-# Add User to Group
-# Add User to Site
+Export-ModuleMember -Function Add-TSUserToGroup
+Export-ModuleMember -Function Remove-TSUserFromGroup
+Export-ModuleMember -Function Get-TSUsersInGroup
+Export-ModuleMember -Function Get-TSGroupsForUser
 # Import Users to Site from CSV
 # Delete Users from Site with CSV
-# Get Groups for a User
-# Get Users in Group
-# Get Users on Site
-# Query User On Site
-# Remove User from Site
-# Remove User from Group
