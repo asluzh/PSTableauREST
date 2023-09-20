@@ -334,19 +334,17 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             }
             It "Simple GraphQL queries on <ConfigFile.server>" {
                 $query = Get-Content "Tests/Assets/workbooks.graphql" | Out-String
-                $data = Get-TSGraphQL -Query $query
-                $data | Should -BeOfType PSCustomObject
-                $entity = $data.PSObject.Properties | Select-Object -First 1 -ExpandProperty Name
-                ($data.$entity | Measure-Object).Count | Should -BeGreaterThan 0
+                $results = Get-TSMetadataGraphQL -Query $query
+                ($results | Measure-Object).Count | Should -BeGreaterThan 0
             }
             It "Paginated GraphQL query on <ConfigFile.server>" {
                 $query = Get-Content "Tests/Assets/fields-paginated.graphql" | Out-String
-                $data = Get-TSGraphQL -Query $query -PaginatedEntity "fieldsConnection" #-PageSize 100
-                ($data | Measure-Object).Count | Should -BeGreaterThan 100
-                $data = Get-TSGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 1000
-                ($data | Measure-Object).Count | Should -BeGreaterThan 100
-                $data = Get-TSGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 20000
-                ($data | Measure-Object).Count | Should -BeGreaterThan 100
+                $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" #-PageSize 100
+                ($results | Measure-Object).Count | Should -BeGreaterThan 100
+                $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 1000
+                ($results | Measure-Object).Count | Should -BeGreaterThan 100
+                $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 20000
+                ($results | Measure-Object).Count | Should -BeGreaterThan 100
             }
         }
     }

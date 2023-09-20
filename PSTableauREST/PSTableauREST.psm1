@@ -912,7 +912,7 @@ function Get-TSTableColumn {
     }
 }
 
-function Get-TSGraphQL {
+function Get-TSMetadataGraphQL {
     [OutputType([PSCustomObject[]])]
     Param(
         [Parameter(Mandatory)][string] $Query,
@@ -941,12 +941,12 @@ function Get-TSGraphQL {
                 $endCursor = $response.data.$PaginatedEntity.pageInfo.endCursor
                 $hasNextPage = $response.data.$PaginatedEntity.pageInfo.hasNextPage
                 $totalCount = $response.data.$PaginatedEntity.totalCount
-                $response.data.$PaginatedEntity.nodes
                 $nodesCount += $response.data.$PaginatedEntity.nodes.length
+                $response.data.$PaginatedEntity.nodes
                 # TODO add progress indicator
             }
             if ($nodesCount -ne $totalCount) {
-                throw "Nodes count ($nodesCount) is not equal to totalCount ($totalCount)"
+                throw "Nodes count ($nodesCount) is not equal to totalCount ($totalCount), fetched results are incomplete."
             }
         } else {
             $jsonQuery = @{
@@ -954,7 +954,8 @@ function Get-TSGraphQL {
                 # TODO variables = $null
             } | ConvertTo-Json
             $response = Invoke-RestMethod -Uri $uri -Body $jsonQuery -Method Post -Headers (Get-TSRequestHeaderDict -ContentType 'application/json')
-            $response.data
+            $entity = $response.data.PSObject.Properties | Select-Object -First 1 -ExpandProperty Name
+            $response.data.$entity
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -1276,7 +1277,7 @@ Export-ModuleMember -Function Get-TSDatasourceConnection
 Export-ModuleMember -Function Get-TSDatabase
 Export-ModuleMember -Function Get-TSTable
 Export-ModuleMember -Function Get-TSTableColumn
-Export-ModuleMember -Function Get-TSGraphQL
+Export-ModuleMember -Function Get-TSMetadataGraphQL
 # Query Data Quality Warning by ID
 # Query Data Quality Warning by Content
 # Query Data Quality Certification by ID
