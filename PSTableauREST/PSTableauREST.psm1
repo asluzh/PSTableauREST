@@ -190,6 +190,18 @@ function Invoke-TSSignOut {
     }
 }
 
+function Revoke-TSServerAdminTokens {
+    [CmdletBinding(SupportsShouldProcess)]
+    Param()
+    try {
+        if ($PSCmdlet.ShouldProcess()) {
+            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Auth -Param serverAdminAccessTokens) -Method Delete -Headers (Get-TSRequestHeaderDict)
+        }
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
 function Get-TSSite {
     [OutputType([PSCustomObject[]])]
     Param(
@@ -812,7 +824,7 @@ function Get-TSGraphQL {
                 }
                 $jsonQuery = @{
                     query = $queryPage
-                    # variables = $null
+                    # TODO variables = $null
                 } | ConvertTo-Json
                 $response = Invoke-RestMethod -Uri $uri -Body $jsonQuery -Method Post -Headers (Get-TSRequestHeaderDict -ContentType 'application/json')
                 $endCursor = $response.data.$PaginatedEntity.pageInfo.endCursor
@@ -828,7 +840,7 @@ function Get-TSGraphQL {
         } else {
             $jsonQuery = @{
                 query = $Query
-                # variables = $null
+                # TODO variables = $null
             } | ConvertTo-Json
             $response = Invoke-RestMethod -Uri $uri -Body $jsonQuery -Method Post -Headers (Get-TSRequestHeaderDict -ContentType 'application/json')
             $response.data
