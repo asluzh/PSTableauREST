@@ -290,6 +290,8 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 $workbookId | Should -BeOfType String
                 $workbook = Get-TSWorkbook -WorkbookId $workbookId
                 $workbook.id | Should -Be $workbookId
+                $workbookConnections = Get-TSWorkbookConnection -WorkbookId $workbookId
+                ($workbookConnections | Measure-Object).Count | Should -BeGreaterThan 0
             }
             It "Query workbooks for current user on <ConfigFile.server>" {
                 $workbooks = Get-TSWorkbooksForUser -UserId (Get-TSCurrentUserId)
@@ -305,8 +307,10 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 $datasourceId | Should -BeOfType String
                 $datasource = Get-TSDatasource -DatasourceId $datasourceId
                 $datasource.id | Should -Be $datasourceId
+                $datasourceConnections = Get-TSDatasourceConnection -DatasourceId $datasourceId
+                ($datasourceConnections | Measure-Object).Count | Should -BeGreaterThan 0
             }
-         }
+        }
         Context "Metadata operations" -Tag Metadata {
             It "Query databases on <ConfigFile.server>" {
                 $databases = Get-TSDatabase
