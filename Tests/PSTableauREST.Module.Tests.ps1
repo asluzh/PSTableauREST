@@ -3,15 +3,12 @@ BeforeDiscovery {
     $script:ModuleName = (Split-Path -Leaf $PSCommandPath) -Replace ".Module.Tests.ps1"
     $script:ModuleFile =     "$ParentDir/$ModuleName/$ModuleName.psm1"
     $script:ModuleManifest = "$ParentDir/$ModuleName/$ModuleName.psd1"
+    $script:CodeFiles = Get-ChildItem -Path "$ParentDir" -Filter *.ps1 -Recurse
+    $script:ScriptAnalyzerRules = Get-ScriptAnalyzerRule
+    $script:ScriptAnalyzerResults = Invoke-ScriptAnalyzer -Path $ModuleFile -ExcludeRule PSUseBOMForUnicodeEncodedFile -Severity Error,Warning
 }
 
 Describe "Module Structure and Validation Tests" -Tag Module -WarningAction SilentlyContinue {
-    BeforeAll {
-        $script:CodeFiles = Get-ChildItem -Path "$ParentDir" -Filter *.ps1 -Recurse
-        $script:ScriptAnalyzerRules = Get-ScriptAnalyzerRule
-        $script:ScriptAnalyzerResults = Invoke-ScriptAnalyzer -Path $ModuleFile -ExcludeRule PSUseBOMForUnicodeEncodedFile -Severity Error,Warning
-    }
-
     Context "Module File <ModuleFile>" {
         It "has the root module <ModuleName>" {
             "$ModuleFile" | Should -Exist

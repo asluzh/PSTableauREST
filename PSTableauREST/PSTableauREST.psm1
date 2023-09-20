@@ -190,7 +190,7 @@ function Invoke-TSSignOut {
     }
 }
 
-function Revoke-TSServerAdminTokens {
+function Revoke-TSServerAdminToken {
     [CmdletBinding(SupportsShouldProcess)]
     Param()
     try {
@@ -528,8 +528,8 @@ function Remove-TSUser {
     try {
         if ($PSCmdlet.ShouldProcess($UserId)) {
             $uri = Get-TSRequestUri -Endpoint User -Param $UserId
-            if ($PublishSMapAssetsToUserIdamples) {
-                $uri += "?mapAssetsTo=$PublishSMapAssetsToUserIdamples"
+            if ($MapAssetsToUserId) {
+                $uri += "?mapAssetsTo=$MapAssetsToUserId"
             }
             Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
         }
@@ -968,7 +968,7 @@ Export-ModuleMember -Function Get-TSServerInfo
 Export-ModuleMember -Function Invoke-TSSignIn
 Export-ModuleMember -Function Invoke-TSSwitchSite
 Export-ModuleMember -Function Invoke-TSSignOut
-Export-ModuleMember -Function Revoke-TSServerAdminTokens
+Export-ModuleMember -Function Revoke-TSServerAdminToken
 Export-ModuleMember -Function Get-TSCurrentUserId
 # Delete Server Session
 # Get Current Server Session
