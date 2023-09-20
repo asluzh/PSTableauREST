@@ -297,6 +297,9 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 $workbooks = Get-TSWorkbooksForUser -UserId (Get-TSCurrentUserId)
                 ($workbooks | Measure-Object).Count | Should -BeGreaterThan 0
                 $workbooks | Select-Object -First 1 -ExpandProperty id | Should -BeOfType String
+                $workbooks = Get-TSWorkbooksForUser -UserId (Get-TSCurrentUserId) -IsOwner
+                ($workbooks | Measure-Object).Count | Should -BeGreaterThan 0
+                $workbooks | Select-Object -First 1 -ExpandProperty id | Should -BeOfType String
             }
         }
         Context "Datasource operations" -Tag Datasource {
@@ -338,16 +341,16 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             }
             It "Simple GraphQL queries on <ConfigFile.server>" {
                 $query = Get-Content "Tests/Assets/workbooks.graphql" | Out-String
-                $results = Get-TSMetadataGraphQL -Query $query
+                $results = Invoke-TSMetadataGraphQL -Query $query
                 ($results | Measure-Object).Count | Should -BeGreaterThan 0
             }
             It "Paginated GraphQL query on <ConfigFile.server>" {
                 $query = Get-Content "Tests/Assets/fields-paginated.graphql" | Out-String
-                $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" #-PageSize 100
+                $results = Invoke-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" #-PageSize 100
                 ($results | Measure-Object).Count | Should -BeGreaterThan 100
-                $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 1000
+                $results = Invoke-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 1000
                 ($results | Measure-Object).Count | Should -BeGreaterThan 100
-                $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 20000
+                $results = Invoke-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 20000
                 ($results | Measure-Object).Count | Should -BeGreaterThan 100
             }
         }

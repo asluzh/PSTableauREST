@@ -48,6 +48,7 @@ function Get-TSRequestHeaderDict {
 }
 
 function Get-TSRequestUri {
+    [OutputType([string])]
     Param(
         [Parameter(Mandatory)][ValidateSet('Auth','Site','Project','User','Group','Workbook','Datasource','View','Database','Table','GraphQL')][string] $Endpoint,
         [Parameter()][string] $Param
@@ -192,6 +193,7 @@ function Invoke-TSSignOut {
 
 function Revoke-TSServerAdminToken {
     [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
     Param()
     try {
         if ($PSCmdlet.ShouldProcess()) {
@@ -203,6 +205,7 @@ function Revoke-TSServerAdminToken {
 }
 
 function Get-TSCurrentUserId {
+    [OutputType([string])]
     Param()
     return $script:TSUserId
 }
@@ -237,6 +240,7 @@ function Get-TSSite {
 
 function New-TSSite {
     [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
     Param(
         [Parameter(Mandatory)][string] $Name,
         [Parameter(Mandatory)][string] $ContentUrl,
@@ -275,6 +279,7 @@ function New-TSSite {
 
 function Update-TSSite {
     [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
     Param(
         [Parameter(Mandatory)][string] $SiteId,
         [Parameter()][hashtable] $SiteParams
@@ -303,6 +308,7 @@ function Update-TSSite {
 
 function Remove-TSSite {
     [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
     Param(
         [Parameter(Mandatory)][string] $SiteId,
         [Parameter()][switch] $BackgroundTask
@@ -347,6 +353,7 @@ function Get-TSProject {
 
 function New-TSProject {
     [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
     Param(
         [Parameter(Mandatory)][string] $Name,
         [Parameter()][string] $Description,
@@ -379,6 +386,7 @@ function New-TSProject {
 
 function Update-TSProject {
     [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
     Param(
         [Parameter(Mandatory)][string] $ProjectId,
         [Parameter()][string] $Name,
@@ -417,6 +425,7 @@ function Update-TSProject {
 
 function Remove-TSProject {
     [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
     Param(
         [Parameter(Mandatory)][string] $ProjectId
     )
@@ -458,6 +467,7 @@ function Get-TSUser {
 
 function New-TSUser {
     [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
     Param(
         [Parameter(Mandatory)][string] $Name,
         [Parameter(Mandatory)][ValidateSet('Creator','Explorer','ExplorerCanPublish','SiteAdministratorExplorer','SiteAdministratorCreator','Viewer','Unlicensed')][string] $SiteRole,
@@ -483,6 +493,7 @@ function New-TSUser {
 
 function Update-TSUser {
     [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
     Param(
         [Parameter(Mandatory)][string] $UserId,
         [Parameter()][string] $FullName,
@@ -521,6 +532,7 @@ function Update-TSUser {
 
 function Remove-TSUser {
     [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
     Param(
         [Parameter(Mandatory)][string] $UserId,
         [Parameter()][string] $MapAssetsToUserId
@@ -560,6 +572,7 @@ function Get-TSGroup {
 
 function New-TSGroup {
     [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
     Param(
         [Parameter(Mandatory)][string] $Name,
         [Parameter()][ValidateSet('Creator','Explorer','ExplorerCanPublish','SiteAdministratorExplorer','SiteAdministratorCreator','Viewer','Unlicensed')][string] $MinimumSiteRole,
@@ -600,6 +613,7 @@ function New-TSGroup {
 
 function Update-TSGroup {
     [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
     Param(
         [Parameter(Mandatory)][string] $GroupId,
         [Parameter()][string] $Name,
@@ -641,6 +655,7 @@ function Update-TSGroup {
 
 function Remove-TSGroup {
     [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
     Param(
         [Parameter(Mandatory)][string] $GroupId
     )
@@ -655,6 +670,7 @@ function Remove-TSGroup {
 
 function Add-TSUserToGroup {
     [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
     Param(
         [Parameter(Mandatory)][string] $UserId,
         [Parameter(Mandatory)][string] $GroupId
@@ -675,6 +691,7 @@ function Add-TSUserToGroup {
 
 function Remove-TSUserFromGroup {
     [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
     Param(
         [Parameter(Mandatory)][string] $UserId,
         [Parameter(Mandatory)][string] $GroupId
@@ -793,6 +810,129 @@ function Get-TSWorkbookConnection {
     }
 }
 
+function Export-TSWorkbook { # TODO
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $WorkbookId
+    )
+}
+
+function Update-TSWorkbook {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $WorkbookId,
+        [Parameter()][string] $Name,
+        [Parameter()][string] $NewProjectId,
+        [Parameter()][string] $NewOwnerId,
+        [Parameter()][switch] $ShowTabs,
+        [Parameter()][switch] $IncludeInRecentlyViewed,
+        [Parameter()][switch] $EncryptExtracts,
+        [Parameter()][switch] $EnableDataAcceleration,
+        [Parameter()][switch] $AccelerateNow
+    )
+    # generate xml request
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_workbook = $tsRequest.AppendChild($xml.CreateElement("workbook"))
+    if ($Name) {
+        $el_workbook.SetAttribute("name", $Name)
+    }
+    if ($ShowTabs) {
+        $el_workbook.SetAttribute("showTabs", "true")
+    }
+    if ($IncludeInRecentlyViewed) {
+        $el_workbook.SetAttribute("recentlyViewed", "true")
+    }
+    if ($EncryptExtracts) {
+        $el_workbook.SetAttribute("encryptExtracts", "true")
+    }
+    if ($NewProjectId) {
+        $el_project = $el_workbook.AppendChild($xml.CreateElement("project"))
+        $el_project.SetAttribute("id", $NewProjectId)
+    }
+    if ($NewOwnerId) {
+        $el_owner = $el_workbook.AppendChild($xml.CreateElement("owner"))
+        $el_owner.SetAttribute("id", $NewOwnerId)
+    }
+    if ($EnableDataAcceleration) {
+        $el_dataaccel = $el_workbook.AppendChild($xml.CreateElement("dataAccelerationConfig"))
+        $el_dataaccel.SetAttribute("accelerationEnabled", "true")
+        if ($AccelerateNow) {
+            $el_dataaccel.SetAttribute("accelerateNow", "true")
+        }
+    }
+    try {
+        if ($PSCmdlet.ShouldProcess($WorkbookId)) {
+            $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId
+            Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+        }
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function Update-TSWorkbookConnection {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $WorkbookId,
+        [Parameter(Mandatory)][string] $ConnectionId,
+        [Parameter()][string] $ServerAddress,
+        [Parameter()][string] $ServerPort,
+        [Parameter()][string] $Username,
+        [Parameter()][securestring] $SecurePassword,
+        [Parameter()][switch] $EmbedPassword,
+        [Parameter()][switch] $QueryTagging
+    )
+    # generate xml request
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_connection = $tsRequest.AppendChild($xml.CreateElement("connection"))
+    if ($ServerAddress) {
+        $el_connection.SetAttribute("serverAddress", $ServerAddress)
+    }
+    if ($ServerPort) {
+        $el_connection.SetAttribute("serverPort", $ServerPort)
+    }
+    if ($Username) {
+        $el_connection.SetAttribute("userName", $Username)
+    }
+    if ($SecurePassword) {
+        $private:PlainPassword = [System.Net.NetworkCredential]::new("", $SecurePassword).Password
+        $el_connection.SetAttribute("password", $private:PlainPassword)
+    }
+    if ($EmbedPassword) {
+        $el_connection.SetAttribute("embedPassword", "true")
+    }
+    if ($QueryTagging) {
+        $el_connection.SetAttribute("queryTaggingEnabled", "true")
+    }
+    try {
+        if ($PSCmdlet.ShouldProcess($ConnectionId)) {
+            $uri = Get-TSRequestUri -Endpoint Workbook -Param "$WorkbookId/connections/$ConnectionId"
+            Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+        }
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function Remove-TSWorkbook {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $WorkbookId
+    )
+    try {
+        if ($PSCmdlet.ShouldProcess($WorkbookId)) {
+            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId) -Method Delete -Headers (Get-TSRequestHeaderDict)
+        }
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
 function Get-TSDatasource {
     [OutputType([PSCustomObject[]])]
     Param(
@@ -827,6 +967,125 @@ function Get-TSDatasourceConnection {
     try {
         $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param "$DatasourceId/connections") -Method Get -Headers (Get-TSRequestHeaderDict)
         $response.tsResponse.connections.connection
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function Export-TSDatasource { # TODO
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $DatasourceId
+    )
+}
+
+function Update-TSDatasource {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $DatasourceId,
+        [Parameter()][string] $Name,
+        [Parameter()][string] $NewProjectId,
+        [Parameter()][string] $NewOwnerId,
+        [Parameter()][switch] $Certified,
+        [Parameter()][string] $CertificationNote,
+        [Parameter()][switch] $EncryptExtracts,
+        [Parameter()][switch] $EnableAskData
+    )
+    # generate xml request
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_datasource = $tsRequest.AppendChild($xml.CreateElement("datasource"))
+    if ($Name) {
+        $el_datasource.SetAttribute("name", $Name)
+    }
+    if ($Certified) {
+        $el_datasource.SetAttribute("isCertified", "true")
+    }
+    if ($CertificationNote) {
+        $el_datasource.SetAttribute("certificationNote", $CertificationNote)
+    }
+    if ($EncryptExtracts) {
+        $el_datasource.SetAttribute("encryptExtracts", "true")
+    }
+    if ($NewProjectId) {
+        $el_project = $el_datasource.AppendChild($xml.CreateElement("project"))
+        $el_project.SetAttribute("id", $NewProjectId)
+    }
+    if ($NewOwnerId) {
+        $el_owner = $el_datasource.AppendChild($xml.CreateElement("owner"))
+        $el_owner.SetAttribute("id", $NewOwnerId)
+    }
+    if ($EnableAskData) {
+        $el_askdata = $el_datasource.AppendChild($xml.CreateElement("askData"))
+        $el_askdata.SetAttribute("enablement", "true")
+    }
+    try {
+        if ($PSCmdlet.ShouldProcess($DatasourceId)) {
+            $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId
+            Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+        }
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function Update-TSDatasourceConnection {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $DatasourceId,
+        [Parameter(Mandatory)][string] $ConnectionId,
+        [Parameter()][string] $ServerAddress,
+        [Parameter()][string] $ServerPort,
+        [Parameter()][string] $Username,
+        [Parameter()][securestring] $SecurePassword,
+        [Parameter()][switch] $EmbedPassword,
+        [Parameter()][switch] $QueryTagging
+    )
+    # generate xml request
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_connection = $tsRequest.AppendChild($xml.CreateElement("connection"))
+    if ($ServerAddress) {
+        $el_connection.SetAttribute("serverAddress", $ServerAddress)
+    }
+    if ($ServerPort) {
+        $el_connection.SetAttribute("serverPort", $ServerPort)
+    }
+    if ($Username) {
+        $el_connection.SetAttribute("userName", $Username)
+    }
+    if ($SecurePassword) {
+        $private:PlainPassword = [System.Net.NetworkCredential]::new("", $SecurePassword).Password
+        $el_connection.SetAttribute("password", $private:PlainPassword)
+    }
+    if ($EmbedPassword) {
+        $el_connection.SetAttribute("embedPassword", "true")
+    }
+    if ($QueryTagging) {
+        $el_connection.SetAttribute("queryTaggingEnabled", "true")
+    }
+    try {
+        if ($PSCmdlet.ShouldProcess($ConnectionId)) {
+            $uri = Get-TSRequestUri -Endpoint Datasource -Param "$DatasourceId/connections/$ConnectionId"
+            Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+        }
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function Remove-TSDatasource {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $DatasourceId
+    )
+    try {
+        if ($PSCmdlet.ShouldProcess($DatasourceId)) {
+            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId) -Method Delete -Headers (Get-TSRequestHeaderDict)
+        }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
     }
@@ -912,7 +1171,7 @@ function Get-TSTableColumn {
     }
 }
 
-function Get-TSMetadataGraphQL {
+function Invoke-TSMetadataGraphQL {
     [OutputType([PSCustomObject[]])]
     Param(
         [Parameter(Mandatory)][string] $Query,
@@ -1010,16 +1269,20 @@ Export-ModuleMember -Function Get-TSGroupsForUser
 
 ### Workbooks, Views and Datasources methods
 Export-ModuleMember -Function Get-TSWorkbook
+Export-ModuleMember -Function Export-TSWorkbook
 Export-ModuleMember -Function Get-TSWorkbooksForUser
 Export-ModuleMember -Function Get-TSWorkbookConnection
 Export-ModuleMember -Function Get-TSDatasource
+Export-ModuleMember -Function Export-TSDatasource
 Export-ModuleMember -Function Get-TSDatasourcesForUser
 Export-ModuleMember -Function Get-TSDatasourceConnection
-# Delete Workbook
-# Delete Data Source
+Export-ModuleMember -Function Update-TSWorkbook
+Export-ModuleMember -Function Update-TSWorkbookConnection
+Export-ModuleMember -Function Update-TSDatasource
+Export-ModuleMember -Function Update-TSDatasourceConnection
+Export-ModuleMember -Function Remove-TSWorkbook
+Export-ModuleMember -Function Remove-TSDatasource
 # Download View Crosstab Excel
-# Download Workbook
-# Download Data Source
 # Download Workbook PDF
 # Download Workbook PowerPoint
 # Get View
@@ -1037,10 +1300,6 @@ Export-ModuleMember -Function Get-TSDatasourceConnection
 # Query View PDF
 # Query View Preview Image
 # Unhide a Recommendation for a View
-# Update Workbook
-# Update Data Source
-# Update Workbook Connection
-# Update Data Source Connection
 # Update Workbook Now
 # Update Data Source Now
 # Update Data in Hyper Connection
@@ -1277,7 +1536,7 @@ Export-ModuleMember -Function Get-TSDatasourceConnection
 Export-ModuleMember -Function Get-TSDatabase
 Export-ModuleMember -Function Get-TSTable
 Export-ModuleMember -Function Get-TSTableColumn
-Export-ModuleMember -Function Get-TSMetadataGraphQL
+Export-ModuleMember -Function Invoke-TSMetadataGraphQL
 # Query Data Quality Warning by ID
 # Query Data Quality Warning by Content
 # Query Data Quality Certification by ID
