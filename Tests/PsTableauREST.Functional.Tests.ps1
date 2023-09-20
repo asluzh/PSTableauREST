@@ -108,7 +108,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             It "Query sites on <ConfigFile.server>" {
                 if ($ConfigFile.test_site_name) {
                     $sites = Get-TSSite
-                    $sites.length | Should -BeGreaterThan 0
+                    ($sites | Measure-Object).Count | Should -BeGreaterThan 0
                     $sites | Where-Object id -eq $script:testSiteId | Should -Not -BeNullOrEmpty
                     $sites | Where-Object contentUrl -eq $script:testSite | Should -Not -BeNullOrEmpty
                 }
@@ -117,7 +117,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 if ($ConfigFile.test_site_name) {
                     {Invoke-TSSwitchSite -Site $testSite} | Should -Not -Throw
                     $sites = Get-TSSite -Current
-                    $sites.length | Should -Be 1
+                    ($sites | Measure-Object).Count | Should -Be 1
                     $sites | Where-Object id -eq $script:testSiteId | Should -Not -BeNullOrEmpty
                     $sites | Where-Object contentUrl -eq $script:testSite | Should -Not -BeNullOrEmpty
                 }
@@ -170,7 +170,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             }
             It "Query projects on <ConfigFile.server>" {
                 $projects = Get-TSProject
-                $projects.length | Should -BeGreaterThan 0
+                ($projects | Measure-Object).Count | Should -BeGreaterThan 0
                 $projects | Where-Object id -eq $script:testProjectId | Should -Not -BeNullOrEmpty
             }
             It "Delete project <testProjectId> on <ConfigFile.server>" {
@@ -210,7 +210,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             }
             It "Query users on <ConfigFile.server>" {
                 $users = Get-TSUser
-                $users.length | Should -BeGreaterThan 0
+                ($users | Measure-Object).Count | Should -BeGreaterThan 0
                 $users | Where-Object id -eq $script:testUserId | Should -Not -BeNullOrEmpty
                 $response = Get-TSUser -UserId $script:testUserId
                 $response.id | Should -Be $script:testUserId
@@ -236,7 +236,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             }
             It "Query groups on <ConfigFile.server>" {
                 $groups = Get-TSGroup
-                $groups.length | Should -BeGreaterThan 0
+                ($groups | Measure-Object).Count | Should -BeGreaterThan 0
                 $groups | Where-Object id -eq $script:testGroupId | Should -Not -BeNullOrEmpty
             }
             It "Remove group <testGroupId> on <ConfigFile.server>" {
@@ -267,43 +267,68 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             }
             It "Query groups for user on <ConfigFile.server>" {
                 $groups = Get-TSGroupsForUser -UserId $script:testUserId
-                $groups.length | Should -BeGreaterThan 0
+                ($groups | Measure-Object).Count | Should -BeGreaterThan 0
                 $groups | Where-Object id -eq $script:testGroupId | Should -Not -BeNullOrEmpty
             }
             It "Query users in group on <ConfigFile.server>" {
                 $users = Get-TSUsersInGroup -GroupId $script:testGroupId
-                $users.length | Should -BeGreaterThan 0
+                ($users | Measure-Object).Count | Should -BeGreaterThan 0
                 $users | Where-Object id -eq $script:testUserId | Should -Not -BeNullOrEmpty
             }
             It "Remove user from group on <ConfigFile.server>" {
                 $response = Remove-TSUserFromGroup -UserId $script:testUserId -GroupId $script:testGroupId
                 $response | Should -BeOfType String
                 $users = Get-TSUsersInGroup -GroupId $script:testGroupId
-                $users.length | Should -Be 0
+                ($users | Measure-Object).Count | Should -Be 0
             }
         }
+        Context "Workbook operations" -Tag Workbook {
+            It "Query workbooks on <ConfigFile.server>" {
+                $workbooks = Get-TSWorkbook
+                ($workbooks | Measure-Object).Count | Should -BeGreaterThan 0
+                $workbookId = $workbooks | Select-Object -First 1 -ExpandProperty id
+                $workbookId | Should -BeOfType String
+                $workbook = Get-TSWorkbook -WorkbookId $workbookId
+                $workbook.id | Should -Be $workbookId
+            }
+            It "Query workbooks for current user on <ConfigFile.server>" {
+                $workbooks = Get-TSWorkbooksForUser -UserId (Get-TSCurrentUserId)
+                ($workbooks | Measure-Object).Count | Should -BeGreaterThan 0
+                $workbooks | Select-Object -First 1 -ExpandProperty id | Should -BeOfType String
+            }
+        }
+        Context "Datasource operations" -Tag Datasource {
+            It "Query datasources on <ConfigFile.server>" {
+                $datasources = Get-TSDatasource
+                ($datasources | Measure-Object).Count | Should -BeGreaterThan 0
+                $datasourceId = $datasources | Select-Object -First 1 -ExpandProperty id
+                $datasourceId | Should -BeOfType String
+                $datasource = Get-TSDatasource -DatasourceId $datasourceId
+                $datasource.id | Should -Be $datasourceId
+            }
+         }
         Context "Metadata operations" -Tag Metadata {
             It "Query databases on <ConfigFile.server>" {
                 $databases = Get-TSDatabase
-                $databases.length | Should -BeGreaterThan 0
-                $databases[0].id | Should -BeOfType String
-                $databaseId = $databases[0].id
+                ($databases | Measure-Object).Count | Should -BeGreaterThan 0
+                $databaseId = $databases | Select-Object -First 1 -ExpandProperty id
+                $databaseId | Should -BeOfType String
                 $database = Get-TSDatabase -DatabaseId $databaseId
                 $database.id | Should -Be $databaseId
             }
             It "Query tables on <ConfigFile.server>" {
                 $tables = Get-TSTable
-                $tables.length | Should -BeGreaterThan 0
-                $tables[0].id | Should -BeOfType String
-                $script:tableId = $tables[0].id
+                ($tables | Measure-Object).Count | Should -BeGreaterThan 0
+                $script:tableId = $tables | Select-Object -First 1 -ExpandProperty id
+                $script:tableId | Should -BeOfType String
                 $table = Get-TSTable -TableId $script:tableId
                 $table.id | Should -Be $script:tableId
             }
             It "Query columns in <tableId> on <ConfigFile.server>" {
                 $columns = Get-TSTableColumn -TableId $script:tableId
-                $columns.length | Should -BeGreaterThan 0
-                $columns[0].id | Should -BeOfType String
-                $columnId = $columns[0].id
+                ($columns | Measure-Object).Count | Should -BeGreaterThan 0
+                $columnId = $columns | Select-Object -First 1 -ExpandProperty id
+                $columnId | Should -BeOfType String
                 $column = Get-TSTableColumn -TableId $script:tableId -ColumnId $columnId
                 $column.id | Should -Be $columnId
             }
@@ -312,16 +337,16 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 $data = Get-TSGraphQL -Query $query
                 $data | Should -BeOfType PSCustomObject
                 $entity = $data.PSObject.Properties | Select-Object -First 1 -ExpandProperty Name
-                $data.$entity.length | Should -BeGreaterThan 0
+                ($data.$entity | Measure-Object).Count | Should -BeGreaterThan 0
             }
             It "Paginated GraphQL query on <ConfigFile.server>" {
                 $query = Get-Content "Tests/Assets/fields-paginated.graphql" | Out-String
                 $data = Get-TSGraphQL -Query $query -PaginatedEntity "fieldsConnection" #-PageSize 100
-                $data.nodes.length | Should -BeGreaterThan 100
+                ($data | Measure-Object).Count | Should -BeGreaterThan 100
                 $data = Get-TSGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 1000
-                $data.nodes.length | Should -BeGreaterThan 100
+                ($data | Measure-Object).Count | Should -BeGreaterThan 100
                 $data = Get-TSGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 20000
-                $data.nodes.length | Should -BeGreaterThan 100
+                ($data | Measure-Object).Count | Should -BeGreaterThan 100
             }
         }
     }

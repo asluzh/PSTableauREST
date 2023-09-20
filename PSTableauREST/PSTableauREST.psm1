@@ -26,25 +26,10 @@
 # "@;
 # Add-Type -TypeDefinition $Source -Language CSharp
 
-# Module variables
+### Module variables and helper functions
 $TSRestApiVersion = '2.4' # minimum supported version
 $TSRestApiMinVersion = '2.4' # supported version for initial sign-in calls
 #$TSRestApiChunkSize = 2097152	   ## 2MB or 2048KB
-
-function Get-TSServerInfo {
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter()][string] $ServerUrl
-    )
-    try {
-        if ($ServerUrl) {
-            $script:TSServerUrl = $ServerUrl
-        }
-        return Invoke-RestMethod -Uri $script:TSServerUrl/api/$script:TSRestApiMinVersion/serverinfo -Method Get
-    } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
-    }
-}
 
 # set up headers IDictionary with auth token (and optionally other headers)
 function Get-TSRequestHeaderDict {
@@ -64,7 +49,7 @@ function Get-TSRequestHeaderDict {
 
 function Get-TSRequestUri {
     Param(
-        [Parameter(Mandatory)][ValidateSet('Auth','Site','Project','User','Group','Database','Table','GraphQL')][string] $Endpoint,
+        [Parameter(Mandatory)][ValidateSet('Auth','Site','Project','User','Group','Workbook','Datasource','View','Database','Table','GraphQL')][string] $Endpoint,
         [Parameter()][string] $Param
     )
     $Uri = "$script:TSServerUrl/api/$script:TSRestApiVersion/"
@@ -87,6 +72,22 @@ function Get-TSRequestUri {
         }
     }
     return $Uri
+}
+
+### Authentication / Server methods
+function Get-TSServerInfo {
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter()][string] $ServerUrl
+    )
+    try {
+        if ($ServerUrl) {
+            $script:TSServerUrl = $ServerUrl
+        }
+        return Invoke-RestMethod -Uri $script:TSServerUrl/api/$script:TSRestApiMinVersion/serverinfo -Method Get
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
 }
 
 function Invoke-TSSignIn {
@@ -114,7 +115,6 @@ function Invoke-TSSignIn {
     }
 
     $xml = New-Object System.Xml.XmlDocument
-
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_credentials = $tsRequest.AppendChild($xml.CreateElement("credentials"))
     $el_site = $el_credentials.AppendChild($xml.CreateElement("site"))
@@ -202,6 +202,12 @@ function Revoke-TSServerAdminTokens {
     }
 }
 
+function Get-TSCurrentUserId {
+    Param()
+    return $script:TSUserId
+}
+
+### Sites methods
 function Get-TSSite {
     [OutputType([PSCustomObject[]])]
     Param(
@@ -318,6 +324,7 @@ function Remove-TSSite {
     }
 }
 
+### Projects methods
 function Get-TSProject {
     [OutputType([PSCustomObject[]])]
     Param(
@@ -422,6 +429,7 @@ function Remove-TSProject {
     }
 }
 
+### Users and Groups methods
 function Get-TSUser {
     [OutputType([PSCustomObject[]])]
     Param(
@@ -722,6 +730,109 @@ function Get-TSGroupsForUser {
     }
 }
 
+### Workbooks, Views and Datasources methods
+function Get-TSWorkbook {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter()][string] $WorkbookId,
+        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+    )
+    try {
+        if ($WorkbookId) { # Get Workbook
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId) -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response.tsResponse.workbook
+        } else { # Query Workbooks on Site
+            $pageNumber = 0
+            do {
+                $pageNumber += 1
+                $uri = Get-TSRequestUri -Endpoint Workbook
+                $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+                $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+                $totalAvailable = $response.tsResponse.pagination.totalAvailable
+                $response.tsResponse.workbooks.workbook
+            } until ($PageSize*$pageNumber -gt $totalAvailable)
+        }
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function Get-TSWorkbooksForUser {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter(Mandatory)][string] $UserId,
+        [Parameter()][switch] $IsOwner,
+        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+    )
+    try {
+        $pageNumber = 0
+        do {
+            $pageNumber += 1
+            $uri = Get-TSRequestUri -Endpoint User -Param "$UserId/workbooks"
+            $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+            if ($IsOwner) { $uri += "&isOwner=true" }
+            $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+            $totalAvailable = $response.tsResponse.pagination.totalAvailable
+            $response.tsResponse.workbooks.workbook
+        } until ($PageSize*$pageNumber -gt $totalAvailable)
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function Get-TSWorkbookConnection {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter(Mandatory)][string] $WorkbookId
+    )
+    try {
+        $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param "$WorkbookId/connections") -Method Get -Headers (Get-TSRequestHeaderDict)
+        $response.tsResponse.connections.connection
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function Get-TSDatasource {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter()][string] $DatasourceId,
+        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+    )
+    try {
+        if ($DatasourceId) { # Query Data Source
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId) -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response.tsResponse.datasource
+        } else { # Query Data Sources
+            $pageNumber = 0
+            do {
+                $pageNumber += 1
+                $uri = Get-TSRequestUri -Endpoint Datasource
+                $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+                $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+                $totalAvailable = $response.tsResponse.pagination.totalAvailable
+                $response.tsResponse.datasources.datasource
+            } until ($PageSize*$pageNumber -gt $totalAvailable)
+        }
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function Get-TSDatasourceConnection {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter(Mandatory)][string] $DatasourceId
+    )
+    try {
+        $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param "$DatasourceId/connections") -Method Get -Headers (Get-TSRequestHeaderDict)
+        $response.tsResponse.connections.connection
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+### Metadata methods
 function Get-TSDatabase {
     [OutputType([PSCustomObject[]])]
     Param(
@@ -850,11 +961,20 @@ function Get-TSGraphQL {
     }
 }
 
+# Export module members
+### Authentication / Server methods
 Export-ModuleMember -Function Get-TSServerInfo
 Export-ModuleMember -Function Invoke-TSSignIn
-Export-ModuleMember -Function Invoke-TSSignOut
 Export-ModuleMember -Function Invoke-TSSwitchSite
+Export-ModuleMember -Function Invoke-TSSignOut
+Export-ModuleMember -Function Revoke-TSServerAdminTokens
+Export-ModuleMember -Function Get-TSCurrentUserId
+# Delete Server Session
+# Get Current Server Session
+# List Server Active Directory Domains
+# Update Server Active Directory Domain
 
+### Site methods
 Export-ModuleMember -Function Get-TSSite
 Export-ModuleMember -Function New-TSSite
 Export-ModuleMember -Function Update-TSSite
@@ -865,11 +985,13 @@ Export-ModuleMember -Function Remove-TSSite
 # Query Views for Site
 # Update Embedding Settings for Site
 
+### Projects methods
 Export-ModuleMember -Function Get-TSProject
 Export-ModuleMember -Function New-TSProject
 Export-ModuleMember -Function Update-TSProject
 Export-ModuleMember -Function Remove-TSProject
 
+### Users and Groups methods
 Export-ModuleMember -Function Get-TSUser
 Export-ModuleMember -Function New-TSUser
 Export-ModuleMember -Function Update-TSUser
@@ -885,6 +1007,272 @@ Export-ModuleMember -Function Get-TSGroupsForUser
 # Import Users to Site from CSV
 # Delete Users from Site with CSV
 
+### Workbooks, Views and Datasources methods
+Export-ModuleMember -Function Get-TSWorkbook
+Export-ModuleMember -Function Get-TSWorkbooksForUser
+Export-ModuleMember -Function Get-TSWorkbookConnection
+Export-ModuleMember -Function Get-TSDatasource
+Export-ModuleMember -Function Get-TSDatasourcesForUser
+Export-ModuleMember -Function Get-TSDatasourceConnection
+# Delete Workbook
+# Delete Data Source
+# Download View Crosstab Excel
+# Download Workbook
+# Download Data Source
+# Download Workbook PDF
+# Download Workbook PowerPoint
+# Get View
+# Get View by Path
+# Get Recommendations for Views
+# Get Workbook Downgrade Info
+# Hide a Recommendation for a View
+# Publish Workbook
+# Publish Data Source
+# Query Workbook Preview Image
+# Query Views for Site
+# Query Views for Workbook
+# Query View Data
+# Query View Image
+# Query View PDF
+# Query View Preview Image
+# Unhide a Recommendation for a View
+# Update Workbook
+# Update Data Source
+# Update Workbook Connection
+# Update Data Source Connection
+# Update Workbook Now
+# Update Data Source Now
+# Update Data in Hyper Connection
+# Update Data in Hyper Data Source
+# List Custom Views
+# Get Custom View
+# Get Custom View Image
+# Update Custom View
+# Delete Custom View
+# Add Tags to View
+# Add Tags to Workbook
+# Add Tags to Data Source
+# Delete Tag from View
+# Delete Tag from Workbook
+# Delete Tag from Data Source
+
+### Permissions methods
+# Add Ask Data Lens Permissions
+# Add Data Source Permissions
+# Add Default Permissions
+# Add Project Permissions
+# Add View Permissions
+# Add Workbook Permissions
+# Add Workbook to Server Schedule
+# Delete Ask Data Lens Permission
+# Delete Data Source Permission
+# Delete Default Permission
+# Delete Project Permission
+# Delete View Permission
+# Delete Workbook Permission
+# List Ask Data Lens Permissions
+# Query Data Source Permissions
+# Query Default Permissions
+# Query Project Permissions
+# Query View Permissions
+# Query Workbook Permissions
+
+### Revision methods
+# Get Workbook Revisions
+# Get Data Source Revisions
+# Download Workbook Revision
+# Download Data Source Revision
+# Remove Workbook Revision
+# Remove Data Source Revision
+
+### Publishing methods
+# Append to File Upload
+# Initiate File Upload
+# Publish Data Source
+# Publish Flow
+# Publish Workbook
+
+### Jobs, Tasks and Schedules methods
+# Add Data Source to Server Schedule
+# Add Workbook to Server Schedule
+# Cancel Job
+# Create Server Schedule
+# Delete Data Acceleration Task
+# Delete Server Schedule
+# Get Data Acceleration Tasks in a Site
+# Get Server Schedule
+# Query Job
+# Query Jobs
+# List Server Schedules
+# Update Server Schedule
+
+### Extract and Encryption methods
+# Create Cloud Extract Refresh Task
+# Create Extracts for Embedded Data Sources in a Workbook
+# Create an Extract for a Data Source
+# Decrypt Extracts in a Site
+# Delete Extracts of Embedded Data Sources from a Workbook
+# Delete the Extract from a Data Source
+# Delete Extract Refresh Task
+# Encrypt Extracts in a Site
+# Get Extract Refresh Task
+# List Extract Refresh Tasks in Site
+# List Extract Refresh Tasks in Server Schedule
+# Reencrypt Extracts in a Site
+# Run Extract Refresh Task
+# Update Cloud extract refresh task
+
+### Flow methods
+# Add Flow Permissions
+# Add Flow Task to Schedule
+# Cancel Flow Run
+# Delete Flow
+# Delete Flow Permission
+# Download Flow
+# Get Flow Run
+# Get Flow Runs
+# Get Flow Run Task
+# Get Flow Run Tasks
+# Get Linked Task
+# Get Linked Tasks
+# Publish Flow
+# Query Flow
+# Query Flows for a Site
+# Query Flows for User
+# Query Flow Connections
+# Query Flow Permissions
+# Run Flow Now
+# Run Flow Task
+# Run Linked Task Now
+# Update Flow
+# Update Flow Connection
+
+### Favorites methods
+# Add Data Source to Favorites
+# Add Flow to Favorites
+# Add Metric to Favorites
+# Add Project to Favorites
+# Add View to Favorites
+# Add Workbook to Favorites
+# Delete Data Source from Favorites
+# Delete Flow from Favorites
+# Delete Project from Favorites
+# Delete View from Favorites
+# Delete Workbook from Favorites
+# Get Favorites for User
+# Organize Favorites
+
+### Subscription methods
+# Create Subscription
+# Delete Subscription
+# Get Subscription
+# List Subscriptions
+# Update Subscription
+
+### Dashboard Extensions Settings methods
+# Block dashboard extension on server
+# Allow dashboard extension on site
+# Unblock dashboard extension on server
+# Get blocked dashboard extension on server
+# List blocked dashboard extensions on server
+# List allowed dashboard extensions on site
+# List settings for dashboard extensions on server
+# Update dashboard extensions settings of server
+# Disallow dashboard extension on site
+# Get allowed dashboard extension on site
+# List dashboard extension settings of site
+# Update settings for allowed dashboard extension on site
+# Update dashboard extension settings of site
+
+### Analytics Extensions Settings methods
+# Add analytics extension connection to site
+# Delete analytics extension connection from site
+# Remove current analytics extension connection for workbook
+# Get analytics extension details
+# List analytics extension connections on site
+# Get enabled state of analytics extensions on server
+# Get enabled state of analytics extensions on site
+# List analytics extension connections of workbook
+# Get current analytics extension for workbook
+# Update analytics extension connection of site
+# Enable or disable analytics extensions on server
+# Update enabled state of analytics extensions on site
+# Update analytics extension for workbook
+
+### Connected App methods
+# Create Connected App
+# Register EAS
+# Create Connected App Secret
+# Delete Connected App
+# Delete EAS
+# Delete Connected App Secret
+# Get Connected App
+# List Connected Apps
+# List All Registered EAS
+# List Registered EAS
+# Get Connected App Secret
+# Update Connected App
+# Update EAS
+
+### Notifications methods
+# Add User to Data-Driven Alert
+# Create Data Driven Alert
+# Create a Webhook
+# Delete Data-Driven Alert
+# Delete User from Data-Driven Alert
+# Delete a Webhook
+# Get User Notification Preferences
+# Get a Webhook
+# List Webhooks
+# List Data-Driven Alerts on Site
+# Get Data-Driven Alert
+# Test a Webhook
+# Update Data-Driven Alert
+# Update User Notification Preferences
+# Update a Webhook
+
+### Content Exploration methods
+# Get content Suggestions
+# Get content search results
+# Get batch content usage statistics
+# Get usage statistics for content item
+
+### Ask Data Lens methods
+# Create ask data lens
+# Delete ask data lens
+# Get ask data lens
+# Import ask data lens
+# List ask data lenses in site
+
+### Metrics methods
+# Delete Metric
+# Get Metric
+# Get Metric Data
+# List Metrics for Site
+# Update Metric
+
+### Identity Pools methods
+# Add User to Identity Pool
+# Delete Authentication Configuration
+# Remove User from Identity Pool
+# Delete Identity Pool
+# Delete Identity Store
+# Get Identity Pool
+# List Authentication Configurations
+# List Identity Pools
+# List Identity Stores
+# Create Authentication Configuration
+# Create Identity Pool
+# Configure Identity Store
+# Update Authentication Configuration
+# Update Identity Pool
+
+### Virtual Connections methods
+# List Virtual Connections
+# List Virtual Connection Database Connections
+# Update Virtual Connection Database Connections
+
+### Metadata methods
 Export-ModuleMember -Function Get-TSDatabase
 Export-ModuleMember -Function Get-TSTable
 Export-ModuleMember -Function Get-TSTableColumn
