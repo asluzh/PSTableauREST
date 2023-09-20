@@ -27,8 +27,8 @@
 # Add-Type -TypeDefinition $Source -Language CSharp
 
 ### Module variables and helper functions
-$TSRestApiVersion = '2.4' # minimum supported version
-$TSRestApiMinVersion = '2.4' # supported version for initial sign-in calls
+$TSRestApiVersion = [version]'2.4' # minimum supported version
+$TSRestApiMinVersion = [version]'2.4' # supported version for initial sign-in calls
 #$TSRestApiChunkSize = 2097152	   ## 2MB or 2048KB
 
 # set up headers IDictionary with auth token (and optionally other headers)
@@ -75,17 +75,56 @@ function Get-TSRequestUri {
     return $Uri
 }
 
+### API version methods
+# version mapping: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_versions.htm
+# what's new here: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_whats_new.htm
+function Assert-TSRestApiVersion {
+    [OutputType()]
+    Param(
+        [Parameter()][version] $AtLeast,
+        [Parameter()][version] $LessThan
+    )
+    if ($AtLeast -and $script:TSRestApiVersion -lt $AtLeast) {
+        throw "Method or Parameter not supported, needs API version >= $AtLeast"
+    }
+    if ($LessThan -and $script:TSRestApiVersion -ge $LessThan) {
+        throw "Method or Parameter not supported, needs API version < $LessThan"
+    }
+}
+
+function Get-TSRestApiVersion {
+    [OutputType([version])]
+    Param()
+    return $script:TSRestApiVersion
+}
+
+function Set-TSRestApiVersion {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType()]
+    Param(
+        [Parameter()][version] $ApiVersion
+    )
+    if ($PSCmdlet.ShouldProcess($ApiVersion)) {
+        $script:TSRestApiVersion = $ApiVersion
+    }
+}
+
 ### Authentication / Server methods
 function Get-TSServerInfo {
     [OutputType([PSCustomObject])]
     Param(
         [Parameter()][string] $ServerUrl
     )
+    # Assert-TSRestApiVersion -AtLeast 2.4
     try {
-        if ($ServerUrl) {
-            $script:TSServerUrl = $ServerUrl
+        if (-Not $ServerUrl) {
+            $ServerUrl = $script:TSServerUrl
         }
-        return Invoke-RestMethod -Uri $script:TSServerUrl/api/$script:TSRestApiMinVersion/serverinfo -Method Get
+        $apiVersion = $script:TSRestApiMinVersion
+        if ($script:TSRestApiVersion) {
+            $apiVersion = $script:TSRestApiVersion
+        }
+        return Invoke-RestMethod -Uri $ServerUrl/api/$apiVersion/serverinfo -Method Get
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
     }
@@ -103,18 +142,17 @@ function Invoke-TSSignIn {
         [Parameter()][string] $ImpersonateUserId,
         [Parameter()][boolean] $UseServerVersion = $True
     )
-
+    # Assert-TSRestApiVersion -AtLeast 2.0
     $script:TSServerUrl = $ServerUrl
     $response = Get-TSServerInfo
     $script:TSProductVersion = $response.tsResponse.serverInfo.productVersion.InnerText
     $script:TSProductVersionBuild = $response.tsResponse.serverInfo.productVersion.build
     # $response.tsResponse.serverInfo.prepConductorVersion
     if ($UseServerVersion) {
-        $script:TSRestApiVersion = $response.tsResponse.serverInfo.restApiVersion
+        $script:TSRestApiVersion = [version]$response.tsResponse.serverInfo.restApiVersion
     } else {
-        $script:TSRestApiVersion = $script:TSRestApiMinVersion
+        $script:TSRestApiVersion = [version]$script:TSRestApiMinVersion
     }
-
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_credentials = $tsRequest.AppendChild($xml.CreateElement("credentials"))
@@ -128,18 +166,19 @@ function Invoke-TSSignIn {
         $private:PlainPassword = [System.Net.NetworkCredential]::new("", $SecurePassword).Password
         $el_credentials.SetAttribute("name", $Username)
         $el_credentials.SetAttribute("password", $private:PlainPassword)
+        # if ($ImpersonateUserId) { Assert-TSRestApiVersion -AtLeast 2.0 }
     } elseif ($PersonalAccessTokenName -and $PersonalAccessTokenSecret) {
+        Assert-TSRestApiVersion -AtLeast 3.6
         $private:PlainSecret = [System.Net.NetworkCredential]::new("", $PersonalAccessTokenSecret).Password
         $el_credentials.SetAttribute("personalAccessTokenName", $PersonalAccessTokenName)
         $el_credentials.SetAttribute("personalAccessTokenSecret", $private:PlainSecret)
+        # if ($ImpersonateUserId) { Assert-TSRestApiVersion -AtLeast 2.0 }
     } else {
         Write-Error -Exception "Sign-in parameters not provided (username/password or PAT)."
         return $null
     }
-
     try {
         $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Auth -Param signin) -Body $xml.OuterXml -Method Post
-        # get the auth token, site id and my user id
         $script:TSAuthToken = $response.tsResponse.credentials.token
         $script:TSSiteId = $response.tsResponse.credentials.site.id
         $script:TSUserId = $response.tsResponse.credentials.user.id
@@ -154,12 +193,11 @@ function Invoke-TSSwitchSite {
     Param(
         [Parameter()][string] $Site = ""
     )
-    # generate xml request
+    Assert-TSRestApiVersion -AtLeast 2.6
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_site = $tsRequest.AppendChild($xml.CreateElement("site"))
     $el_site.SetAttribute("contentUrl", $Site)
-
     try {
         $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Auth -Param switchSite) -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
         $script:TSAuthToken = $response.tsResponse.credentials.token
@@ -174,6 +212,7 @@ function Invoke-TSSwitchSite {
 function Invoke-TSSignOut {
     [OutputType([PSCustomObject])]
     Param()
+    # Assert-TSRestApiVersion -AtLeast 2.0
     try {
         $response = $Null
         if ($Null -ne $script:TSServerUrl -and $Null -ne $script:TSAuthToken) {
@@ -191,10 +230,11 @@ function Invoke-TSSignOut {
     }
 }
 
-function Revoke-TSServerAdminToken {
+function Revoke-TSServerAdminPAT {
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType([PSCustomObject])]
     Param()
+    Assert-TSRestApiVersion -AtLeast 3.10
     try {
         if ($PSCmdlet.ShouldProcess()) {
             Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Auth -Param serverAdminAccessTokens) -Method Delete -Headers (Get-TSRequestHeaderDict)
@@ -217,6 +257,7 @@ function Get-TSSite {
         [Parameter()][switch] $Current,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
+    # Assert-TSRestApiVersion -AtLeast 2.0
     try {
         if ($Current) { # get single (current) site
             $uri = Get-TSRequestUri -Endpoint Site -Param $script:TSSiteId
@@ -256,10 +297,10 @@ function New-TSSite {
         # sheetImageEnabled, catalogingEnabled, derivedPermissionsEnabled, userVisibilityMode, useDefaultTimeZone, timeZone
         # autoSuspendRefreshEnabled, autoSuspendRefreshInactivityWindow
     )
+    # Assert-TSRestApiVersion -AtLeast 2.0
     if ($SiteParams.Keys -contains 'adminMode' -and $SiteParams.Keys -contains 'userQuota' -and $SiteParams["adminMode"] -eq "ContentOnly") {
         Write-Error -Exception "You cannot set admin_mode to ContentOnly and also set a user quota."
     }
-    # generate xml request
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_site = $tsRequest.AppendChild($xml.CreateElement("site"))
@@ -284,6 +325,7 @@ function Update-TSSite {
         [Parameter(Mandatory)][string] $SiteId,
         [Parameter()][hashtable] $SiteParams
     )
+    # Assert-TSRestApiVersion -AtLeast 2.0
     if ($SiteParams.Keys -contains 'adminMode' -and $SiteParams.Keys -contains 'userQuota' -and $SiteParams["adminMode"] -eq "ContentOnly") {
         Write-Error -Exception "You cannot set admin_mode to ContentOnly and also set a user quota."
     }
@@ -313,11 +355,13 @@ function Remove-TSSite {
         [Parameter(Mandatory)][string] $SiteId,
         [Parameter()][switch] $BackgroundTask
     )
+    # Assert-TSRestApiVersion -AtLeast 2.0
     try {
         if ($PSCmdlet.ShouldProcess($SiteId)) {
             if ($SiteId -eq $script:TSSiteId) {
                 $uri = Get-TSRequestUri -Endpoint Site -Param $SiteId
-                if ($BackgroundTask) { # TODO check $script:TSRestApiVersion >= 3.18
+                if ($BackgroundTask) {
+                    Assert-TSRestApiVersion -AtLeast 3.18
                     $uri += "?asJob=true"
                 }
                 Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
@@ -336,6 +380,7 @@ function Get-TSProject {
     Param(
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
+    # Assert-TSRestApiVersion -AtLeast 2.0
     try {
         $pageNumber = 0
         do {
@@ -360,7 +405,7 @@ function New-TSProject {
         [Parameter()][ValidateSet('ManagedByOwner','LockedToProject','LockedToProjectWithoutNested')][string] $ContentPermissions,
         [Parameter()][string] $ParentProjectId
     )
-    # generate xml request
+    # Assert-TSRestApiVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_project = $tsRequest.AppendChild($xml.CreateElement("project"))
@@ -395,6 +440,7 @@ function Update-TSProject {
         [Parameter()][string] $ParentProjectId,
         [Parameter()][switch] $PublishSamples
     )
+    # Assert-TSRestApiVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_project = $tsRequest.AppendChild($xml.CreateElement("project"))
@@ -429,6 +475,7 @@ function Remove-TSProject {
     Param(
         [Parameter(Mandatory)][string] $ProjectId
     )
+    # Assert-TSRestApiVersion -AtLeast 2.0
     try {
         if ($PSCmdlet.ShouldProcess($ProjectId)) {
             Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Project -Param $ProjectId) -Method Delete -Headers (Get-TSRequestHeaderDict)
@@ -445,6 +492,7 @@ function Get-TSUser {
         [Parameter()][string] $UserId,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
+    # Assert-TSRestApiVersion -AtLeast 2.0
     try {
         if ($UserId) { # Query User On Site
             $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint User -Param $UserId) -Method Get -Headers (Get-TSRequestHeaderDict)
@@ -472,8 +520,8 @@ function New-TSUser {
         [Parameter(Mandatory)][string] $Name,
         [Parameter(Mandatory)][ValidateSet('Creator','Explorer','ExplorerCanPublish','SiteAdministratorExplorer','SiteAdministratorCreator','Viewer','Unlicensed')][string] $SiteRole,
         [Parameter()][string] $AuthSetting
-        )
-    # generate xml request
+    )
+    # Assert-TSRestApiVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_user = $tsRequest.AppendChild($xml.CreateElement("user"))
@@ -502,6 +550,7 @@ function Update-TSUser {
         [Parameter()][ValidateSet('Creator','Explorer','ExplorerCanPublish','SiteAdministratorExplorer','SiteAdministratorCreator','Viewer','Unlicensed')][string] $SiteRole,
         [Parameter()][string] $AuthSetting
     )
+    # Assert-TSRestApiVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_user = $tsRequest.AppendChild($xml.CreateElement("user"))
@@ -537,6 +586,7 @@ function Remove-TSUser {
         [Parameter(Mandatory)][string] $UserId,
         [Parameter()][string] $MapAssetsToUserId
     )
+    # Assert-TSRestApiVersion -AtLeast 2.0
     try {
         if ($PSCmdlet.ShouldProcess($UserId)) {
             $uri = Get-TSRequestUri -Endpoint User -Param $UserId
@@ -555,6 +605,7 @@ function Get-TSGroup {
     Param(
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
+    # Assert-TSRestApiVersion -AtLeast 2.0
     try {
         $pageNumber = 0
         do {
@@ -580,7 +631,7 @@ function New-TSGroup {
         [Parameter()][ValidateSet('onLogin','onSync')][string] $GrantLicenseMode,
         [Parameter()][switch] $BackgroundTask
     )
-    # generate xml request
+    # Assert-TSRestApiVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_group = $tsRequest.AppendChild($xml.CreateElement("group"))
@@ -622,7 +673,7 @@ function Update-TSGroup {
         [Parameter()][ValidateSet('onLogin','onSync')][string] $GrantLicenseMode,
         [Parameter()][switch] $BackgroundTask
     )
-    # generate xml request
+    # Assert-TSRestApiVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_group = $tsRequest.AppendChild($xml.CreateElement("group"))
@@ -659,6 +710,7 @@ function Remove-TSGroup {
     Param(
         [Parameter(Mandatory)][string] $GroupId
     )
+    # Assert-TSRestApiVersion -AtLeast 2.0
     try {
         if ($PSCmdlet.ShouldProcess($GroupId)) {
             Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Group -Param $GroupId) -Method Delete -Headers (Get-TSRequestHeaderDict)
@@ -675,7 +727,7 @@ function Add-TSUserToGroup {
         [Parameter(Mandatory)][string] $UserId,
         [Parameter(Mandatory)][string] $GroupId
     )
-    # generate xml request
+    # Assert-TSRestApiVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_user = $tsRequest.AppendChild($xml.CreateElement("user"))
@@ -696,6 +748,7 @@ function Remove-TSUserFromGroup {
         [Parameter(Mandatory)][string] $UserId,
         [Parameter(Mandatory)][string] $GroupId
     )
+    # Assert-TSRestApiVersion -AtLeast 2.0
     try {
         if ($PSCmdlet.ShouldProcess("remove user $UserId from group $GroupId")) {
             Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Group -Param "$GroupId/users/$UserId") -Method Delete -Headers (Get-TSRequestHeaderDict)
@@ -711,6 +764,7 @@ function Get-TSUsersInGroup {
         [Parameter(Mandatory)][string] $GroupId,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
+    # Assert-TSRestApiVersion -AtLeast 2.0
     try {
         $pageNumber = 0
         do {
@@ -732,6 +786,7 @@ function Get-TSGroupsForUser {
         [Parameter(Mandatory)][string] $UserId,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
+    Assert-TSRestApiVersion -AtLeast 3.7
     try {
         $pageNumber = 0
         do {
@@ -754,6 +809,7 @@ function Get-TSWorkbook {
         [Parameter()][string] $WorkbookId,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
+    # Assert-TSRestApiVersion -AtLeast 2.0
     try {
         if ($WorkbookId) { # Get Workbook
             $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId) -Method Get -Headers (Get-TSRequestHeaderDict)
@@ -781,6 +837,7 @@ function Get-TSWorkbooksForUser {
         [Parameter()][switch] $IsOwner,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
+    # Assert-TSRestApiVersion -AtLeast 2.0
     try {
         $pageNumber = 0
         do {
@@ -802,6 +859,7 @@ function Get-TSWorkbookConnection {
     Param(
         [Parameter(Mandatory)][string] $WorkbookId
     )
+    # Assert-TSRestApiVersion -AtLeast 2.0
     try {
         $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param "$WorkbookId/connections") -Method Get -Headers (Get-TSRequestHeaderDict)
         $response.tsResponse.connections.connection
@@ -815,6 +873,7 @@ function Export-TSWorkbook { # TODO
     Param(
         [Parameter(Mandatory)][string] $WorkbookId
     )
+    # Assert-TSRestApiVersion -AtLeast 2.0
 }
 
 function Update-TSWorkbook {
@@ -831,7 +890,7 @@ function Update-TSWorkbook {
         [Parameter()][switch] $EnableDataAcceleration,
         [Parameter()][switch] $AccelerateNow
     )
-    # generate xml request
+    # Assert-TSRestApiVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_workbook = $tsRequest.AppendChild($xml.CreateElement("workbook"))
@@ -856,6 +915,7 @@ function Update-TSWorkbook {
         $el_owner.SetAttribute("id", $NewOwnerId)
     }
     if ($EnableDataAcceleration) {
+        Assert-TSRestApiVersion -AtLeast 3.16
         $el_dataaccel = $el_workbook.AppendChild($xml.CreateElement("dataAccelerationConfig"))
         $el_dataaccel.SetAttribute("accelerationEnabled", "true")
         if ($AccelerateNow) {
@@ -885,7 +945,7 @@ function Update-TSWorkbookConnection {
         [Parameter()][switch] $EmbedPassword,
         [Parameter()][switch] $QueryTagging
     )
-    # generate xml request
+    # Assert-TSRestApiVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_connection = $tsRequest.AppendChild($xml.CreateElement("connection"))
@@ -924,6 +984,7 @@ function Remove-TSWorkbook {
     Param(
         [Parameter(Mandatory)][string] $WorkbookId
     )
+    # Assert-TSRestApiVersion -AtLeast 2.0
     try {
         if ($PSCmdlet.ShouldProcess($WorkbookId)) {
             Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId) -Method Delete -Headers (Get-TSRequestHeaderDict)
@@ -939,6 +1000,7 @@ function Get-TSDatasource {
         [Parameter()][string] $DatasourceId,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
+    # Assert-TSRestApiVersion -AtLeast 2.0
     try {
         if ($DatasourceId) { # Query Data Source
             $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId) -Method Get -Headers (Get-TSRequestHeaderDict)
@@ -964,6 +1026,7 @@ function Get-TSDatasourceConnection {
     Param(
         [Parameter(Mandatory)][string] $DatasourceId
     )
+    # Assert-TSRestApiVersion -AtLeast 2.3
     try {
         $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param "$DatasourceId/connections") -Method Get -Headers (Get-TSRequestHeaderDict)
         $response.tsResponse.connections.connection
@@ -977,6 +1040,7 @@ function Export-TSDatasource { # TODO
     Param(
         [Parameter(Mandatory)][string] $DatasourceId
     )
+    # Assert-TSRestApiVersion -AtLeast 2.0
 }
 
 function Update-TSDatasource {
@@ -992,7 +1056,7 @@ function Update-TSDatasource {
         [Parameter()][switch] $EncryptExtracts,
         [Parameter()][switch] $EnableAskData
     )
-    # generate xml request
+    # Assert-TSRestApiVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_datasource = $tsRequest.AppendChild($xml.CreateElement("datasource"))
@@ -1017,6 +1081,7 @@ function Update-TSDatasource {
         $el_owner.SetAttribute("id", $NewOwnerId)
     }
     if ($EnableAskData) {
+        Assert-TSRestApiVersion -LessThan 3.12
         $el_askdata = $el_datasource.AppendChild($xml.CreateElement("askData"))
         $el_askdata.SetAttribute("enablement", "true")
     }
@@ -1043,7 +1108,7 @@ function Update-TSDatasourceConnection {
         [Parameter()][switch] $EmbedPassword,
         [Parameter()][switch] $QueryTagging
     )
-    # generate xml request
+    # Assert-TSRestApiVersion -AtLeast 2.3
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_connection = $tsRequest.AppendChild($xml.CreateElement("connection"))
@@ -1082,6 +1147,7 @@ function Remove-TSDatasource {
     Param(
         [Parameter(Mandatory)][string] $DatasourceId
     )
+    # Assert-TSRestApiVersion -AtLeast 2.0
     try {
         if ($PSCmdlet.ShouldProcess($DatasourceId)) {
             Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId) -Method Delete -Headers (Get-TSRequestHeaderDict)
@@ -1098,6 +1164,7 @@ function Get-TSDatabase {
         [Parameter()][string] $DatabaseId,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
+    Assert-TSRestApiVersion -AtLeast 3.5
     try {
         if ($DatabaseId) {
             $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Database -Param $DatabaseId) -Method Get -Headers (Get-TSRequestHeaderDict)
@@ -1124,6 +1191,7 @@ function Get-TSTable {
         [Parameter()][string] $TableId,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
+    Assert-TSRestApiVersion -AtLeast 3.5
     try {
         if ($TableId) {
             $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Table -Param $TableId) -Method Get -Headers (Get-TSRequestHeaderDict)
@@ -1151,6 +1219,7 @@ function Get-TSTableColumn {
         [Parameter()][string] $ColumnId,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
+    Assert-TSRestApiVersion -AtLeast 3.5
     try {
         if ($ColumnId) {
             $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Table -Param "$TableId/columns/$ColumnId") -Method Get -Headers (Get-TSRequestHeaderDict)
@@ -1178,6 +1247,7 @@ function Invoke-TSMetadataGraphQL {
         [Parameter()][string] $PaginatedEntity,
         [Parameter()][ValidateRange(1,20000)][int] $PageSize = 100
     )
+    Assert-TSRestApiVersion -AtLeast 3.5
     try {
         $uri = Get-TSRequestUri -Endpoint GraphQL
         if ($PaginatedEntity) {
@@ -1222,12 +1292,17 @@ function Invoke-TSMetadataGraphQL {
 }
 
 # Export module members
+### API version methods
+Export-ModuleMember -Function Assert-TSRestApiVersion
+Export-ModuleMember -Function Get-TSRestApiVersion
+Export-ModuleMember -Function Set-TSRestApiVersion
+
 ### Authentication / Server methods
 Export-ModuleMember -Function Get-TSServerInfo
 Export-ModuleMember -Function Invoke-TSSignIn
 Export-ModuleMember -Function Invoke-TSSwitchSite
 Export-ModuleMember -Function Invoke-TSSignOut
-Export-ModuleMember -Function Revoke-TSServerAdminToken
+Export-ModuleMember -Function Revoke-TSServerAdminPAT
 Export-ModuleMember -Function Get-TSCurrentUserId
 # Delete Server Session
 # Get Current Server Session
