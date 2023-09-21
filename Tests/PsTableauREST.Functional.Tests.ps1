@@ -19,42 +19,42 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
     }
     Context "Auth operations" -Tag Auth {
         It "Invoke auth sign-in for <ConfigFile.server>" {
-            $response = Invoke-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
+            $response = Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
             $response.tsResponse.credentials.user.id | Should -BeOfType String
         }
         It "Invoke switch site to <ConfigFile.switch_site> for <ConfigFile.server>" {
-            $response = Invoke-TSSwitchSite -Site $ConfigFile.switch_site
+            $response = Switch-TSSite -Site $ConfigFile.switch_site
             $response.tsResponse.credentials.user.id | Should -BeOfType String
         }
         It "Invoke sign-out for <ConfigFile.server>" {
-            $response = Invoke-TSSignOut
+            $response = Close-TSSignOut
             $response | Should -BeOfType "String"
         }
         It "Invoke PAT sign-in for <ConfigFile.server>" {
             if (-not $ConfigFile.pat_name) {
                 Set-ItResult -Skipped
             }
-            $response = Invoke-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
+            $response = Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
             $response.tsResponse.credentials.user.id | Should -BeOfType String
-            $response = Invoke-TSSignOut
+            $response = Close-TSSignOut
             $response | Should -BeOfType "String"
         }
         It "Impersonate user sign-in for <ConfigFile.server>" {
             if (-not $ConfigFile.impersonate_user_id) {
                 Set-ItResult -Skipped
             }
-            $response = Invoke-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password -ImpersonateUserId $ConfigFile.impersonate_user_id
+            $response = Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password -ImpersonateUserId $ConfigFile.impersonate_user_id
             $response.tsResponse.credentials.user.id | Should -Be $ConfigFile.impersonate_user_id
-            $response = Invoke-TSSignOut
+            $response = Open-TSSignIn
             $response | Should -BeOfType "String"
         }
     }
     Context "Content operations" -Tag Content {
         BeforeAll {
             if ($ConfigFile.pat_name) {
-                Invoke-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
+                Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
             } else {
-                Invoke-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
+                Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
             }
             $script:testProjectId = $null
         }
@@ -69,15 +69,15 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 Remove-TSGroup -GroupId $script:testGroupId
             }
             if ($script:testSiteId -and $script:testSite) { # Note: this should be the last cleanup step (session is killed by removing the site)
-                Invoke-TSSwitchSite -Site $script:testSite
+                Switch-TSSite -Site $script:testSite
                 Remove-TSSite -SiteId $script:testSiteId
             }
-            Invoke-TSSignOut
+            Close-TSSignOut
         }
         Context "Site operations" -Tag Site {
             It "Create new site on <ConfigFile.server>" {
                 if ($ConfigFile.test_site_name) {
-                    $response = New-TSSite -Name $ConfigFile.test_site_name -ContentUrl $ConfigFile.test_site_contenturl -SiteParams @{
+                    $response = Add-TSSite -Name $ConfigFile.test_site_name -ContentUrl $ConfigFile.test_site_contenturl -SiteParams @{
                         adminMode = "ContentOnly"
                         revisionLimit = 20
                     }
@@ -89,7 +89,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             }
             It "Update site <testSite> on <ConfigFile.server>" {
                 if ($ConfigFile.test_site_name) {
-                    {Invoke-TSSwitchSite -Site $testSite} | Should -Not -Throw
+                    {Switch-TSSite -Site $testSite} | Should -Not -Throw
                     $siteNewName = New-Guid
                     $response = Update-TSSite -SiteId $testSiteId -SiteParams @{
                         name = $siteNewName
@@ -115,7 +115,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             }
             It "Get current site on <ConfigFile.server>" {
                 if ($ConfigFile.test_site_name) {
-                    {Invoke-TSSwitchSite -Site $testSite} | Should -Not -Throw
+                    {Switch-TSSite -Site $testSite} | Should -Not -Throw
                     $sites = Get-TSSite -Current
                     ($sites | Measure-Object).Count | Should -Be 1
                     $sites | Where-Object id -eq $script:testSiteId | Should -Not -BeNullOrEmpty
@@ -124,33 +124,33 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             }
             It "Delete site <testSite> on <ConfigFile.server>" {
                 if ($ConfigFile.test_site_name) {
-                    {Invoke-TSSwitchSite -Site $testSite} | Should -Not -Throw
+                    {Switch-TSSite -Site $testSite} | Should -Not -Throw
                     $response = Remove-TSSite -SiteId $testSiteId
                     $response | Should -BeOfType String
                     $script:testSiteId = $null
                     $script:testSite = $null
                     # because we've just deleted the current site, we need to sign-in again
                     if ($ConfigFile.pat_name) {
-                        Invoke-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
+                        Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
                     } else {
-                        Invoke-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
+                        Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
                     }
                 }
             }
             It "Delete site <testSite> on <ConfigFile.server> asynchronously" {
                 if ($ConfigFile.test_site_name) {
                     $tempSiteName = New-Guid # get UUID for site name and content URL
-                    $response = New-TSSite -Name $tempSiteName -ContentUrl $tempSiteName
+                    $response = Add-TSSite -Name $tempSiteName -ContentUrl $tempSiteName
                     $response.tsResponse.site.id | Should -BeOfType String
                     $tempSiteId = $response.tsResponse.site.id
-                    {Invoke-TSSwitchSite -Site $tempSiteName} | Should -Not -Throw
+                    {Switch-TSSite -Site $tempSiteName} | Should -Not -Throw
                     $response = Remove-TSSite -SiteId $tempSiteId -BackgroundTask
                     $response | Should -BeOfType String
                     # because we've just deleted the current site, we need to sign-in again
                     if ($ConfigFile.pat_name) {
-                        Invoke-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
+                        Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
                     } else {
-                        Invoke-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
+                        Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
                     }
                 }
             }
@@ -158,7 +158,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
         Context "Project operations" -Tag Project {
             It "Create new project on <ConfigFile.server>" {
                 $projectName = New-Guid
-                $response = New-TSProject -Name $projectName
+                $response = Add-TSProject -Name $projectName
                 $response.tsResponse.project.id | Should -BeOfType String
                 $script:testProjectId = $response.tsResponse.project.id
             }
@@ -180,7 +180,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             }
             It "Create/update new project with samples on <ConfigFile.server>" -Skip {
                 $projectNameSamples = New-Guid
-                $response = New-TSProject -Name $projectNameSamples
+                $response = Add-TSProject -Name $projectNameSamples
                 $response.tsResponse.project.id | Should -BeOfType String
                 $script:testProjectId = $response.tsResponse.project.id
                 $response = Update-TSProject -ProjectId $script:testProjectId -Name $projectNameSamples -PublishSamples
@@ -194,7 +194,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 } else {
                     $userName = New-Guid
                 }
-                $response = New-TSUser -Name $userName -SiteRole Unlicensed
+                $response = Add-TSUser -Name $userName -SiteRole Unlicensed
                 $response.tsResponse.user.id | Should -BeOfType String
                 $script:testUserId = $response.tsResponse.user.id
             }
@@ -224,7 +224,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
         Context "Group operations" -Tag Group {
             It "Add new group on <ConfigFile.server>" {
                 $groupName = New-Guid
-                $response = New-TSGroup -Name $groupName -MinimumSiteRole Viewer
+                $response = Add-TSGroup -Name $groupName -MinimumSiteRole Viewer
                 $response.tsResponse.group.id | Should -BeOfType String
                 $script:testGroupId = $response.tsResponse.group.id
             }
@@ -252,11 +252,11 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 } else {
                     $userName = New-Guid
                 }
-                $response = New-TSUser -Name $userName -SiteRole Unlicensed -AuthSetting "ServerDefault"
+                $response = Add-TSUser -Name $userName -SiteRole Unlicensed -AuthSetting "ServerDefault"
                 $response.tsResponse.user.id | Should -BeOfType String
                 $script:testUserId = $response.tsResponse.user.id
                 $groupName = New-Guid
-                $response = New-TSGroup -Name $groupName -MinimumSiteRole Viewer -GrantLicenseMode onLogin
+                $response = Add-TSGroup -Name $groupName -MinimumSiteRole Viewer -GrantLicenseMode onLogin
                 $response.tsResponse.group.id | Should -BeOfType String
                 $script:testGroupId = $response.tsResponse.group.id
             }
@@ -341,16 +341,16 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             }
             It "Simple GraphQL queries on <ConfigFile.server>" {
                 $query = Get-Content "Tests/Assets/workbooks.graphql" | Out-String
-                $results = Invoke-TSMetadataGraphQL -Query $query
+                $results = Get-TSMetadataGraphQL -Query $query
                 ($results | Measure-Object).Count | Should -BeGreaterThan 0
             }
             It "Paginated GraphQL query on <ConfigFile.server>" {
                 $query = Get-Content "Tests/Assets/fields-paginated.graphql" | Out-String
-                $results = Invoke-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" #-PageSize 100
+                $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" #-PageSize 100
                 ($results | Measure-Object).Count | Should -BeGreaterThan 100
-                $results = Invoke-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 1000
+                $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 1000
                 ($results | Measure-Object).Count | Should -BeGreaterThan 100
-                $results = Invoke-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 20000
+                $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 20000
                 ($results | Measure-Object).Count | Should -BeGreaterThan 100
             }
         }

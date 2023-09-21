@@ -130,7 +130,7 @@ function Get-TSServerInfo {
     }
 }
 
-function Invoke-TSSignIn {
+function Open-TSSignIn {
     [OutputType([PSCustomObject])]
     Param(
         [Parameter(Mandatory)][string] $ServerUrl,
@@ -188,7 +188,7 @@ function Invoke-TSSignIn {
     }
 }
 
-function Invoke-TSSwitchSite {
+function Switch-TSSite {
     [OutputType([PSCustomObject])]
     Param(
         [Parameter()][string] $Site = ""
@@ -209,7 +209,7 @@ function Invoke-TSSwitchSite {
     }
 }
 
-function Invoke-TSSignOut {
+function Close-TSSignOut {
     [OutputType([PSCustomObject])]
     Param()
     # Assert-TSRestApiVersion -AtLeast 2.0
@@ -279,7 +279,7 @@ function Get-TSSite {
     }
 }
 
-function New-TSSite {
+function Add-TSSite {
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType([PSCustomObject])]
     Param(
@@ -396,7 +396,7 @@ function Get-TSProject {
     }
 }
 
-function New-TSProject {
+function Add-TSProject {
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType([PSCustomObject])]
     Param(
@@ -513,7 +513,7 @@ function Get-TSUser {
     }
 }
 
-function New-TSUser {
+function Add-TSUser {
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType([PSCustomObject])]
     Param(
@@ -621,7 +621,7 @@ function Get-TSGroup {
     }
 }
 
-function New-TSGroup {
+function Add-TSGroup {
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType([PSCustomObject])]
     Param(
@@ -885,7 +885,7 @@ function Update-TSWorkbook {
         [Parameter()][string] $NewProjectId,
         [Parameter()][string] $NewOwnerId,
         [Parameter()][switch] $ShowTabs,
-        [Parameter()][switch] $IncludeInRecentlyViewed,
+        [Parameter()][switch] $RecentlyViewed,
         [Parameter()][switch] $EncryptExtracts,
         [Parameter()][switch] $EnableDataAcceleration,
         [Parameter()][switch] $AccelerateNow
@@ -900,7 +900,7 @@ function Update-TSWorkbook {
     if ($ShowTabs) {
         $el_workbook.SetAttribute("showTabs", "true")
     }
-    if ($IncludeInRecentlyViewed) {
+    if ($RecentlyViewed) {
         $el_workbook.SetAttribute("recentlyViewed", "true")
     }
     if ($EncryptExtracts) {
@@ -1240,7 +1240,7 @@ function Get-TSTableColumn {
     }
 }
 
-function Invoke-TSMetadataGraphQL {
+function Get-TSMetadataGraphQL {
     [OutputType([PSCustomObject[]])]
     Param(
         [Parameter(Mandatory)][string] $Query,
@@ -1299,9 +1299,9 @@ Export-ModuleMember -Function Set-TSRestApiVersion
 
 ### Authentication / Server methods
 Export-ModuleMember -Function Get-TSServerInfo
-Export-ModuleMember -Function Invoke-TSSignIn
-Export-ModuleMember -Function Invoke-TSSwitchSite
-Export-ModuleMember -Function Invoke-TSSignOut
+Export-ModuleMember -Function Open-TSSignIn
+Export-ModuleMember -Function Switch-TSSite
+Export-ModuleMember -Function Close-TSSignOut
 Export-ModuleMember -Function Revoke-TSServerAdminPAT
 Export-ModuleMember -Function Get-TSCurrentUserId
 # Delete Server Session
@@ -1311,7 +1311,7 @@ Export-ModuleMember -Function Get-TSCurrentUserId
 
 ### Site methods
 Export-ModuleMember -Function Get-TSSite
-Export-ModuleMember -Function New-TSSite
+Export-ModuleMember -Function Add-TSSite
 Export-ModuleMember -Function Update-TSSite
 Export-ModuleMember -Function Remove-TSSite
 # Get Data Acceleration Report for a Site
@@ -1322,17 +1322,17 @@ Export-ModuleMember -Function Remove-TSSite
 
 ### Projects methods
 Export-ModuleMember -Function Get-TSProject
-Export-ModuleMember -Function New-TSProject
+Export-ModuleMember -Function Add-TSProject
 Export-ModuleMember -Function Update-TSProject
 Export-ModuleMember -Function Remove-TSProject
 
 ### Users and Groups methods
 Export-ModuleMember -Function Get-TSUser
-Export-ModuleMember -Function New-TSUser
+Export-ModuleMember -Function Add-TSUser
 Export-ModuleMember -Function Update-TSUser
 Export-ModuleMember -Function Remove-TSUser
 Export-ModuleMember -Function Get-TSGroup
-Export-ModuleMember -Function New-TSGroup
+Export-ModuleMember -Function Add-TSGroup
 Export-ModuleMember -Function Update-TSGroup
 Export-ModuleMember -Function Remove-TSGroup
 Export-ModuleMember -Function Add-TSUserToGroup
@@ -1611,7 +1611,7 @@ Export-ModuleMember -Function Remove-TSDatasource
 Export-ModuleMember -Function Get-TSDatabase
 Export-ModuleMember -Function Get-TSTable
 Export-ModuleMember -Function Get-TSTableColumn
-Export-ModuleMember -Function Invoke-TSMetadataGraphQL
+Export-ModuleMember -Function Get-TSMetadataGraphQL
 # Query Data Quality Warning by ID
 # Query Data Quality Warning by Content
 # Query Data Quality Certification by ID
