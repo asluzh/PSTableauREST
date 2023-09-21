@@ -734,7 +734,7 @@ function Add-TSUserToGroup {
     $el_user.SetAttribute("id", $UserId)
     try {
         if ($PSCmdlet.ShouldProcess("add user $UserId into group $GroupId")) {
-            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Group -Param "$GroupId/users") -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Group -Param $GroupId/users) -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -751,7 +751,7 @@ function Remove-TSUserFromGroup {
     # Assert-TSRestApiVersion -AtLeast 2.0
     try {
         if ($PSCmdlet.ShouldProcess("remove user $UserId from group $GroupId")) {
-            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Group -Param "$GroupId/users/$UserId") -Method Delete -Headers (Get-TSRequestHeaderDict)
+            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Group -Param $GroupId/users/$UserId) -Method Delete -Headers (Get-TSRequestHeaderDict)
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -769,7 +769,7 @@ function Get-TSUsersInGroup {
         $pageNumber = 0
         do {
             $pageNumber += 1
-            $uri = Get-TSRequestUri -Endpoint Group -Param "$GroupId/users"
+            $uri = Get-TSRequestUri -Endpoint Group -Param $GroupId/users
             $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
             $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
@@ -791,7 +791,7 @@ function Get-TSGroupsForUser {
         $pageNumber = 0
         do {
             $pageNumber += 1
-            $uri = Get-TSRequestUri -Endpoint User -Param "$UserId/groups"
+            $uri = Get-TSRequestUri -Endpoint User -Param $UserId/groups
             $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
             $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
@@ -807,13 +807,27 @@ function Get-TSWorkbook {
     [OutputType([PSCustomObject[]])]
     Param(
         [Parameter()][string] $WorkbookId,
+        [Parameter()][switch] $Revisions,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
     try {
-        if ($WorkbookId) { # Get Workbook
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId) -Method Get -Headers (Get-TSRequestHeaderDict)
-            $response.tsResponse.workbook
+        if ($WorkbookId) {
+            if ($Revisions) { # Get Workbook Revisions
+                # Assert-TSRestApiVersion -AtLeast 2.3
+                $pageNumber = 0
+                do {
+                    $pageNumber += 1
+                    $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/revisions
+                    $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+                    $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+                    $totalAvailable = $response.tsResponse.pagination.totalAvailable
+                    $response.tsResponse.revisions.revision
+                } until ($PageSize*$pageNumber -gt $totalAvailable)
+            } else { # Get Workbook
+                $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId) -Method Get -Headers (Get-TSRequestHeaderDict)
+                $response.tsResponse.workbook
+            }
         } else { # Query Workbooks on Site
             $pageNumber = 0
             do {
@@ -842,7 +856,7 @@ function Get-TSWorkbooksForUser {
         $pageNumber = 0
         do {
             $pageNumber += 1
-            $uri = Get-TSRequestUri -Endpoint User -Param "$UserId/workbooks"
+            $uri = Get-TSRequestUri -Endpoint User -Param $UserId/workbooks
             $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
             if ($IsOwner) { $uri += "&isOwner=true" }
             $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
@@ -861,7 +875,7 @@ function Get-TSWorkbookConnection {
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
     try {
-        $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param "$WorkbookId/connections") -Method Get -Headers (Get-TSRequestHeaderDict)
+        $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/connections) -Method Get -Headers (Get-TSRequestHeaderDict)
         $response.tsResponse.connections.connection
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -992,7 +1006,7 @@ function Update-TSWorkbookConnection {
     }
     try {
         if ($PSCmdlet.ShouldProcess($ConnectionId)) {
-            $uri = Get-TSRequestUri -Endpoint Workbook -Param "$WorkbookId/connections/$ConnectionId"
+            $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/connections/$ConnectionId
             Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
         }
     } catch {
@@ -1004,12 +1018,20 @@ function Remove-TSWorkbook {
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType([PSCustomObject])]
     Param(
-        [Parameter(Mandatory)][string] $WorkbookId
+        [Parameter(Mandatory)][string] $WorkbookId,
+        [Parameter()][int] $Revision
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
     try {
-        if ($PSCmdlet.ShouldProcess($WorkbookId)) {
-            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId) -Method Delete -Headers (Get-TSRequestHeaderDict)
+        if ($Revision) { # Remove Workbook Revision
+            # Assert-TSRestApiVersion -AtLeast 2.3
+            if ($PSCmdlet.ShouldProcess("$WorkbookId, revision $Revision")) {
+                Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/revisions/$Revision) -Method Delete -Headers (Get-TSRequestHeaderDict)
+            }
+        } else { # Remove Workbook
+            if ($PSCmdlet.ShouldProcess($WorkbookId)) {
+                Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId) -Method Delete -Headers (Get-TSRequestHeaderDict)
+            }
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -1020,13 +1042,27 @@ function Get-TSDatasource {
     [OutputType([PSCustomObject[]])]
     Param(
         [Parameter()][string] $DatasourceId,
+        [Parameter()][switch] $Revisions,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
     try {
-        if ($DatasourceId) { # Query Data Source
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId) -Method Get -Headers (Get-TSRequestHeaderDict)
-            $response.tsResponse.datasource
+        if ($DatasourceId) {
+            if ($Revisions) { # Get Data Source Revisions
+                # Assert-TSRestApiVersion -AtLeast 2.3
+                $pageNumber = 0
+                do {
+                    $pageNumber += 1
+                    $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/revisions
+                    $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+                    $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+                    $totalAvailable = $response.tsResponse.pagination.totalAvailable
+                    $response.tsResponse.revisions.revision
+                } until ($PageSize*$pageNumber -gt $totalAvailable)
+            } else { # Query Data Source
+                $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId) -Method Get -Headers (Get-TSRequestHeaderDict)
+                $response.tsResponse.datasource
+            }
         } else { # Query Data Sources
             $pageNumber = 0
             do {
@@ -1050,7 +1086,7 @@ function Get-TSDatasourceConnection {
     )
     # Assert-TSRestApiVersion -AtLeast 2.3
     try {
-        $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param "$DatasourceId/connections") -Method Get -Headers (Get-TSRequestHeaderDict)
+        $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/connections) -Method Get -Headers (Get-TSRequestHeaderDict)
         $response.tsResponse.connections.connection
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -1177,7 +1213,7 @@ function Update-TSDatasourceConnection {
     }
     try {
         if ($PSCmdlet.ShouldProcess($ConnectionId)) {
-            $uri = Get-TSRequestUri -Endpoint Datasource -Param "$DatasourceId/connections/$ConnectionId"
+            $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/connections/$ConnectionId
             Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
         }
     } catch {
@@ -1189,12 +1225,20 @@ function Remove-TSDatasource {
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType([PSCustomObject])]
     Param(
-        [Parameter(Mandatory)][string] $DatasourceId
+        [Parameter(Mandatory)][string] $DatasourceId,
+        [Parameter()][int] $Revision
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
     try {
-        if ($PSCmdlet.ShouldProcess($DatasourceId)) {
-            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId) -Method Delete -Headers (Get-TSRequestHeaderDict)
+        if ($Revision) { # Remove Data Source Revision
+            # Assert-TSRestApiVersion -AtLeast 2.3
+            if ($PSCmdlet.ShouldProcess("$DatasourceId, revision $Revision")) {
+                Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/revisions/$Revision) -Method Delete -Headers (Get-TSRequestHeaderDict)
+            }
+        } else { # Remove Data Source
+            if ($PSCmdlet.ShouldProcess($DatasourceId)) {
+                Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId) -Method Delete -Headers (Get-TSRequestHeaderDict)
+            }
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -1266,13 +1310,13 @@ function Get-TSTableColumn {
     Assert-TSRestApiVersion -AtLeast 3.5
     try {
         if ($ColumnId) {
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Table -Param "$TableId/columns/$ColumnId") -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Table -Param $TableId/columns/$ColumnId) -Method Get -Headers (Get-TSRequestHeaderDict)
             $response.tsResponse.column
         } else {
             $pageNumber = 0
             do {
                 $pageNumber += 1
-                $uri = Get-TSRequestUri -Endpoint Table -Param "$TableId/columns"
+                $uri = Get-TSRequestUri -Endpoint Table -Param $TableId/columns
                 $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
                 $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
@@ -1455,12 +1499,6 @@ Export-ModuleMember -Function Remove-TSDatasource
 # Query Project Permissions
 # Query View Permissions
 # Query Workbook Permissions
-
-### Revision methods
-# Get Workbook Revisions
-# Get Data Source Revisions
-# Remove Workbook Revision
-# Remove Data Source Revision
 
 ### Publishing methods
 # Append to File Upload

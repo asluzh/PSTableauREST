@@ -301,6 +301,12 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 ($workbooks | Measure-Object).Count | Should -BeGreaterThan 0
                 $workbooks | Select-Object -First 1 -ExpandProperty id | Should -BeOfType String
             }
+            It "Query workbook revisions on <ConfigFile.server>" {
+                $workbookId = Get-TSWorkbook | Select-Object -First 1 -ExpandProperty id
+                $revisions = Get-TSWorkbook -WorkbookId $workbookId -Revisions
+                ($revisions | Measure-Object).Count | Should -BeGreaterThan 0
+                $revisions | Select-Object -First 1 -ExpandProperty revisionNumber | Should -BeGreaterThan 0
+            }
         }
         Context "Datasource operations" -Tag Datasource {
             It "Query datasources on <ConfigFile.server>" {
@@ -312,6 +318,12 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 $datasource.id | Should -Be $datasourceId
                 $datasourceConnections = Get-TSDatasourceConnection -DatasourceId $datasourceId
                 ($datasourceConnections | Measure-Object).Count | Should -BeGreaterThan 0
+            }
+            It "Query datasource revisions on <ConfigFile.server>" {
+                $datasourceId = Get-TSDatasource | Select-Object -First 1 -ExpandProperty id
+                $revisions = Get-TSDatasource -DatasourceId $datasourceId -Revisions
+                ($revisions | Measure-Object).Count | Should -BeGreaterThan 0
+                $revisions | Select-Object -First 1 -ExpandProperty revisionNumber | Should -BeGreaterThan 0
             }
         }
         Context "Metadata operations" -Tag Metadata {
