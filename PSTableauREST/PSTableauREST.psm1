@@ -868,12 +868,34 @@ function Get-TSWorkbookConnection {
     }
 }
 
-function Export-TSWorkbook { # TODO
+function Export-TSWorkbook {
     [OutputType([PSCustomObject])]
     Param(
-        [Parameter(Mandatory)][string] $WorkbookId
+        [Parameter(Mandatory)][string] $WorkbookId,
+        [Parameter()][string] $OutFile,
+        [Parameter()][switch] $ExcludeExtract,
+        [Parameter()][int] $Revision
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
+    $OutFileParam = @{}
+    if ($OutFile) {
+        $OutFileParam.Add("OutFile", $OutFile)
+    }
+    $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId
+    if ($Revision) {
+        # Assert-TSRestApiVersion -AtLeast 2.3
+        $uri += "/revisions/$Revision"
+    }
+    $uri += "/content"
+    if ($ExcludeExtract) {
+        Assert-TSRestApiVersion -AtLeast 2.5
+        $uri += "?includeExtract=false"
+    }
+    try {
+        Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict) -TimeoutSec 600 @OutFileParam
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
 }
 
 function Update-TSWorkbook {
@@ -1035,12 +1057,34 @@ function Get-TSDatasourceConnection {
     }
 }
 
-function Export-TSDatasource { # TODO
+function Export-TSDatasource {
     [OutputType([PSCustomObject])]
     Param(
-        [Parameter(Mandatory)][string] $DatasourceId
+        [Parameter(Mandatory)][string] $DatasourceId,
+        [Parameter()][string] $OutFile,
+        [Parameter()][switch] $ExcludeExtract,
+        [Parameter()][int] $Revision
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
+    $OutFileParam = @{}
+    if ($OutFile) {
+        $OutFileParam.Add("OutFile", $OutFile)
+    }
+    $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId
+    if ($Revision) {
+        # Assert-TSRestApiVersion -AtLeast 2.3
+        $uri += "/revisions/$Revision"
+    }
+    $uri += "/content"
+    if ($ExcludeExtract) {
+        Assert-TSRestApiVersion -AtLeast 2.5
+        $uri += "?includeExtract=false"
+    }
+    try {
+        Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict) -TimeoutSec 600 @OutFileParam
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
 }
 
 function Update-TSDatasource {
@@ -1415,8 +1459,6 @@ Export-ModuleMember -Function Remove-TSDatasource
 ### Revision methods
 # Get Workbook Revisions
 # Get Data Source Revisions
-# Download Workbook Revision
-# Download Data Source Revision
 # Remove Workbook Revision
 # Remove Data Source Revision
 

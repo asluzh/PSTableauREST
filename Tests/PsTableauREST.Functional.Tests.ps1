@@ -18,19 +18,19 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
         }
     }
     Context "Auth operations" -Tag Auth {
-        It "Invoke auth sign-in for <ConfigFile.server>" {
+        It "Request auth sign-in for <ConfigFile.server>" {
             $response = Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
             $response.tsResponse.credentials.user.id | Should -BeOfType String
         }
-        It "Invoke switch site to <ConfigFile.switch_site> for <ConfigFile.server>" {
+        It "Request switch site to <ConfigFile.switch_site> for <ConfigFile.server>" {
             $response = Switch-TSSite -Site $ConfigFile.switch_site
             $response.tsResponse.credentials.user.id | Should -BeOfType String
         }
-        It "Invoke sign-out for <ConfigFile.server>" {
+        It "Request sign-out for <ConfigFile.server>" {
             $response = Close-TSSignOut
             $response | Should -BeOfType "String"
         }
-        It "Invoke PAT sign-in for <ConfigFile.server>" {
+        It "Request PAT sign-in for <ConfigFile.server>" {
             if (-not $ConfigFile.pat_name) {
                 Set-ItResult -Skipped
             }

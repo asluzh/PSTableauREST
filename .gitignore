@@ -1,5 +1,6 @@
-Tests/Config/
 Tests/Assets/
+Tests/Config/
+Tests/Output/
 
 Tableau-REST/
 server-client-python-master/
