@@ -301,11 +301,50 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 ($workbooks | Measure-Object).Count | Should -BeGreaterThan 0
                 $workbooks | Select-Object -First 1 -ExpandProperty id | Should -BeOfType String
             }
-            It "Query workbook revisions on <ConfigFile.server>" {
+            It "Get workbook connections on <ConfigFile.server>" {
+                $workbookId = Get-TSWorkbook | Select-Object -First 1 -ExpandProperty id
+                $connections = Get-TSWorkbookConnection -WorkbookId $workbookId
+                ($connections | Measure-Object).Count | Should -BeGreaterThan 0
+            }
+            It "Get workbook revisions on <ConfigFile.server>" {
                 $workbookId = Get-TSWorkbook | Select-Object -First 1 -ExpandProperty id
                 $revisions = Get-TSWorkbook -WorkbookId $workbookId -Revisions
                 ($revisions | Measure-Object).Count | Should -BeGreaterThan 0
                 $revisions | Select-Object -First 1 -ExpandProperty revisionNumber | Should -BeGreaterThan 0
+            }
+            It "Download workbook on <ConfigFile.server>" {
+                $workbookId = Get-TSWorkbook | Select-Object -First 1 -ExpandProperty id
+                {Export-TSWorkbook -WorkbookId $workbookId -OutFile "Tests/Output/download.twbx"} | Should -Not -Throw
+                Test-Path -Path "Tests/Output/download.twbx" | Should -BeTrue
+                Remove-Item -Path "Tests/Output/download.twbx"
+            }
+            It "Download previous workbook revision on <ConfigFile.server>" {
+                $downloaded = $false
+                Get-TSWorkbook | ForEach-Object { # find at least one workbook with multiple revisions, get the penultimate one
+                    if (-Not $downloaded) {
+                        $workbookId = $_.id
+                        $revisions = Get-TSWorkbook -WorkbookId $workbookId -Revisions
+                        if (($revisions | Measure-Object).Count -gt 1) {
+                            $revision = $revisions | Sort-Object revisionNumber -Descending | Select-Object -Skip 1 -First 1 -ExpandProperty revisionNumber
+                            # write-error "$workbookId $revision"
+                            {Export-TSWorkbook -WorkbookId $workbookId -Revision $revision -OutFile "Tests/Output/download_revision.twbx"} | Should -Not -Throw
+                            Test-Path -Path "Tests/Output/download_revision.twbx" | Should -BeTrue
+                            Remove-Item -Path "Tests/Output/download_revision.twbx"
+                            $downloaded = $true
+                        }
+                    }
+                }
+                if (-Not $downloaded) { # if none revisions downloaded
+                    Set-ItResult -Skipped
+                }
+            }
+            It "Download current workbook revision on <ConfigFile.server>" -Skip {
+                $workbookId = Get-TSWorkbook | Select-Object -First 1 -ExpandProperty id
+                $revision = Get-TSWorkbook -WorkbookId $workbookId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
+                write-error "$workbookId $revision"
+                {Export-TSWorkbook -WorkbookId $workbookId -Revision $revision -OutFile "Tests/Output/download_revision.twbx"} | Should -Not -Throw
+                Test-Path -Path "Tests/Output/download_revision.twbx" | Should -BeTrue
+                Remove-Item -Path "Tests/Output/download_revision.twbx"
             }
         }
         Context "Datasource operations" -Tag Datasource {
@@ -319,11 +358,50 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 $datasourceConnections = Get-TSDatasourceConnection -DatasourceId $datasourceId
                 ($datasourceConnections | Measure-Object).Count | Should -BeGreaterThan 0
             }
-            It "Query datasource revisions on <ConfigFile.server>" {
+            It "Get datasource connections on <ConfigFile.server>" {
+                $datasourceId = Get-TSDatasource | Select-Object -First 1 -ExpandProperty id
+                $connections = Get-TSDatasourceConnection -DatasourceId $datasourceId
+                ($connections | Measure-Object).Count | Should -BeGreaterThan 0
+            }
+            It "Get datasource revisions on <ConfigFile.server>" {
                 $datasourceId = Get-TSDatasource | Select-Object -First 1 -ExpandProperty id
                 $revisions = Get-TSDatasource -DatasourceId $datasourceId -Revisions
                 ($revisions | Measure-Object).Count | Should -BeGreaterThan 0
                 $revisions | Select-Object -First 1 -ExpandProperty revisionNumber | Should -BeGreaterThan 0
+            }
+            It "Download datasource on <ConfigFile.server>" {
+                $datasourceId = Get-TSDatasource | Select-Object -First 1 -ExpandProperty id
+                {Export-TSDatasource -DatasourceId $datasourceId -OutFile "Tests/Output/download.tdsx"} | Should -Not -Throw
+                Test-Path -Path "Tests/Output/download.tdsx" | Should -BeTrue
+                Remove-Item -Path "Tests/Output/download.tdsx"
+            }
+            It "Download previous datasource revision on <ConfigFile.server>" {
+                $downloaded = $false
+                Get-TSDatasource | ForEach-Object { # find at least one workbook with multiple revisions, get the penultimate one
+                    if (-Not $downloaded) {
+                        $datasourceId = $_.id
+                        $revisions = Get-TSDatasource -DatasourceId $datasourceId -Revisions
+                        if (($revisions | Measure-Object).Count -gt 1) {
+                            $revision = $revisions | Sort-Object revisionNumber -Descending | Select-Object -Skip 1 -First 1 -ExpandProperty revisionNumber
+                            # write-error "$datasourceId $revision"
+                            {Export-TSDatasource -DatasourceId $datasourceId -Revision $revision -OutFile "Tests/Output/download_revision.tdsx"} | Should -Not -Throw
+                            Test-Path -Path "Tests/Output/download_revision.tdsx" | Should -BeTrue
+                            Remove-Item -Path "Tests/Output/download_revision.tdsx"
+                            $downloaded = $true
+                        }
+                    }
+                }
+                if (-Not $downloaded) { # if none revisions downloaded
+                    Set-ItResult -Skipped
+                }
+            }
+            It "Download current datasource revision on <ConfigFile.server>" -Skip {
+                $datasourceId = Get-TSDatasource | Select-Object -First 1 -ExpandProperty id
+                $revision = Get-TSDatasource -DatasourceId $datasourceId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
+                write-error "$datasourceId $revision"
+                {Export-TSDatasource -DatasourceId $datasourceId -Revision $revision -OutFile "Tests/Output/download_revision.tdsx"} | Should -Not -Throw
+                Test-Path -Path "Tests/Output/download_revision.tdsx" | Should -BeTrue
+                Remove-Item -Path "Tests/Output/download_revision.tdsx"
             }
         }
         Context "Metadata operations" -Tag Metadata {

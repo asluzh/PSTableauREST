@@ -898,6 +898,7 @@ function Export-TSWorkbook {
     $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId
     if ($Revision) {
         # Assert-TSRestApiVersion -AtLeast 2.3
+        # TODO Note that the current revision of a workbook cannot be accessed by this call; use Download Workbook instead
         $uri += "/revisions/$Revision"
     }
     $uri += "/content"
@@ -1109,6 +1110,7 @@ function Export-TSDatasource {
     $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId
     if ($Revision) {
         # Assert-TSRestApiVersion -AtLeast 2.3
+        # TODO Note that the current revision of a datasource cannot be accessed by this call; use Download Datasource instead
         $uri += "/revisions/$Revision"
     }
     $uri += "/content"
