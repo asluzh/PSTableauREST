@@ -100,7 +100,8 @@ function Get-TSServerInfo {
         if ($script:TSRestApiVersion) {
             $apiVersion = $script:TSRestApiVersion
         }
-        return Invoke-RestMethod -Uri $ServerUrl/api/$apiVersion/serverinfo -Method Get
+        $response = Invoke-RestMethod -Uri $ServerUrl/api/$apiVersion/serverinfo -Method Get
+        return $response.tsResponse.serverInfo
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
     }
@@ -120,12 +121,12 @@ function Open-TSSignIn {
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
     $script:TSServerUrl = $ServerUrl
-    $response = Get-TSServerInfo
-    $script:TSProductVersion = $response.tsResponse.serverInfo.productVersion.InnerText
-    $script:TSProductVersionBuild = $response.tsResponse.serverInfo.productVersion.build
-    # $response.tsResponse.serverInfo.prepConductorVersion
+    $serverInfo = Get-TSServerInfo
+    $script:TSProductVersion = $serverInfo.productVersion.InnerText
+    $script:TSProductVersionBuild = $serverInfo.productVersion.build
+    # $serverInfo.prepConductorVersion
     if ($UseServerVersion) {
-        $script:TSRestApiVersion = [version]$response.tsResponse.serverInfo.restApiVersion
+        $script:TSRestApiVersion = [version]$serverInfo.restApiVersion
     } else {
         $script:TSRestApiVersion = [version]$script:TSRestApiMinVersion
     }
@@ -158,7 +159,7 @@ function Open-TSSignIn {
         $script:TSAuthToken = $response.tsResponse.credentials.token
         $script:TSSiteId = $response.tsResponse.credentials.site.id
         $script:TSUserId = $response.tsResponse.credentials.user.id
-        return $response
+        return $response.tsResponse.credentials
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
     }
@@ -179,7 +180,7 @@ function Switch-TSSite {
         $script:TSAuthToken = $response.tsResponse.credentials.token
         $script:TSSiteId = $response.tsResponse.credentials.site.id
         $script:TSUserId = $response.tsResponse.credentials.user.id
-        return $response
+        return $response.tsResponse.credentials
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
     }
@@ -248,7 +249,7 @@ function Get-TSSite {
                 $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.sites.site
-            } until ($PageSize*$pageNumber -gt $totalAvailable)
+            } until ($PageSize*$pageNumber -ge $totalAvailable)
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -287,7 +288,8 @@ function Add-TSSite {
     }
     try {
         if ($PSCmdlet.ShouldProcess($Name)) {
-            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Site) -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Site) -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+            return $response.tsResponse.site
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -314,7 +316,8 @@ function Update-TSSite {
     try {
         if ($PSCmdlet.ShouldProcess($SiteId)) {
             if ($SiteId -eq $script:TSSiteId) {
-                Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Site -Param $SiteId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+                $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Site -Param $SiteId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+                return $response.tsResponse.site
             } else {
                 Write-Error -Exception "You can only update the site for which you are currently authenticated."
             }
@@ -366,7 +369,7 @@ function Get-TSProject {
             $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.projects.project
-        } until ($PageSize*$pageNumber -gt $totalAvailable)
+        } until ($PageSize*$pageNumber -ge $totalAvailable)
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
     }
@@ -398,7 +401,8 @@ function Add-TSProject {
     try {
         if ($PSCmdlet.ShouldProcess($Name)) {
             $uri = Get-TSRequestUri -Endpoint Project # -Param $ProjectId
-            Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+            return $response.tsResponse.project
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -438,7 +442,8 @@ function Update-TSProject {
             if ($PublishSamples) {
                 $uri += "?publishSamples=true"
             }
-            Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            return $response.tsResponse.project
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -482,7 +487,7 @@ function Get-TSUser {
                 $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.users.user
-            } until ($PageSize*$pageNumber -gt $totalAvailable)
+            } until ($PageSize*$pageNumber -ge $totalAvailable)
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -508,7 +513,8 @@ function Add-TSUser {
     }
     try {
         if ($PSCmdlet.ShouldProcess($Name)) {
-            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint User) -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint User) -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+            return $response.tsResponse.user
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -548,7 +554,8 @@ function Update-TSUser {
     }
     try {
         if ($PSCmdlet.ShouldProcess($UserId)) {
-            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint User -Param $UserId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint User -Param $UserId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            return $response.tsResponse.user
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -591,7 +598,7 @@ function Get-TSGroup {
             $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.groups.group
-        } until ($PageSize*$pageNumber -gt $totalAvailable)
+        } until ($PageSize*$pageNumber -ge $totalAvailable)
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
     }
@@ -631,7 +638,8 @@ function Add-TSGroup {
             if ($BackgroundTask) {
                 $uri += "?asJob=true"
             }
-            Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+            return $response.tsResponse.group
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -673,7 +681,8 @@ function Update-TSGroup {
             if ($BackgroundTask) {
                 $uri += "?asJob=true"
             }
-            Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            return $response.tsResponse.group
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -710,7 +719,8 @@ function Add-TSUserToGroup {
     $el_user.SetAttribute("id", $UserId)
     try {
         if ($PSCmdlet.ShouldProcess("add user $UserId into group $GroupId")) {
-            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Group -Param $GroupId/users) -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Group -Param $GroupId/users) -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+            return $response.tsResponse.user
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -750,7 +760,7 @@ function Get-TSUsersInGroup {
             $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.users.user
-        } until ($PageSize*$pageNumber -gt $totalAvailable)
+        } until ($PageSize*$pageNumber -ge $totalAvailable)
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
     }
@@ -772,7 +782,7 @@ function Get-TSGroupsForUser {
             $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.groups.group
-        } until ($PageSize*$pageNumber -gt $totalAvailable)
+        } until ($PageSize*$pageNumber -ge $totalAvailable)
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
     }
@@ -799,7 +809,7 @@ function Get-TSWorkbook {
                     $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
                     $totalAvailable = $response.tsResponse.pagination.totalAvailable
                     $response.tsResponse.revisions.revision
-                } until ($PageSize*$pageNumber -gt $totalAvailable)
+                } until ($PageSize*$pageNumber -ge $totalAvailable)
             } else { # Get Workbook
                 $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId) -Method Get -Headers (Get-TSRequestHeaderDict)
                 $response.tsResponse.workbook
@@ -813,7 +823,7 @@ function Get-TSWorkbook {
                 $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.workbooks.workbook
-            } until ($PageSize*$pageNumber -gt $totalAvailable)
+            } until ($PageSize*$pageNumber -ge $totalAvailable)
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -838,7 +848,7 @@ function Get-TSWorkbooksForUser {
             $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.workbooks.workbook
-        } until ($PageSize*$pageNumber -gt $totalAvailable)
+        } until ($PageSize*$pageNumber -ge $totalAvailable)
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
     }
@@ -971,7 +981,8 @@ function Update-TSWorkbook {
     try {
         if ($PSCmdlet.ShouldProcess($WorkbookId)) {
             $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId
-            Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            return $response.tsResponse.workbook
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -1017,7 +1028,8 @@ function Update-TSWorkbookConnection {
     try {
         if ($PSCmdlet.ShouldProcess($ConnectionId)) {
             $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/connections/$ConnectionId
-            Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            return $response.tsResponse.connection
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -1068,7 +1080,7 @@ function Get-TSDatasource {
                     $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
                     $totalAvailable = $response.tsResponse.pagination.totalAvailable
                     $response.tsResponse.revisions.revision
-                } until ($PageSize*$pageNumber -gt $totalAvailable)
+                } until ($PageSize*$pageNumber -ge $totalAvailable)
             } else { # Query Data Source
                 $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId) -Method Get -Headers (Get-TSRequestHeaderDict)
                 $response.tsResponse.datasource
@@ -1082,7 +1094,7 @@ function Get-TSDatasource {
                 $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.datasources.datasource
-            } until ($PageSize*$pageNumber -gt $totalAvailable) # TODO check paging
+            } until ($PageSize*$pageNumber -ge $totalAvailable)
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -1312,7 +1324,8 @@ function Update-TSDatasource {
     try {
         if ($PSCmdlet.ShouldProcess($DatasourceId)) {
             $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId
-            Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            return $response.tsResponse.datasource
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -1358,7 +1371,8 @@ function Update-TSDatasourceConnection {
     try {
         if ($PSCmdlet.ShouldProcess($ConnectionId)) {
             $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/connections/$ConnectionId
-            Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            return $response.tsResponse.connection
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -1462,7 +1476,7 @@ function Get-TSDatabase {
                 $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.databases.database
-            } until ($PageSize*$pageNumber -gt $totalAvailable)
+            } until ($PageSize*$pageNumber -ge $totalAvailable)
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -1489,7 +1503,7 @@ function Get-TSTable {
                 $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.tables.table
-            } until ($PageSize*$pageNumber -gt $totalAvailable)
+            } until ($PageSize*$pageNumber -ge $totalAvailable)
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -1517,7 +1531,7 @@ function Get-TSTableColumn {
                 $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.columns.column
-            } until ($PageSize*$pageNumber -gt $totalAvailable)
+            } until ($PageSize*$pageNumber -ge $totalAvailable)
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)

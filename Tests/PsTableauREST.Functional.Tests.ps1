@@ -19,12 +19,12 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
     }
     Context "Auth operations" -Tag Auth {
         It "Request auth sign-in for <ConfigFile.server>" {
-            $response = Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
-            $response.tsResponse.credentials.user.id | Should -BeOfType String
+            $credentials = Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
+            $credentials.user.id | Should -BeOfType String
         }
         It "Request switch site to <ConfigFile.switch_site> for <ConfigFile.server>" {
-            $response = Switch-TSSite -Site $ConfigFile.switch_site
-            $response.tsResponse.credentials.user.id | Should -BeOfType String
+            $credentials = Switch-TSSite -Site $ConfigFile.switch_site
+            $credentials.user.id | Should -BeOfType String
         }
         It "Request sign-out for <ConfigFile.server>" {
             $response = Close-TSSignOut
@@ -34,8 +34,8 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             if (-not $ConfigFile.pat_name) {
                 Set-ItResult -Skipped
             }
-            $response = Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
-            $response.tsResponse.credentials.user.id | Should -BeOfType String
+            $credentials = Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
+            $credentials.user.id | Should -BeOfType String
             $response = Close-TSSignOut
             $response | Should -BeOfType "String"
         }
@@ -43,9 +43,9 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             if (-not $ConfigFile.impersonate_user_id) {
                 Set-ItResult -Skipped
             }
-            $response = Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password -ImpersonateUserId $ConfigFile.impersonate_user_id
-            $response.tsResponse.credentials.user.id | Should -Be $ConfigFile.impersonate_user_id
-            $response = Open-TSSignIn
+            $credentials = Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password -ImpersonateUserId $ConfigFile.impersonate_user_id
+            $credentials.user.id | Should -Be $ConfigFile.impersonate_user_id
+            $response = Close-TSSignOut
             $response | Should -BeOfType "String"
         }
     }
@@ -77,27 +77,27 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
         Context "Site operations" -Tag Site {
             It "Create new site on <ConfigFile.server>" {
                 if ($ConfigFile.test_site_name) {
-                    $response = Add-TSSite -Name $ConfigFile.test_site_name -ContentUrl $ConfigFile.test_site_contenturl -SiteParams @{
+                    $site = Add-TSSite -Name $ConfigFile.test_site_name -ContentUrl $ConfigFile.test_site_contenturl -SiteParams @{
                         adminMode = "ContentOnly"
                         revisionLimit = 20
                     }
-                    $response.tsResponse.site.id | Should -BeOfType String
-                    $response.tsResponse.site.contentUrl | Should -BeOfType String
-                    $script:testSiteId = $response.tsResponse.site.id
-                    $script:testSite = $response.tsResponse.site.contentUrl
+                    $site.id | Should -BeOfType String
+                    $site.contentUrl | Should -BeOfType String
+                    $script:testSiteId = $site.id
+                    $script:testSite = $site.contentUrl
                 }
             }
             It "Update site <testSite> on <ConfigFile.server>" {
                 if ($ConfigFile.test_site_name) {
                     {Switch-TSSite -Site $testSite} | Should -Not -Throw
                     $siteNewName = New-Guid
-                    $response = Update-TSSite -SiteId $testSiteId -SiteParams @{
+                    $site = Update-TSSite -SiteId $testSiteId -SiteParams @{
                         name = $siteNewName
                         revisionLimit = 10
                     }
-                    $response.tsResponse.site.id | Should -Be $testSiteId
-                    $response.tsResponse.site.contentUrl | Should -Be $testSite
-                    $response.tsResponse.site.name | Should -Be $siteNewName
+                    $site.id | Should -Be $testSiteId
+                    $site.contentUrl | Should -Be $testSite
+                    $site.name | Should -Be $siteNewName
                     {Update-TSSite -SiteId $testSiteId -SiteParams @{
                         name = $ConfigFile.test_site_name
                         adminMode = "ContentAndUsers"
@@ -140,9 +140,9 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             It "Delete site <testSite> on <ConfigFile.server> asynchronously" {
                 if ($ConfigFile.test_site_name) {
                     $tempSiteName = New-Guid # get UUID for site name and content URL
-                    $response = Add-TSSite -Name $tempSiteName -ContentUrl $tempSiteName
-                    $response.tsResponse.site.id | Should -BeOfType String
-                    $tempSiteId = $response.tsResponse.site.id
+                    $site = Add-TSSite -Name $tempSiteName -ContentUrl $tempSiteName
+                    $site.id | Should -BeOfType String
+                    $tempSiteId = $site.id
                     {Switch-TSSite -Site $tempSiteName} | Should -Not -Throw
                     $response = Remove-TSSite -SiteId $tempSiteId -BackgroundTask
                     $response | Should -BeOfType String
@@ -158,15 +158,15 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
         Context "Project operations" -Tag Project {
             It "Create new project on <ConfigFile.server>" {
                 $projectName = New-Guid
-                $response = Add-TSProject -Name $projectName
-                $response.tsResponse.project.id | Should -BeOfType String
-                $script:testProjectId = $response.tsResponse.project.id
+                $project = Add-TSProject -Name $projectName
+                $project.id | Should -BeOfType String
+                $script:testProjectId = $project.id
             }
             It "Update project <testProjectId> on <ConfigFile.server>" {
                 $projectNewName = New-Guid
-                $response = Update-TSProject -ProjectId $script:testProjectId -Name $projectNewName
-                $response.tsResponse.project.id | Should -Be $script:testProjectId
-                $response.tsResponse.project.name | Should -Be $projectNewName
+                $project = Update-TSProject -ProjectId $script:testProjectId -Name $projectNewName
+                $project.id | Should -Be $script:testProjectId
+                $project.name | Should -Be $projectNewName
             }
             It "Query projects on <ConfigFile.server>" {
                 $projects = Get-TSProject
@@ -180,11 +180,11 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             }
             It "Create/update new project with samples on <ConfigFile.server>" -Skip {
                 $projectNameSamples = New-Guid
-                $response = Add-TSProject -Name $projectNameSamples
-                $response.tsResponse.project.id | Should -BeOfType String
-                $script:testProjectId = $response.tsResponse.project.id
-                $response = Update-TSProject -ProjectId $script:testProjectId -Name $projectNameSamples -PublishSamples
-                $response.tsResponse.project.id | Should -BeOfType String
+                $project = Add-TSProject -Name $projectNameSamples
+                $project.id | Should -BeOfType String
+                $script:testProjectId = $project.id
+                $project = Update-TSProject -ProjectId $script:testProjectId -Name $projectNameSamples -PublishSamples
+                $project.id | Should -BeOfType String
             }
         }
         Context "User operations" -Tag User {
@@ -194,26 +194,26 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 } else {
                     $userName = New-Guid
                 }
-                $response = Add-TSUser -Name $userName -SiteRole Unlicensed
-                $response.tsResponse.user.id | Should -BeOfType String
-                $script:testUserId = $response.tsResponse.user.id
+                $user = Add-TSUser -Name $userName -SiteRole Unlicensed
+                $user.id | Should -BeOfType String
+                $script:testUserId = $user.id
             }
             It "Update user <testUserId> on <ConfigFile.server>" {
-                $response = Update-TSUser -UserId $script:testUserId -SiteRole Viewer
-                $response.tsResponse.user.siteRole | Should -Be "Viewer"
+                $user = Update-TSUser -UserId $script:testUserId -SiteRole Viewer
+                $user.siteRole | Should -Be "Viewer"
                 if ($ConfigFile.test_password) {
                     $fullName = New-Guid
-                    $response = Update-TSUser -UserId $script:testUserId -SiteRole Viewer -FullName $fullName -SecurePassword (ConvertTo-SecureString $ConfigFile.test_password -AsPlainText -Force)
-                    $response.tsResponse.user.siteRole | Should -Be "Viewer"
-                    $response.tsResponse.user.fullName | Should -Be $fullName
+                    $user = Update-TSUser -UserId $script:testUserId -SiteRole Viewer -FullName $fullName -SecurePassword (ConvertTo-SecureString $ConfigFile.test_password -AsPlainText -Force)
+                    $user.siteRole | Should -Be "Viewer"
+                    $user.fullName | Should -Be $fullName
                 }
             }
             It "Query users on <ConfigFile.server>" {
                 $users = Get-TSUser
                 ($users | Measure-Object).Count | Should -BeGreaterThan 0
                 $users | Where-Object id -eq $script:testUserId | Should -Not -BeNullOrEmpty
-                $response = Get-TSUser -UserId $script:testUserId
-                $response.id | Should -Be $script:testUserId
+                $user = Get-TSUser -UserId $script:testUserId
+                $user.id | Should -Be $script:testUserId
             }
             It "Remove user <testUserId> on <ConfigFile.server>" {
                 $response = Remove-TSUser -UserId $script:testUserId
@@ -224,15 +224,15 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
         Context "Group operations" -Tag Group {
             It "Add new group on <ConfigFile.server>" {
                 $groupName = New-Guid
-                $response = Add-TSGroup -Name $groupName -MinimumSiteRole Viewer
-                $response.tsResponse.group.id | Should -BeOfType String
-                $script:testGroupId = $response.tsResponse.group.id
+                $group = Add-TSGroup -Name $groupName -MinimumSiteRole Viewer
+                $group.id | Should -BeOfType String
+                $script:testGroupId = $group.id
             }
             It "Update group <testGroupId> on <ConfigFile.server>" {
                 $groupName = New-Guid
-                $response = Update-TSGroup -GroupId $script:testGroupId -Name $groupName
-                $response.tsResponse.group.id | Should -Be $script:testGroupId
-                $response.tsResponse.group.name | Should -Be $groupName
+                $group = Update-TSGroup -GroupId $script:testGroupId -Name $groupName
+                $group.id | Should -Be $script:testGroupId
+                $group.name | Should -Be $groupName
             }
             It "Query groups on <ConfigFile.server>" {
                 $groups = Get-TSGroup
@@ -252,18 +252,18 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 } else {
                     $userName = New-Guid
                 }
-                $response = Add-TSUser -Name $userName -SiteRole Unlicensed -AuthSetting "ServerDefault"
-                $response.tsResponse.user.id | Should -BeOfType String
-                $script:testUserId = $response.tsResponse.user.id
+                $user = Add-TSUser -Name $userName -SiteRole Unlicensed -AuthSetting "ServerDefault"
+                $user.id | Should -BeOfType String
+                $script:testUserId = $user.id
                 $groupName = New-Guid
-                $response = Add-TSGroup -Name $groupName -MinimumSiteRole Viewer -GrantLicenseMode onLogin
-                $response.tsResponse.group.id | Should -BeOfType String
-                $script:testGroupId = $response.tsResponse.group.id
+                $group = Add-TSGroup -Name $groupName -MinimumSiteRole Viewer -GrantLicenseMode onLogin
+                $group.id | Should -BeOfType String
+                $script:testGroupId = $group.id
             }
             It "Add user to group on <ConfigFile.server>" {
-                $response = Add-TSUserToGroup -UserId $script:testUserId -GroupId $script:testGroupId
-                $response.tsResponse.user.id | Should -Be $script:testUserId
-                # $response.tsResponse.user.siteRole | Should -Be "Viewer" # doesn't work on Tableau Cloud
+                $user = Add-TSUserToGroup -UserId $script:testUserId -GroupId $script:testGroupId
+                $user.id | Should -Be $script:testUserId
+                # $user.siteRole | Should -Be "Viewer" # doesn't work on Tableau Cloud
             }
             It "Query groups for user on <ConfigFile.server>" {
                 $groups = Get-TSGroupsForUser -UserId $script:testUserId
@@ -341,7 +341,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             It "Download current workbook revision on <ConfigFile.server>" -Skip {
                 $workbookId = Get-TSWorkbook | Select-Object -First 1 -ExpandProperty id
                 $revision = Get-TSWorkbook -WorkbookId $workbookId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
-                write-error "$workbookId $revision"
+                # write-error "$workbookId $revision"
                 {Export-TSWorkbook -WorkbookId $workbookId -Revision $revision -OutFile "Tests/Output/download_revision.twbx"} | Should -Not -Throw
                 Test-Path -Path "Tests/Output/download_revision.twbx" | Should -BeTrue
                 Remove-Item -Path "Tests/Output/download_revision.twbx"
@@ -371,8 +371,8 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             }
             It "Publish TDSX datasource on <ConfigFile.server>" {
                 $defaultProjectId = Get-TSProject | Where-Object Name -eq "default" | Select-Object -First 1 -ExpandProperty id
-                $response = Publish-TSDatasource -Name "SampleDS" -InFile "Tests/Assets/Datasources/SampleDS.tds" -ProjectId $defaultProjectId
-                $response.id | Should -BeOfType String
+                $datasource = Publish-TSDatasource -Name "SampleDS" -InFile "Tests/Assets/Datasources/SampleDS.tds" -ProjectId $defaultProjectId
+                $datasource.id | Should -BeOfType String
             }
             It "Download datasource on <ConfigFile.server>" {
                 $datasourceId = Get-TSDatasource | Select-Object -First 1 -ExpandProperty id
@@ -403,7 +403,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             It "Download current datasource revision on <ConfigFile.server>" -Skip {
                 $datasourceId = Get-TSDatasource | Select-Object -First 1 -ExpandProperty id
                 $revision = Get-TSDatasource -DatasourceId $datasourceId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
-                write-error "$datasourceId $revision"
+                # write-error "$datasourceId $revision"
                 {Export-TSDatasource -DatasourceId $datasourceId -Revision $revision -OutFile "Tests/Output/download_revision.tdsx"} | Should -Not -Throw
                 Test-Path -Path "Tests/Output/download_revision.tdsx" | Should -BeTrue
                 Remove-Item -Path "Tests/Output/download_revision.tdsx"
