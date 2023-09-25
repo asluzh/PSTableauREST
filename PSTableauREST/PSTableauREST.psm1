@@ -884,8 +884,11 @@ function Export-TSWorkbook {
     $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId
     if ($Revision) {
         # Assert-TSRestApiVersion -AtLeast 2.3
-        # TODO Note that the current revision of a workbook cannot be accessed by this call; use Download Workbook instead
-        $uri += "/revisions/$Revision"
+        $lastRevision = Get-TSWorkbook -WorkbookId $WorkbookId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
+        # Note that the current revision of a workbook cannot be accessed by the /revisions endpoint; in this case we ignore the -Revision parameter
+        if ($Revision -lt $lastRevision) {
+            $uri += "/revisions/$Revision"
+        }
     }
     $uri += "/content"
     if ($ExcludeExtract) {
@@ -1131,8 +1134,11 @@ function Export-TSDatasource {
     $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId
     if ($Revision) {
         # Assert-TSRestApiVersion -AtLeast 2.3
-        # TODO Note that the current revision of a datasource cannot be accessed by this call; use Download Datasource instead
-        $uri += "/revisions/$Revision"
+        $lastRevision = Get-TSDatasource -DatasourceId $DatasourceId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
+        # Note that the current revision of a datasource cannot be accessed by the /revisions endpoint; in this case we ignore the -Revision parameter
+        if ($Revision -lt $lastRevision) {
+            $uri += "/revisions/$Revision"
+        }
     }
     $uri += "/content"
     if ($ExcludeExtract) {

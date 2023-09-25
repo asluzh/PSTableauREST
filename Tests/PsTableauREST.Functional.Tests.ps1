@@ -369,44 +369,49 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 ($revisions | Measure-Object).Count | Should -BeGreaterThan 0
                 $revisions | Select-Object -First 1 -ExpandProperty revisionNumber | Should -BeGreaterThan 0
             }
-            It "Publish TDSX datasource on <ConfigFile.server>" {
-                $defaultProjectId = Get-TSProject | Where-Object Name -eq "default" | Select-Object -First 1 -ExpandProperty id
-                $datasource = Publish-TSDatasource -Name "SampleDS" -InFile "Tests/Assets/Datasources/SampleDS.tds" -ProjectId $defaultProjectId
-                $datasource.id | Should -BeOfType String
-            }
-            It "Download datasource on <ConfigFile.server>" {
-                $datasourceId = Get-TSDatasource | Select-Object -First 1 -ExpandProperty id
-                {Export-TSDatasource -DatasourceId $datasourceId -OutFile "Tests/Output/download.tdsx"} | Should -Not -Throw
-                Test-Path -Path "Tests/Output/download.tdsx" | Should -BeTrue
-                Remove-Item -Path "Tests/Output/download.tdsx"
-            }
-            It "Download previous datasource revision on <ConfigFile.server>" {
-                $downloaded = $false
-                Get-TSDatasource | ForEach-Object { # find at least one workbook with multiple revisions, get the penultimate one
-                    if (-Not $downloaded) {
-                        $datasourceId = $_.id
-                        $revisions = Get-TSDatasource -DatasourceId $datasourceId -Revisions
-                        if (($revisions | Measure-Object).Count -gt 1) {
-                            $revision = $revisions | Sort-Object revisionNumber -Descending | Select-Object -Skip 1 -First 1 -ExpandProperty revisionNumber
-                            # write-error "$datasourceId $revision"
-                            {Export-TSDatasource -DatasourceId $datasourceId -Revision $revision -OutFile "Tests/Output/download_revision.tdsx"} | Should -Not -Throw
-                            Test-Path -Path "Tests/Output/download_revision.tdsx" | Should -BeTrue
-                            Remove-Item -Path "Tests/Output/download_revision.tdsx"
-                            $downloaded = $true
-                        }
+            Context "Publish, download, datasource revisions on <ConfigFile.server>" {
+                BeforeAll {
+                    $project = Add-TSProject -Name (New-Guid)
+                    $script:publishProjectId = $project.id
+                }
+                AfterAll {
+                    if ($script:publishProjectId) {
+                        Remove-TSProject -ProjectId $script:publishProjectId
+                        $script:publishProjectId = $null
                     }
                 }
-                if (-Not $downloaded) { # if none revisions downloaded
-                    Set-ItResult -Skipped
+                It "Publish sample datasource on <ConfigFile.server>" {
+                    $datasource = Publish-TSDatasource -Name "SampleDS" -InFile "Tests/Assets/Samples/SampleDS.tds" -ProjectId $publishProjectId
+                    $datasource.id | Should -BeOfType String
                 }
-            }
-            It "Download current datasource revision on <ConfigFile.server>" -Skip {
-                $datasourceId = Get-TSDatasource | Select-Object -First 1 -ExpandProperty id
-                $revision = Get-TSDatasource -DatasourceId $datasourceId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
-                # write-error "$datasourceId $revision"
-                {Export-TSDatasource -DatasourceId $datasourceId -Revision $revision -OutFile "Tests/Output/download_revision.tdsx"} | Should -Not -Throw
-                Test-Path -Path "Tests/Output/download_revision.tdsx" | Should -BeTrue
-                Remove-Item -Path "Tests/Output/download_revision.tdsx"
+                It "Publish sample datasource on <ConfigFile.server> - rev. 2" {
+                    $datasource = Publish-TSDatasource -Name "SampleDS" -InFile "Tests/Assets/Samples/SampleDS.tds" -ProjectId $publishProjectId -Overwrite
+                    $datasource.id | Should -BeOfType String
+                    $script:publishDatasourceId = $datasource.id
+                }
+                It "Download sample datasource on <ConfigFile.server>" {
+                    {Export-TSDatasource -DatasourceId $script:publishDatasourceId -OutFile "Tests/Output/download.tdsx"} | Should -Not -Throw
+                    Test-Path -Path "Tests/Output/download.tdsx" | Should -BeTrue
+                    Remove-Item -Path "Tests/Output/download.tdsx"
+                }
+                It "Download & remove previous datasource revision on <ConfigFile.server>" {
+                    $revisions = Get-TSDatasource -DatasourceId $script:publishDatasourceId -Revisions
+                    if (($revisions | Measure-Object).Count -gt 1) {
+                        $revision = $revisions | Sort-Object revisionNumber -Descending | Select-Object -Skip 1 -First 1 -ExpandProperty revisionNumber
+                        {Export-TSDatasource -DatasourceId $script:publishDatasourceId -Revision $revision -OutFile "Tests/Output/download_revision.tdsx"} | Should -Not -Throw
+                        Test-Path -Path "Tests/Output/download_revision.tdsx" | Should -BeTrue
+                        Remove-Item -Path "Tests/Output/download_revision.tdsx"
+                        {Remove-TSDatasource -DatasourceId $script:publishDatasourceId -Revision $revision} | Should -Not -Throw
+                    } else {
+                        Set-ItResult -Skipped
+                    }
+                }
+                It "Download latest datasource revision on <ConfigFile.server>" {
+                    $revision = Get-TSDatasource -DatasourceId $script:publishDatasourceId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
+                    {Export-TSDatasource -DatasourceId $script:publishDatasourceId -Revision $revision -OutFile "Tests/Output/download_revision.tdsx"} | Should -Not -Throw
+                    Test-Path -Path "Tests/Output/download_revision.tdsx" | Should -BeTrue
+                    Remove-Item -Path "Tests/Output/download_revision.tdsx"
+                }
             }
         }
         Context "Metadata operations" -Tag Metadata {
