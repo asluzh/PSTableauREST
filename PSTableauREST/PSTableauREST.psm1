@@ -1,35 +1,11 @@
 # Legacy code
 # [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-# $Source = @"
-# using System.Net;
-# public class ExtendedWebClient : WebClient
-# {
-# public int Timeout;
-# public bool KeepAlive;
-# protected override WebRequest GetWebRequest(System.Uri address)
-# {
-# HttpWebRequest request = (HttpWebRequest)base.GetWebRequest(address);
-# if (request != null)
-# {
-# request.Timeout = Timeout;
-# request.KeepAlive = KeepAlive;
-# request.Proxy = null;
-# }
-# return request;
-# }
-# public ExtendedWebClient()
-# {
-# Timeout = 600000; // Timeout value by default
-# KeepAlive = false;
-# }
-# }
-# "@;
-# Add-Type -TypeDefinition $Source -Language CSharp
 
 ### Module variables and helper functions
 $TSRestApiVersion = [version]'2.4' # minimum supported version
 $TSRestApiMinVersion = [version]'2.4' # supported version for initial sign-in calls
-#$TSRestApiChunkSize = 2097152	   ## 2MB or 2048KB
+$TSRestApiFileSizeLimit = 64*1048576 # 64MB
+$TSRestApiChunkSize = 2*1048576 # 2MB or 5MB or 50MB
 
 # set up headers IDictionary with auth token (and optionally other headers)
 function Get-TSRequestHeaderDict {
@@ -50,7 +26,7 @@ function Get-TSRequestHeaderDict {
 function Get-TSRequestUri {
     [OutputType([string])]
     Param(
-        [Parameter(Mandatory)][ValidateSet('Auth','Site','Project','User','Group','Workbook','Datasource','View','Database','Table','GraphQL')][string] $Endpoint,
+        [Parameter(Mandatory)][ValidateSet('Auth','Site','Project','User','Group','Workbook','Datasource','View','FileUpload','Database','Table','GraphQL')][string] $Endpoint,
         [Parameter()][string] $Param
     )
     $Uri = "$script:TSServerUrl/api/$script:TSRestApiVersion/"
@@ -63,8 +39,8 @@ function Get-TSRequestUri {
             $Uri += "sites"
             if ($Param) { $Uri += "/$Param" }
         }
-        "User" {
-            $Uri += "sites/$script:TSSiteId/users"
+        "FileUpload" {
+            $Uri += "sites/$script:TSSiteId/fileUploads"
             if ($Param) { $Uri += "/$Param" }
         }
         default {
@@ -163,13 +139,13 @@ function Open-TSSignIn {
         $el_user.SetAttribute("id", $ImpersonateUserId)
     }
     if ($Username -and $SecurePassword) {
-        $private:PlainPassword = [System.Net.NetworkCredential]::new("", $SecurePassword).Password
+        $private:PlainPassword = (New-Object System.Net.NetworkCredential("", $SecurePassword)).Password
         $el_credentials.SetAttribute("name", $Username)
         $el_credentials.SetAttribute("password", $private:PlainPassword)
         # if ($ImpersonateUserId) { Assert-TSRestApiVersion -AtLeast 2.0 }
     } elseif ($PersonalAccessTokenName -and $PersonalAccessTokenSecret) {
         Assert-TSRestApiVersion -AtLeast 3.6
-        $private:PlainSecret = [System.Net.NetworkCredential]::new("", $PersonalAccessTokenSecret).Password
+        $private:PlainSecret = (New-Object System.Net.NetworkCredential("", $PersonalAccessTokenSecret)).Password
         $el_credentials.SetAttribute("personalAccessTokenName", $PersonalAccessTokenName)
         $el_credentials.SetAttribute("personalAccessTokenSecret", $private:PlainSecret)
         # if ($ImpersonateUserId) { Assert-TSRestApiVersion -AtLeast 2.0 }
@@ -561,7 +537,7 @@ function Update-TSUser {
         $el_user.SetAttribute("email", $Email)
     }
     if ($SecurePassword) {
-        $private:PlainPassword = [System.Net.NetworkCredential]::new("", $SecurePassword).Password
+        $private:PlainPassword = (New-Object System.Net.NetworkCredential("", $SecurePassword)).Password
         $el_user.SetAttribute("password", $private:PlainPassword)
     }
     if ($SiteRole) {
@@ -913,6 +889,39 @@ function Export-TSWorkbook {
     }
 }
 
+function Publish-TSWorkbook {
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $InFile,
+        [Parameter()][string] $FileName,
+        [Parameter()][string] $FileType,
+        [Parameter()][string] $Name,
+        # [Parameter()][string] $Description,
+        [Parameter()][string] $ProjectId,
+        [Parameter()][switch] $ShowTabs,
+        [Parameter()][hashtable] $HideViews,
+        [Parameter()][string] $ThumbnailUserId,
+        [Parameter()][switch] $Overwrite,
+        [Parameter()][switch] $SkipConnectionCheck,
+        [Parameter()][switch] $BackgroundTask,
+        [Parameter()][switch] $Chunked,
+        [Parameter()][string] $ServerAddress,
+        [Parameter()][string] $ServerPort,
+        [Parameter()][string] $Username,
+        [Parameter()][securestring] $SecurePassword,
+        [Parameter()][switch] $EmbedPassword,
+        [Parameter()][switch] $EncryptExtracts,
+        [Parameter()][switch] $OAuth
+    )
+    # Assert-TSRestApiVersion -AtLeast 2.0
+    $uri = Get-TSRequestUri -Endpoint Workbook
+    try {
+        Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict) -TimeoutSec 600
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
 function Update-TSWorkbook {
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType([PSCustomObject])]
@@ -996,7 +1005,7 @@ function Update-TSWorkbookConnection {
         $el_connection.SetAttribute("userName", $Username)
     }
     if ($SecurePassword) {
-        $private:PlainPassword = [System.Net.NetworkCredential]::new("", $SecurePassword).Password
+        $private:PlainPassword = (New-Object System.Net.NetworkCredential("", $SecurePassword)).Password
         $el_connection.SetAttribute("password", $private:PlainPassword)
     }
     if ($EmbedPassword) {
@@ -1073,7 +1082,7 @@ function Get-TSDatasource {
                 $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.datasources.datasource
-            } until ($PageSize*$pageNumber -gt $totalAvailable)
+            } until ($PageSize*$pageNumber -gt $totalAvailable) # TODO check paging
         }
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
@@ -1120,6 +1129,139 @@ function Export-TSDatasource {
     }
     try {
         Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict) -TimeoutSec 600 @OutFileParam
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+function Publish-TSDatasource {
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $InFile,
+        [Parameter(Mandatory)][string] $Name,
+        [Parameter()][string] $FileName,
+        [Parameter()][string] $FileType,
+        [Parameter()][string] $Description,
+        [Parameter()][string] $ProjectId,
+        [Parameter()][switch] $Overwrite,
+        [Parameter()][switch] $Append,
+        [Parameter()][switch] $BackgroundTask,
+        [Parameter()][switch] $Chunked,
+        [Parameter()][string] $Username,
+        [Parameter()][securestring] $SecurePassword,
+        [Parameter()][switch] $EmbedPassword,
+        [Parameter()][switch] $OAuth,
+        [Parameter()][switch] $UseRemoteQueryAgent,
+        [Parameter()][hashtable] $Connections # TODO
+    )
+    # Assert-TSRestApiVersion -AtLeast 2.0
+    $boundaryString = (New-Guid).ToString("N")
+    $fileItem = Get-Item $InFile
+    if (-Not $FileName) {
+        $FileName = $fileItem.Name
+    }
+    if (-Not $FileType) {
+        $FileType = $fileItem.Extension.Substring(1)
+    }
+    if ($FileType -eq 'zip') {
+        $FileType = 'tdsx'
+    } elseif ($FileType -eq 'xml') {
+        $FileType = 'tds'
+    }
+    if (-Not $FileType -In @("tds", "tdsx", "tde", "hyper", "parquet")) {
+        throw "File type unsupported (supported types are: tds, tdsx, tde, hyper, parquet)"
+    }
+    if ($fileItem.Length -ge $script:TSRestApiFileSizeLimit) {
+        $Chunked = $true
+    }
+    $uri = Get-TSRequestUri -Endpoint Datasource
+    $uri += "?datasourceType=$FileType"
+    if ($Append) {
+        $uri += "&append=true"
+    }
+    if ($Overwrite) {
+        $uri += "&overwrite=true"
+    }
+    if ($BackgroundTask) {
+        Assert-TSRestApiVersion -AtLeast 3.0
+        $uri += "&asJob=true"
+    }
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_datasource = $tsRequest.AppendChild($xml.CreateElement("datasource"))
+    $el_datasource.SetAttribute("name", $Name)
+    if ($Description) {
+        $el_datasource.SetAttribute("description", $Description)
+    }
+    if ($UseRemoteQueryAgent) {
+        $el_datasource.SetAttribute("useRemoteQueryAgent", "true")
+    }
+    if ($Username -or $SecurePassword) {
+        $el_connection = $el_datasource.AppendChild($xml.CreateElement("connectionCredentials"))
+        if ($Username) {
+            $el_connection.SetAttribute("name", $Username)
+        }
+        if ($SecurePassword) {
+            $private:PlainPassword = (New-Object System.Net.NetworkCredential("", $SecurePassword)).Password
+            $el_connection.SetAttribute("password", $private:PlainPassword)
+        }
+        if ($EmbedPassword) {
+            $el_connection.SetAttribute("embed", "true")
+        }
+        if ($OAuth) {
+            $el_connection.SetAttribute("oAuth", "true")
+        }
+    }
+    if ($Connections) {
+        Assert-TSRestApiVersion -AtLeast 2.8
+    }
+    if ($ProjectId) {
+        $el_project = $el_datasource.AppendChild($xml.CreateElement("project"))
+        $el_project.SetAttribute("id", $ProjectId)
+    }
+    try {
+        $multipartContent = New-Object System.Net.Http.MultipartFormDataContent($boundaryString)
+        [void]$multipartContent.Headers.Remove("Content-Type")
+        [void]$multipartContent.Headers.TryAddWithoutValidation("Content-Type", "multipart/mixed; boundary=$boundaryString")
+        $stringContent = New-Object System.Net.Http.StringContent($xml.OuterXml, "text/xml")
+        $stringContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
+        $stringContent.Headers.ContentDisposition.Name = "request_payload"
+        $multipartContent.Add($stringContent)
+        if ($Chunked) {
+            $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName
+            $uri += "&uploadSessionId=$uploadSessionId"
+            $response = Invoke-RestMethod -Uri $uri -Body $multipartContent -Method Post -Headers (Get-TSRequestHeaderDict)
+            # write-error (new-object System.IO.StreamReader($multipartContent.ReadAsStream())).ReadToEnd()
+        } else {
+            $fileContent = New-Object System.Net.Http.StreamContent(New-Object System.IO.FileStream($InFile, [System.IO.FileMode]::Open))
+            $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream")
+            $fileContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
+            $fileContent.Headers.ContentDisposition.Name = "tableau_datasource"
+            $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`"" # TODO check/escape filenames with special chars, e.g. using Uri.EscapeDataString()
+            # $fn = [System.Net.WebUtility]::UrlEncode($FileName)
+            $multipartContent.Add($fileContent)
+            $response = Invoke-RestMethod -Uri $uri -Body $multipartContent -Method Post -Headers (Get-TSRequestHeaderDict)
+
+            # alternative approach, doesn't work yet for binary files
+            # https://stackoverflow.com/questions/25075010/upload-multiple-files-from-powershell-script
+            # possible solution: saving the request body in a file and using -InFile parameter for Invoke-RestMethod
+            # https://hochwald.net/upload-file-powershell-invoke-restmethod/
+            # $requestBody = (
+            #     "--$boundaryString",
+            #     "Content-Type: text/xml",
+            #     "Content-Disposition: form-data; name=request_payload",
+            #     "",
+            #     $xml.OuterXml,
+            #     "--$boundaryString",
+            #     "Content-Type: application/octet-stream",
+            #     "Content-Disposition: form-data; name=tableau_datasource; filename=""$FileName""",
+            #     "",
+            #     (Get-Content $InFile -Raw),
+            #     "--$boundaryString--"
+            # ) -join "`r`n"
+            # Invoke-RestMethod -Uri $uri -Body $requestBody -Method Post -Headers (Get-TSRequestHeaderDict) -ContentType "multipart/mixed; boundary=$boundaryString"
+        }
+        return $response.tsResponse.datasource
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
     }
@@ -1204,7 +1346,7 @@ function Update-TSDatasourceConnection {
         $el_connection.SetAttribute("userName", $Username)
     }
     if ($SecurePassword) {
-        $private:PlainPassword = [System.Net.NetworkCredential]::new("", $SecurePassword).Password
+        $private:PlainPassword = (New-Object System.Net.NetworkCredential("", $SecurePassword)).Password
         $el_connection.SetAttribute("password", $private:PlainPassword)
     }
     if ($EmbedPassword) {
@@ -1242,6 +1384,58 @@ function Remove-TSDatasource {
                 Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId) -Method Delete -Headers (Get-TSRequestHeaderDict)
             }
         }
+    } catch {
+        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+    }
+}
+
+# Publishing methods
+function Send-TSFileUpload {
+    [OutputType([string])]
+    Param(
+        [Parameter(Mandatory)][string] $InFile,
+        [Parameter()][string] $FileName = "file"
+    )
+    # Assert-TSRestApiVersion -AtLeast 2.0
+    try {
+        $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint FileUpload) -Method Post -Headers (Get-TSRequestHeaderDict)
+        $uploadSessionId = $response.tsResponse.fileUpload.GetAttribute("uploadSessionId")
+        $chunkNumber = 0
+        $buffer = New-Object System.Byte[]($script:TSRestApiChunkSize)
+        $fileStream = New-Object System.IO.FileStream($InFile, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read)
+        $byteReader = New-Object System.IO.BinaryReader($fileStream)
+        $totalChunks = [Math]::Ceiling($fileItem.Length / $script:TSRestApiChunkSize)
+        $totalSizeMb = [Math]::Round($fileItem.Length / 1048576)
+        do {
+            if ($chunkNumber -gt 0) {
+                $uploadedSizeMb = [Math]::Round($script:TSRestApiChunkSize * $chunkNumber / 1048576)
+                $percentCompleted = [Math]::Round($chunkNumber / $totalChunks * 100)
+                Write-Progress -Activity "Uploading file $FileName" -Status "$uploadedSizeMb / $totalSizeMb MB uploaded ($percentCompleted%)" -PercentComplete $percentCompleted
+            }
+            $chunkNumber += 1
+            $boundaryString = (New-Guid).ToString("N")
+            $multipartContent = New-Object System.Net.Http.MultipartFormDataContent($boundaryString)
+            [void]$multipartContent.Headers.Remove("Content-Type")
+            [void]$multipartContent.Headers.TryAddWithoutValidation("Content-Type", "multipart/mixed; boundary=$boundaryString")
+            $stringContent = New-Object System.Net.Http.StringContent("", "text/xml")
+            $stringContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
+            $stringContent.Headers.ContentDisposition.Name = "request_payload"
+            $multipartContent.Add($stringContent)
+            # read (next) chunk of the file into memory
+            $bytesRead = $byteReader.Read($buffer, 0, $buffer.Length)
+            $memoryStream = New-Object System.IO.MemoryStream($buffer, 0, $bytesRead)
+            $fileContent = New-Object System.Net.Http.StreamContent($memoryStream)
+            $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream")
+            $fileContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
+            $fileContent.Headers.ContentDisposition.Name = "tableau_file"
+            $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`"" # TODO check/escape filenames with special chars, e.g. using Uri.EscapeDataString()
+            $multipartContent.Add($fileContent)
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint FileUpload -Param $uploadSessionId) -Body $multipartContent -Method Put -Headers (Get-TSRequestHeaderDict)
+        } until ($script:TSRestApiChunkSize*$chunkNumber -ge $fileItem.Length)
+        if ($totalChunks -gt 1) {
+            Write-Progress -Activity "Uploading file $FileName" -Status "$totalSizeMb MB uploaded" -PercentComplete 100
+        }
+        return $uploadSessionId
     } catch {
         Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
     }
@@ -1434,18 +1628,19 @@ Export-ModuleMember -Function Get-TSGroupsForUser
 
 ### Workbooks, Views and Datasources methods
 Export-ModuleMember -Function Get-TSWorkbook
-Export-ModuleMember -Function Export-TSWorkbook
 Export-ModuleMember -Function Get-TSWorkbooksForUser
 Export-ModuleMember -Function Get-TSWorkbookConnection
-Export-ModuleMember -Function Get-TSDatasource
-Export-ModuleMember -Function Export-TSDatasource
-Export-ModuleMember -Function Get-TSDatasourcesForUser
-Export-ModuleMember -Function Get-TSDatasourceConnection
+Export-ModuleMember -Function Export-TSWorkbook
+Export-ModuleMember -Function Publish-TSWorkbook
 Export-ModuleMember -Function Update-TSWorkbook
 Export-ModuleMember -Function Update-TSWorkbookConnection
+Export-ModuleMember -Function Remove-TSWorkbook
+Export-ModuleMember -Function Get-TSDatasource
+Export-ModuleMember -Function Get-TSDatasourceConnection
+Export-ModuleMember -Function Export-TSDatasource
+Export-ModuleMember -Function Publish-TSDatasource
 Export-ModuleMember -Function Update-TSDatasource
 Export-ModuleMember -Function Update-TSDatasourceConnection
-Export-ModuleMember -Function Remove-TSWorkbook
 Export-ModuleMember -Function Remove-TSDatasource
 # Download View Crosstab Excel
 # Download Workbook PDF
@@ -1455,8 +1650,6 @@ Export-ModuleMember -Function Remove-TSDatasource
 # Get Recommendations for Views
 # Get Workbook Downgrade Info
 # Hide a Recommendation for a View
-# Publish Workbook
-# Publish Data Source
 # Query Workbook Preview Image
 # Query Views for Site
 # Query Views for Workbook
@@ -1503,11 +1696,8 @@ Export-ModuleMember -Function Remove-TSDatasource
 # Query Workbook Permissions
 
 ### Publishing methods
-# Append to File Upload
-# Initiate File Upload
-# Publish Data Source
+Export-ModuleMember -Function Send-TSFileUpload
 # Publish Flow
-# Publish Workbook
 
 ### Jobs, Tasks and Schedules methods
 # Add Data Source to Server Schedule

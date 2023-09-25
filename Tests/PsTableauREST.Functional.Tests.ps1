@@ -369,6 +369,11 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 ($revisions | Measure-Object).Count | Should -BeGreaterThan 0
                 $revisions | Select-Object -First 1 -ExpandProperty revisionNumber | Should -BeGreaterThan 0
             }
+            It "Publish TDSX datasource on <ConfigFile.server>" {
+                $defaultProjectId = Get-TSProject | Where-Object Name -eq "default" | Select-Object -First 1 -ExpandProperty id
+                $response = Publish-TSDatasource -Name "SampleDS" -InFile "Tests/Assets/Datasources/SampleDS.tds" -ProjectId $defaultProjectId
+                $response.id | Should -BeOfType String
+            }
             It "Download datasource on <ConfigFile.server>" {
                 $datasourceId = Get-TSDatasource | Select-Object -First 1 -ExpandProperty id
                 {Export-TSDatasource -DatasourceId $datasourceId -OutFile "Tests/Output/download.tdsx"} | Should -Not -Throw
