@@ -103,7 +103,7 @@ function Get-TSServerInfo {
         $response = Invoke-RestMethod -Uri $ServerUrl/api/$apiVersion/serverinfo -Method Get
         return $response.tsResponse.serverInfo
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -151,7 +151,7 @@ function Open-TSSignIn {
         $el_credentials.SetAttribute("personalAccessTokenSecret", $private:PlainSecret)
         # if ($ImpersonateUserId) { Assert-TSRestApiVersion -AtLeast 2.0 }
     } else {
-        Write-Error -Exception "Sign-in parameters not provided (username/password or PAT)."
+        Write-Error "Sign-in parameters not provided (needs either username/password or PAT)."
         return $null
     }
     try {
@@ -161,7 +161,7 @@ function Open-TSSignIn {
         $script:TSUserId = $response.tsResponse.credentials.user.id
         return $response.tsResponse.credentials
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -182,7 +182,7 @@ function Switch-TSSite {
         $script:TSUserId = $response.tsResponse.credentials.user.id
         return $response.tsResponse.credentials
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -203,7 +203,7 @@ function Close-TSSignOut {
         }
         return $response
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -217,7 +217,7 @@ function Revoke-TSServerAdminPAT {
             Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Auth -Param serverAdminAccessTokens) -Method Delete -Headers (Get-TSRequestHeaderDict)
         }
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -252,7 +252,7 @@ function Get-TSSite {
             } until ($PageSize*$pageNumber -ge $totalAvailable)
         }
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -276,7 +276,7 @@ function Add-TSSite {
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
     if ($SiteParams.Keys -contains 'adminMode' -and $SiteParams.Keys -contains 'userQuota' -and $SiteParams["adminMode"] -eq "ContentOnly") {
-        Write-Error -Exception "You cannot set admin_mode to ContentOnly and also set a user quota."
+        Write-Error "You cannot set admin_mode to ContentOnly and also set a user quota."
     }
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -292,7 +292,7 @@ function Add-TSSite {
             return $response.tsResponse.site
         }
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -305,7 +305,7 @@ function Update-TSSite {
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
     if ($SiteParams.Keys -contains 'adminMode' -and $SiteParams.Keys -contains 'userQuota' -and $SiteParams["adminMode"] -eq "ContentOnly") {
-        Write-Error -Exception "You cannot set admin_mode to ContentOnly and also set a user quota."
+        Write-Error "You cannot set admin_mode to ContentOnly and also set a user quota."
     }
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -319,11 +319,11 @@ function Update-TSSite {
                 $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Site -Param $SiteId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
                 return $response.tsResponse.site
             } else {
-                Write-Error -Exception "You can only update the site for which you are currently authenticated."
+                Write-Error "You can only update the site for which you are currently authenticated."
             }
         }
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -345,11 +345,11 @@ function Remove-TSSite {
                 }
                 Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
             } else {
-                Write-Error -Exception "You can only remove the site for which you are currently authenticated."
+                Write-Error "You can only remove the site for which you are currently authenticated."
             }
         }
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -371,7 +371,7 @@ function Get-TSProject {
             $response.tsResponse.projects.project
         } until ($PageSize*$pageNumber -ge $totalAvailable)
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -405,7 +405,7 @@ function Add-TSProject {
             return $response.tsResponse.project
         }
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -446,7 +446,7 @@ function Update-TSProject {
             return $response.tsResponse.project
         }
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -462,7 +462,7 @@ function Remove-TSProject {
             Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Project -Param $ProjectId) -Method Delete -Headers (Get-TSRequestHeaderDict)
         }
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -490,7 +490,7 @@ function Get-TSUser {
             } until ($PageSize*$pageNumber -ge $totalAvailable)
         }
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -517,7 +517,7 @@ function Add-TSUser {
             return $response.tsResponse.user
         }
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -558,7 +558,7 @@ function Update-TSUser {
             return $response.tsResponse.user
         }
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -579,7 +579,7 @@ function Remove-TSUser {
             Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
         }
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -600,7 +600,7 @@ function Get-TSGroup {
             $response.tsResponse.groups.group
         } until ($PageSize*$pageNumber -ge $totalAvailable)
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -642,7 +642,7 @@ function Add-TSGroup {
             return $response.tsResponse.group
         }
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -685,7 +685,7 @@ function Update-TSGroup {
             return $response.tsResponse.group
         }
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -701,7 +701,7 @@ function Remove-TSGroup {
             Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Group -Param $GroupId) -Method Delete -Headers (Get-TSRequestHeaderDict)
         }
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -723,7 +723,7 @@ function Add-TSUserToGroup {
             return $response.tsResponse.user
         }
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -740,7 +740,7 @@ function Remove-TSUserFromGroup {
             Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Group -Param $GroupId/users/$UserId) -Method Delete -Headers (Get-TSRequestHeaderDict)
         }
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -762,7 +762,7 @@ function Get-TSUsersInGroup {
             $response.tsResponse.users.user
         } until ($PageSize*$pageNumber -ge $totalAvailable)
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -784,7 +784,7 @@ function Get-TSGroupsForUser {
             $response.tsResponse.groups.group
         } until ($PageSize*$pageNumber -ge $totalAvailable)
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -826,7 +826,7 @@ function Get-TSWorkbook {
             } until ($PageSize*$pageNumber -ge $totalAvailable)
         }
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -850,7 +850,7 @@ function Get-TSWorkbooksForUser {
             $response.tsResponse.workbooks.workbook
         } until ($PageSize*$pageNumber -ge $totalAvailable)
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -864,7 +864,7 @@ function Get-TSWorkbookConnection {
         $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/connections) -Method Get -Headers (Get-TSRequestHeaderDict)
         $response.tsResponse.connections.connection
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -905,7 +905,7 @@ function Export-TSWorkbook {
         }
         Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict) -TimeoutSec 600 @OutFileParam
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     } finally {
         $global:ProgressPreference = $prevProgressPreference
     }
@@ -941,7 +941,7 @@ function Publish-TSWorkbook {
     try {
         Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict) -TimeoutSec 600
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -998,7 +998,7 @@ function Update-TSWorkbook {
             return $response.tsResponse.workbook
         }
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -1045,7 +1045,7 @@ function Update-TSWorkbookConnection {
             return $response.tsResponse.connection
         }
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -1069,7 +1069,7 @@ function Remove-TSWorkbook {
             }
         }
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -1110,7 +1110,7 @@ function Get-TSDatasource {
             } until ($PageSize*$pageNumber -ge $totalAvailable)
         }
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -1124,7 +1124,7 @@ function Get-TSDatasourceConnection {
         $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/connections) -Method Get -Headers (Get-TSRequestHeaderDict)
         $response.tsResponse.connections.connection
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -1166,7 +1166,7 @@ function Export-TSDatasource {
         }
         Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict) -TimeoutSec 600 @OutFileParam
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     } finally {
         $global:ProgressPreference = $prevProgressPreference
     }
@@ -1207,7 +1207,7 @@ function Publish-TSDatasource {
     } elseif ($FileType -eq 'xml') {
         $FileType = 'tds'
     }
-    if (-Not $FileType -In @("tds", "tdsx", "tde", "hyper", "parquet")) {
+    if (-Not ($FileType -In @("tds", "tdsx", "tde", "hyper", "parquet"))) {
         throw "File type unsupported (supported types are: tds, tdsx, tde, hyper, parquet)"
     }
     if ($fileItem.Length -ge $script:TSRestApiFileSizeLimit) {
@@ -1302,7 +1302,7 @@ function Publish-TSDatasource {
         }
         return $response.tsResponse.datasource
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -1355,7 +1355,7 @@ function Update-TSDatasource {
             return $response.tsResponse.datasource
         }
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -1402,7 +1402,7 @@ function Update-TSDatasourceConnection {
             return $response.tsResponse.connection
         }
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -1426,7 +1426,7 @@ function Remove-TSDatasource {
             }
         }
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -1481,7 +1481,7 @@ function Send-TSFileUpload {
         }
         return $uploadSessionId
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -1509,7 +1509,7 @@ function Get-TSDatabase {
             } until ($PageSize*$pageNumber -ge $totalAvailable)
         }
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -1536,7 +1536,7 @@ function Get-TSTable {
             } until ($PageSize*$pageNumber -ge $totalAvailable)
         }
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -1564,7 +1564,7 @@ function Get-TSTableColumn {
             } until ($PageSize*$pageNumber -ge $totalAvailable)
         }
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
@@ -1621,7 +1621,7 @@ function Get-TSMetadataGraphQL {
             $response.data.$entity
         }
     } catch {
-        Write-Error -Exception ($_.Exception.Message + " " + $_.ErrorDetails.Message)
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
 }
 
