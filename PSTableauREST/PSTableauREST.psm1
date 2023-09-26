@@ -989,15 +989,17 @@ function Publish-TSWorkbook {
     $boundaryString = (New-Guid).ToString("N")
     $fileItem = Get-Item -LiteralPath $InFile
     if (-Not $FileName) {
-        $FileName = $fileItem.Name -Replace '["`]','' # remove special chars
+        $FileName = $fileItem.Name -replace '["`]','' # remove special chars
     }
     if (-Not $FileType) {
         $FileType = $fileItem.Extension.Substring(1)
     }
     if ($FileType -eq 'zip') {
         $FileType = 'twbx'
+        $FileName = $FileName -ireplace 'zip$','twbx'
     } elseif ($FileType -eq 'xml') {
         $FileType = 'twb'
+        $FileName = $FileName -ireplace 'xml$','twb'
     }
     if (-Not ($FileType -In @("twb", "twbx"))) {
         throw "File type unsupported (supported types are: twb, twbx)"
@@ -1062,7 +1064,7 @@ function Publish-TSWorkbook {
             $uri += "&uploadSessionId=$uploadSessionId"
             $response = Invoke-RestMethod -Uri $uri -Body $multipartContent -Method Post -Headers (Get-TSRequestHeaderDict)
         } else {
-            $fileContent = New-Object System.Net.Http.StreamContent(New-Object System.IO.FileStream($InFile, [System.IO.FileMode]::Open))
+            $fileContent = New-Object System.Net.Http.StreamContent(New-Object System.IO.FileStream($InFile, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read))
             $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream")
             $fileContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
             $fileContent.Headers.ContentDisposition.Name = "tableau_workbook"
@@ -1325,15 +1327,17 @@ function Publish-TSDatasource {
     $boundaryString = (New-Guid).ToString("N")
     $fileItem = Get-Item -LiteralPath $InFile
     if (-Not $FileName) {
-        $FileName = $fileItem.Name -Replace '["`]','' # remove special chars
+        $FileName = $fileItem.Name -replace '["`]','' # remove special chars
     }
     if (-Not $FileType) {
         $FileType = $fileItem.Extension.Substring(1)
     }
     if ($FileType -eq 'zip') {
         $FileType = 'tdsx'
+        $FileName = $FileName -ireplace 'zip$','tdsx'
     } elseif ($FileType -eq 'xml') {
         $FileType = 'tds'
+        $FileName = $FileName -ireplace 'xml$','tds'
     }
     if (-Not ($FileType -In @("tds", "tdsx", "tde", "hyper", "parquet"))) {
         throw "File type unsupported (supported types are: tds, tdsx, tde, hyper, parquet)"
@@ -1391,7 +1395,7 @@ function Publish-TSDatasource {
             $response = Invoke-RestMethod -Uri $uri -Body $multipartContent -Method Post -Headers (Get-TSRequestHeaderDict)
             # write-error (new-object System.IO.StreamReader($multipartContent.ReadAsStream())).ReadToEnd()
         } else {
-            $fileContent = New-Object System.Net.Http.StreamContent(New-Object System.IO.FileStream($InFile, [System.IO.FileMode]::Open))
+            $fileContent = New-Object System.Net.Http.StreamContent(New-Object System.IO.FileStream($InFile, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read))
             $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream")
             $fileContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
             $fileContent.Headers.ContentDisposition.Name = "tableau_datasource"
@@ -1704,9 +1708,9 @@ function Get-TSMetadataGraphQL {
             $hasNextPage = $true
             while ($hasNextPage) {
                 if ($endCursor) {
-                    $queryPage = $Query -Replace $PaginatedEntity, "$PaginatedEntity(first: $PageSize, after: ""$endCursor"")"
+                    $queryPage = $Query -replace $PaginatedEntity, "$PaginatedEntity(first: $PageSize, after: ""$endCursor"")"
                 } else {
-                    $queryPage = $Query -Replace $PaginatedEntity, "$PaginatedEntity(first: $PageSize)"
+                    $queryPage = $Query -replace $PaginatedEntity, "$PaginatedEntity(first: $PageSize)"
                 }
                 $jsonQuery = @{
                     query = $queryPage
