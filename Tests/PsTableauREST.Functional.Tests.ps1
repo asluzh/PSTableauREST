@@ -332,6 +332,8 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $script:sampleWorkbookName = $workbook.name
                     {Export-TSWorkbook -WorkbookId $sampleWorkbookId -OutFile "Tests/Output/$sampleWorkbookName.twbx"} | Should -Not -Throw
                     Test-Path -Path "Tests/Output/$sampleWorkbookName.twbx" | Should -BeTrue
+                    {Export-TSWorkbook -WorkbookId $sampleWorkbookId -OutFile "Tests/Output/$sampleWorkbookName.twb" -ExcludeExtract} | Should -Not -Throw
+                    Test-Path -Path "Tests/Output/$sampleWorkbookName.twb" | Should -BeTrue
                     # Remove-Item -Path "Tests/Output/$sampleWorkbookName.twbx"
                 }
                 It "Publish sample workbook on <ConfigFile.server>" {
@@ -388,12 +390,12 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         $script:sampleWorkbookFileName = (Get-Item -LiteralPath $_).Name
                     }
                     It "Publish file ""<sampleWorkbookFileName>"" into workbook ""<sampleWorkbookName>"" on <ConfigFile.server>" {
-                        $workbook = Publish-TSWorkbook -Name $sampleWorkbookName -InFile $_ -ProjectId $samplesProjectId -Overwrite -ShowProgress
+                        $workbook = Publish-TSWorkbook -Name $sampleWorkbookName -InFile $_ -ProjectId $samplesProjectId -Overwrite -ShowProgress -SkipConnectionCheck
                         $workbook.id | Should -BeOfType String
                         $script:sampleWorkbookId = $workbook.id
                     }
                     It "Publish file ""<sampleWorkbookFileName>"" into workbook ""<sampleWorkbookName>"" on <ConfigFile.server> (Chunked)" {
-                        $workbook = Publish-TSWorkbook -Name $sampleWorkbookName -InFile $_ -ProjectId $samplesProjectId -Overwrite -ShowProgress -Chunked
+                        $workbook = Publish-TSWorkbook -Name $sampleWorkbookName -InFile $_ -ProjectId $samplesProjectId -Overwrite -ShowProgress -SkipConnectionCheck -Chunked
                         $workbook.id | Should -BeOfType String
                         $script:sampleWorkbookId = $workbook.id
                     }
@@ -480,8 +482,14 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 It "Publish datasource with invalid contents on <ConfigFile.server>" {
                     {Publish-TSDatasource -Name "invalid" -InFile "Tests/Assets/Misc/invalid.zip.tdsx" -ProjectId $samplesProjectId} | Should -Throw
                 }
-                It "Publish datasource with append option on <ConfigFile.server>" -Skip {
-                    Publish-TSDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/Datasource.txt" -ProjectId $samplesProjectId
+                It "Publish datasource with append option on <ConfigFile.server>" {
+                    $datasource = Publish-TSDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/stops_append.hyper" -ProjectId $samplesProjectId -Overwrite
+                    $datasource.id | Should -BeOfType String
+                    {Publish-TSDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/stops_append.hyper" -ProjectId $samplesProjectId -Overwrite -Append} | Should -Throw
+                    $datasource = Publish-TSDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/stops_append.hyper" -ProjectId $samplesProjectId -Append
+                    $datasource.id | Should -BeOfType String
+                    $datasource = Publish-TSDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/stops_append.hyper" -ProjectId $samplesProjectId -Append -Chunked
+                    $datasource.id | Should -BeOfType String
                 }
                 It "Publish datasource with connections on <ConfigFile.server>" -Skip {
                     Publish-TSDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/Datasource.txt" -ProjectId $samplesProjectId
