@@ -410,6 +410,8 @@ function Remove-TSSite {
 function Get-TSProject {
     [OutputType([PSCustomObject[]])]
     Param(
+        # [Parameter()][PSCustomObject[]] $FilterOptions, # TODO https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm
+        # [Parameter()][PSCustomObject[]] $SortOptions,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
@@ -524,6 +526,8 @@ function Get-TSUser {
     [OutputType([PSCustomObject[]])]
     Param(
         [Parameter()][string] $UserId,
+        # [Parameter()][PSCustomObject[]] $FilterOptions, # TODO https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm
+        # [Parameter()][PSCustomObject[]] $SortOptions,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
@@ -639,6 +643,8 @@ function Remove-TSUser {
 function Get-TSGroup {
     [OutputType([PSCustomObject[]])]
     Param(
+        # [Parameter()][PSCustomObject[]] $FilterOptions, # TODO https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm
+        # [Parameter()][PSCustomObject[]] $SortOptions,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
@@ -847,6 +853,8 @@ function Get-TSWorkbook {
     Param(
         [Parameter()][string] $WorkbookId,
         [Parameter()][switch] $Revisions,
+        # [Parameter()][PSCustomObject[]] $FilterOptions, # TODO https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm
+        # [Parameter()][PSCustomObject[]] $SortOptions,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
@@ -1211,6 +1219,8 @@ function Get-TSDatasource {
     Param(
         [Parameter()][string] $DatasourceId,
         [Parameter()][switch] $Revisions,
+        # [Parameter()][PSCustomObject[]] $FilterOptions, # TODO https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm
+        # [Parameter()][PSCustomObject[]] $SortOptions,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
