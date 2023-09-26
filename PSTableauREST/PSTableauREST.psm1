@@ -987,9 +987,9 @@ function Publish-TSWorkbook {
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
     $boundaryString = (New-Guid).ToString("N")
-    $fileItem = Get-Item $InFile
+    $fileItem = Get-Item -LiteralPath $InFile
     if (-Not $FileName) {
-        $FileName = $fileItem.Name
+        $FileName = $fileItem.Name -Replace '["`]','' # remove special chars
     }
     if (-Not $FileType) {
         $FileType = $fileItem.Extension.Substring(1)
@@ -1066,8 +1066,7 @@ function Publish-TSWorkbook {
             $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream")
             $fileContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
             $fileContent.Headers.ContentDisposition.Name = "tableau_workbook"
-            $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`"" # TODO check/escape filenames with special chars, e.g. using Uri.EscapeDataString()
-            # $fn = [System.Net.WebUtility]::UrlEncode($FileName)
+            $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`""
             $multipartContent.Add($fileContent)
             $response = Invoke-RestMethod -Uri $uri -Body $multipartContent -Method Post -Headers (Get-TSRequestHeaderDict)
         }
@@ -1324,9 +1323,9 @@ function Publish-TSDatasource {
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
     $boundaryString = (New-Guid).ToString("N")
-    $fileItem = Get-Item $InFile
+    $fileItem = Get-Item -LiteralPath $InFile
     if (-Not $FileName) {
-        $FileName = $fileItem.Name
+        $FileName = $fileItem.Name -Replace '["`]','' # remove special chars
     }
     if (-Not $FileType) {
         $FileType = $fileItem.Extension.Substring(1)
@@ -1396,8 +1395,7 @@ function Publish-TSDatasource {
             $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream")
             $fileContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
             $fileContent.Headers.ContentDisposition.Name = "tableau_datasource"
-            $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`"" # TODO check/escape filenames with special chars, e.g. using Uri.EscapeDataString()
-            # $fn = [System.Net.WebUtility]::UrlEncode($FileName)
+            $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`""
             $multipartContent.Add($fileContent)
             $response = Invoke-RestMethod -Uri $uri -Body $multipartContent -Method Post -Headers (Get-TSRequestHeaderDict)
 

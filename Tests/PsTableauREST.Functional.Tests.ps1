@@ -365,10 +365,15 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 }
                 Context "Publish / download sample workbooks on <ConfigFile.server>" -ForEach $WorkbookFiles {
                     BeforeAll {
-                        $script:publishWorkbookName = (Get-Item $_).BaseName
-                        $script:publishWorkbookFileName = (Get-Item $_).Name
+                        $script:publishWorkbookName = (Get-Item -LiteralPath $_).BaseName
+                        $script:publishWorkbookFileName = (Get-Item -LiteralPath $_).Name
                     }
                     It "Publish file ""<publishWorkbookFileName>"" into workbook ""<publishWorkbookName>"" on <ConfigFile.server>" {
+                        $workbook = Publish-TSWorkbook -Name $publishWorkbookName -InFile $_ -ProjectId $publishProjectId -Overwrite -ShowProgress
+                        $workbook.id | Should -BeOfType String
+                        $script:publishWorkbookId = $workbook.id
+                    }
+                    It "Publish file ""<publishWorkbookFileName>"" into workbook ""<publishWorkbookName>"" on <ConfigFile.server> (Chunked)" {
                         $workbook = Publish-TSWorkbook -Name $publishWorkbookName -InFile $_ -ProjectId $publishProjectId -Overwrite -ShowProgress -Chunked
                         $workbook.id | Should -BeOfType String
                         $script:publishWorkbookId = $workbook.id
@@ -455,10 +460,15 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 }
                 Context "Publish / download sample datasources on <ConfigFile.server>" -ForEach $DatasourceFiles {
                     BeforeAll {
-                        $script:publishDatasourceName = (Get-Item $_).BaseName
-                        $script:publishDatasourceFileName = (Get-Item $_).Name
+                        $script:publishDatasourceName = (Get-Item -LiteralPath $_).BaseName
+                        $script:publishDatasourceFileName = (Get-Item -LiteralPath $_).Name
                     }
                     It "Publish file ""<publishDatasourceFileName>"" into datasource ""<publishDatasourceName>"" on <ConfigFile.server>" {
+                        $datasource = Publish-TSDatasource -Name $publishDatasourceName -InFile $_ -ProjectId $publishProjectId -Overwrite -ShowProgress
+                        $datasource.id | Should -BeOfType String
+                        $script:publishDatasourceId = $datasource.id
+                    }
+                    It "Publish file ""<publishDatasourceFileName>"" into datasource ""<publishDatasourceName>"" on <ConfigFile.server> (Chunked)" {
                         $datasource = Publish-TSDatasource -Name $publishDatasourceName -InFile $_ -ProjectId $publishProjectId -Overwrite -ShowProgress -Chunked
                         $datasource.id | Should -BeOfType String
                         $script:publishDatasourceId = $datasource.id
