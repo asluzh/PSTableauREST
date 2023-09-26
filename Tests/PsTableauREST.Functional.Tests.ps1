@@ -2,6 +2,8 @@ BeforeDiscovery {
     Import-Module ./PSTableauREST/PSTableauREST.psm1 -Force
     Import-Module Microsoft.PowerShell.SecretManagement -Force
     $script:ConfigFiles = Get-ChildItem -Path "Tests/Config" -Filter "test_*.json" -Recurse
+    $script:DatasourceFiles = Get-ChildItem -Path "Tests/Assets/Datasources" -Recurse
+    $script:WorkbookFiles = Get-ChildItem -Path "Tests/Assets/Workbooks" -Recurse
 }
 BeforeAll {
     . ./Tests/Test.Functions.ps1
@@ -283,7 +285,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             }
         }
         Context "Workbook operations" -Tag Workbook {
-            It "Query workbooks on <ConfigFile.server>" {
+            It "Get workbooks on <ConfigFile.server>" {
                 $workbooks = Get-TSWorkbook
                 ($workbooks | Measure-Object).Count | Should -BeGreaterThan 0
                 $workbookId = $workbooks | Select-Object -First 1 -ExpandProperty id
@@ -312,43 +314,75 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 ($revisions | Measure-Object).Count | Should -BeGreaterThan 0
                 $revisions | Select-Object -First 1 -ExpandProperty revisionNumber | Should -BeGreaterThan 0
             }
-            It "Download workbook on <ConfigFile.server>" {
-                $workbookId = Get-TSWorkbook | Select-Object -First 1 -ExpandProperty id
-                {Export-TSWorkbook -WorkbookId $workbookId -OutFile "Tests/Output/download.twbx"} | Should -Not -Throw
-                Test-Path -Path "Tests/Output/download.twbx" | Should -BeTrue
-                Remove-Item -Path "Tests/Output/download.twbx"
-            }
-            It "Download previous workbook revision on <ConfigFile.server>" {
-                $downloaded = $false
-                Get-TSWorkbook | ForEach-Object { # find at least one workbook with multiple revisions, get the penultimate one
-                    if (-Not $downloaded) {
-                        $workbookId = $_.id
-                        $revisions = Get-TSWorkbook -WorkbookId $workbookId -Revisions
-                        if (($revisions | Measure-Object).Count -gt 1) {
-                            $revision = $revisions | Sort-Object revisionNumber -Descending | Select-Object -Skip 1 -First 1 -ExpandProperty revisionNumber
-                            # write-error "$workbookId $revision"
-                            {Export-TSWorkbook -WorkbookId $workbookId -Revision $revision -OutFile "Tests/Output/download_revision.twbx"} | Should -Not -Throw
-                            Test-Path -Path "Tests/Output/download_revision.twbx" | Should -BeTrue
-                            Remove-Item -Path "Tests/Output/download_revision.twbx"
-                            $downloaded = $true
-                        }
+            Context "Publish, download, workbook revisions on <ConfigFile.server>" {
+                BeforeAll {
+                    $project = Add-TSProject -Name (New-Guid)
+                    $script:publishProjectId = $project.id
+                }
+                AfterAll {
+                    if ($script:publishProjectId) {
+                        Remove-TSProject -ProjectId $script:publishProjectId
+                        $script:publishProjectId = $null
                     }
                 }
-                if (-Not $downloaded) { # if none revisions downloaded
-                    Set-ItResult -Skipped
+                It "Publish sample workbook on <ConfigFile.server>" {
+                    $workbook = Publish-TSWorkbook -Name "SampleWB" -InFile "Tests/Assets/Workbooks/SampleWB.twbx" -ProjectId $publishProjectId
+                    $workbook.id | Should -BeOfType String
                 }
-            }
-            It "Download current workbook revision on <ConfigFile.server>" -Skip {
-                $workbookId = Get-TSWorkbook | Select-Object -First 1 -ExpandProperty id
-                $revision = Get-TSWorkbook -WorkbookId $workbookId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
-                # write-error "$workbookId $revision"
-                {Export-TSWorkbook -WorkbookId $workbookId -Revision $revision -OutFile "Tests/Output/download_revision.twbx"} | Should -Not -Throw
-                Test-Path -Path "Tests/Output/download_revision.twbx" | Should -BeTrue
-                Remove-Item -Path "Tests/Output/download_revision.twbx"
+                It "Publish/overwrite sample workbook on <ConfigFile.server> - rev. 2" {
+                    $workbook = Publish-TSWorkbook -Name "SampleDS" -InFile "Tests/Assets/Workbooks/SampleWB.twbx" -ProjectId $publishProjectId -Overwrite -Chunked
+                    $workbook.id | Should -BeOfType String
+                    $script:publishWorkbookId = $workbook.id
+                }
+                It "Download sample workbook on <ConfigFile.server>" {
+                    {Export-TSWorkbook -WorkbookId $publishWorkbookId -OutFile "Tests/Output/download.twbx"} | Should -Not -Throw
+                    Test-Path -Path "Tests/Output/download.twbx" | Should -BeTrue
+                    Remove-Item -Path "Tests/Output/download.twbx"
+                }
+                It "Download & remove previous workbook revision on <ConfigFile.server>" {
+                    $revisions = Get-TSWorkbook -WorkbookId $publishWorkbookId -Revisions
+                    if (($revisions | Measure-Object).Count -gt 1) {
+                        $revision = $revisions | Sort-Object revisionNumber -Descending | Select-Object -Skip 1 -First 1 -ExpandProperty revisionNumber
+                        {Export-TSWorkbook -WorkbookId $publishWorkbookId -Revision $revision -OutFile "Tests/Output/download_revision.twbx"} | Should -Not -Throw
+                        Test-Path -Path "Tests/Output/download_revision.twbx" | Should -BeTrue
+                        Remove-Item -Path "Tests/Output/download_revision.twbx"
+                        {Remove-TSWorkbook -WorkbookId $publishWorkbookId -Revision $revision} | Should -Not -Throw
+                    } else {
+                        Set-ItResult -Skipped
+                    }
+                }
+                It "Download latest workbook revision on <ConfigFile.server>" {
+                    $revision = Get-TSWorkbook -WorkbookId $publishWorkbookId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
+                    {Export-TSWorkbook -WorkbookId $publishWorkbookId -Revision $revision -OutFile "Tests/Output/download_revision.twbx"} | Should -Not -Throw
+                    Test-Path -Path "Tests/Output/download_revision.twbx" | Should -BeTrue
+                    Remove-Item -Path "Tests/Output/download_revision.twbx"
+                }
+                It "Publish workbook with invalid extension on <ConfigFile.server>" {
+                    {Publish-TSWorkbook -Name "Workbook" -InFile "Tests/Assets/Misc/Workbook.txt" -ProjectId $publishProjectId} | Should -Throw
+                }
+                It "Publish workbook with invalid contents on <ConfigFile.server>" {
+                    {Publish-TSWorkbook -Name "invalid" -InFile "Tests/Assets/Misc/invalid.twbx" -ProjectId $publishProjectId} | Should -Throw
+                }
+                Context "Publish / download sample workbooks on <ConfigFile.server>" -ForEach $WorkbookFiles {
+                    BeforeAll {
+                        $script:publishWorkbookName = (Get-Item $_).BaseName
+                        $script:publishWorkbookFileName = (Get-Item $_).Name
+                    }
+                    It "Publish file ""<publishWorkbookFileName>"" into workbook ""<publishWorkbookName>"" on <ConfigFile.server>" {
+                        $workbook = Publish-TSWorkbook -Name $publishWorkbookName -InFile $_ -ProjectId $publishProjectId -Overwrite -ShowProgress -Chunked
+                        $workbook.id | Should -BeOfType String
+                        $script:publishWorkbookId = $workbook.id
+                    }
+                    It "Download workbook ""<publishWorkbookName>"" from <ConfigFile.server>" {
+                        {Export-TSWorkbook -WorkbookId $publishWorkbookId -OutFile "Tests/Output/download.twbx"} | Should -Not -Throw
+                        Test-Path -Path "Tests/Output/download.twbx" | Should -BeTrue
+                        Remove-Item -Path "Tests/Output/download.twbx"
+                    }
+                }
             }
         }
         Context "Datasource operations" -Tag Datasource {
-            It "Query datasources on <ConfigFile.server>" {
+            It "Get datasources on <ConfigFile.server>" {
                 $datasources = Get-TSDatasource
                 ($datasources | Measure-Object).Count | Should -BeGreaterThan 0
                 $datasourceId = $datasources | Select-Object -First 1 -ExpandProperty id
@@ -381,36 +415,59 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     }
                 }
                 It "Publish sample datasource on <ConfigFile.server>" {
-                    $datasource = Publish-TSDatasource -Name "SampleDS" -InFile "Tests/Assets/Samples/SampleDS.tds" -ProjectId $publishProjectId
+                    $datasource = Publish-TSDatasource -Name "SampleDS" -InFile "Tests/Assets/Datasources/SampleDS.tds" -ProjectId $publishProjectId
                     $datasource.id | Should -BeOfType String
                 }
-                It "Publish sample datasource on <ConfigFile.server> - rev. 2" {
-                    $datasource = Publish-TSDatasource -Name "SampleDS" -InFile "Tests/Assets/Samples/SampleDS.tds" -ProjectId $publishProjectId -Overwrite
+                It "Publish/overwrite sample datasource on <ConfigFile.server> - rev. 2" {
+                    $datasource = Publish-TSDatasource -Name "SampleDS" -InFile "Tests/Assets/Datasources/SampleDS.tds" -ProjectId $publishProjectId -Overwrite -Chunked
+                    # $datasource = Publish-TSDatasource -Name "SampleDS" -InFile "Tests/Assets/Datasources/trips.tdsx" -ProjectId $publishProjectId -Overwrite -Chunked
                     $datasource.id | Should -BeOfType String
                     $script:publishDatasourceId = $datasource.id
                 }
                 It "Download sample datasource on <ConfigFile.server>" {
-                    {Export-TSDatasource -DatasourceId $script:publishDatasourceId -OutFile "Tests/Output/download.tdsx"} | Should -Not -Throw
+                    {Export-TSDatasource -DatasourceId $publishDatasourceId -OutFile "Tests/Output/download.tdsx"} | Should -Not -Throw
                     Test-Path -Path "Tests/Output/download.tdsx" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/download.tdsx"
                 }
                 It "Download & remove previous datasource revision on <ConfigFile.server>" {
-                    $revisions = Get-TSDatasource -DatasourceId $script:publishDatasourceId -Revisions
+                    $revisions = Get-TSDatasource -DatasourceId $publishDatasourceId -Revisions
                     if (($revisions | Measure-Object).Count -gt 1) {
                         $revision = $revisions | Sort-Object revisionNumber -Descending | Select-Object -Skip 1 -First 1 -ExpandProperty revisionNumber
-                        {Export-TSDatasource -DatasourceId $script:publishDatasourceId -Revision $revision -OutFile "Tests/Output/download_revision.tdsx"} | Should -Not -Throw
+                        {Export-TSDatasource -DatasourceId $publishDatasourceId -Revision $revision -OutFile "Tests/Output/download_revision.tdsx"} | Should -Not -Throw
                         Test-Path -Path "Tests/Output/download_revision.tdsx" | Should -BeTrue
                         Remove-Item -Path "Tests/Output/download_revision.tdsx"
-                        {Remove-TSDatasource -DatasourceId $script:publishDatasourceId -Revision $revision} | Should -Not -Throw
+                        {Remove-TSDatasource -DatasourceId $publishDatasourceId -Revision $revision} | Should -Not -Throw
                     } else {
                         Set-ItResult -Skipped
                     }
                 }
                 It "Download latest datasource revision on <ConfigFile.server>" {
-                    $revision = Get-TSDatasource -DatasourceId $script:publishDatasourceId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
-                    {Export-TSDatasource -DatasourceId $script:publishDatasourceId -Revision $revision -OutFile "Tests/Output/download_revision.tdsx"} | Should -Not -Throw
+                    $revision = Get-TSDatasource -DatasourceId $publishDatasourceId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
+                    {Export-TSDatasource -DatasourceId $publishDatasourceId -Revision $revision -OutFile "Tests/Output/download_revision.tdsx"} | Should -Not -Throw
                     Test-Path -Path "Tests/Output/download_revision.tdsx" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/download_revision.tdsx"
+                }
+                It "Publish datasource with invalid extension on <ConfigFile.server>" {
+                    {Publish-TSDatasource -Name "World Indicators" -InFile "Tests/Assets/Misc/World Indicators.txt" -ProjectId $publishProjectId} | Should -Throw
+                }
+                It "Publish datasource with invalid contents on <ConfigFile.server>" {
+                    {Publish-TSDatasource -Name "invalid" -InFile "Tests/Assets/Misc/invalid.zip.tdsx" -ProjectId $publishProjectId} | Should -Throw
+                }
+                Context "Publish / download sample datasources on <ConfigFile.server>" -ForEach $DatasourceFiles {
+                    BeforeAll {
+                        $script:publishDatasourceName = (Get-Item $_).BaseName
+                        $script:publishDatasourceFileName = (Get-Item $_).Name
+                    }
+                    It "Publish file ""<publishDatasourceFileName>"" into datasource ""<publishDatasourceName>"" on <ConfigFile.server>" {
+                        $datasource = Publish-TSDatasource -Name $publishDatasourceName -InFile $_ -ProjectId $publishProjectId -Overwrite -ShowProgress -Chunked
+                        $datasource.id | Should -BeOfType String
+                        $script:publishDatasourceId = $datasource.id
+                    }
+                    It "Download datasource ""<publishDatasourceName>"" from <ConfigFile.server>" {
+                        {Export-TSDatasource -DatasourceId $publishDatasourceId -OutFile "Tests/Output/download.tdsx"} | Should -Not -Throw
+                        Test-Path -Path "Tests/Output/download.tdsx" | Should -BeTrue
+                        Remove-Item -Path "Tests/Output/download.tdsx"
+                    }
                 }
             }
         }
@@ -440,17 +497,19 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 $column.id | Should -Be $columnId
             }
             It "Simple GraphQL queries on <ConfigFile.server>" {
-                $query = Get-Content "Tests/Assets/workbooks.graphql" | Out-String
+                $query = Get-Content "Tests/Assets/GraphQL/workbooks.graphql" | Out-String
                 $results = Get-TSMetadataGraphQL -Query $query
                 ($results | Measure-Object).Count | Should -BeGreaterThan 0
             }
-            It "Paginated GraphQL query on <ConfigFile.server>" {
-                $query = Get-Content "Tests/Assets/fields-paginated.graphql" | Out-String
-                $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" #-PageSize 100
+            It "Paginated GraphQL queries on <ConfigFile.server>" {
+                $query = Get-Content "Tests/Assets/GraphQL/fields-paginated.graphql" | Out-String
+                $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -ShowProgress
                 ($results | Measure-Object).Count | Should -BeGreaterThan 100
-                $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 1000
+                $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -ShowProgress -PageSize 500
                 ($results | Measure-Object).Count | Should -BeGreaterThan 100
-                $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 20000
+                $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -ShowProgress -PageSize 1000
+                ($results | Measure-Object).Count | Should -BeGreaterThan 100
+                $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -ShowProgress -PageSize 20000
                 ($results | Measure-Object).Count | Should -BeGreaterThan 100
             }
         }

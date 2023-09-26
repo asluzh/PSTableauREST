@@ -51,6 +51,59 @@ function Get-TSRequestUri {
     return $Uri
 }
 
+### Helper functions for generating XML requests
+function Add-TSCredentialsElement {
+    [OutputType()]
+    Param(
+        [Parameter(Mandatory)][xml] $Element,
+        [Parameter(Mandatory)][hashtable] $Credentials
+    )
+    if (-Not ($Credentials["username"] -and $Credentials["password"])) {
+        Write-Error "Credentials must contain both username and password" -Category InvalidArgument -ErrorAction Stop
+    }
+    $el_connection = $Element.AppendChild($Element.OwnerDocument.CreateElement("connectionCredentials"))
+    $el_connection.SetAttribute("name", $Credentials["username"])
+    if ($Credentials["password"] -isnot [securestring]) {
+        Write-Error "Password must be a SecureString" -Category InvalidArgument -ErrorAction Stop
+    }
+    $private:PlainPassword = (New-Object System.Net.NetworkCredential("", $Credentials["password"])).Password
+    $el_connection.SetAttribute("password", $private:PlainPassword)
+    if ($Credentials["embed"]) {
+        $el_connection.SetAttribute("embed", $Credentials["embed"])
+    }
+    if ($Credentials["oAuth"]) {
+        $el_connection.SetAttribute("oAuth", $Credentials["oAuth"])
+    }
+}
+
+function Add-TSConnectionsElement {
+    [OutputType()]
+    Param(
+        [Parameter(Mandatory)][xml] $Element,
+        [Parameter(Mandatory)][hashtable[]] $Connections
+    )
+    $el_connections = $Element.AppendChild($Element.OwnerDocument.CreateElement("connections"))
+    foreach ($connection in $Connections) {
+        $el_connection = $el_connections.AppendChild($Element.OwnerDocument.CreateElement("connection"))
+        if ($connection["serverAddress"]) {
+            $el_connection.SetAttribute("serverAddress", $connection["serverAddress"])
+        } else {
+            Write-Error "Connection must have a server address" -Category InvalidArgument -ErrorAction Stop
+        }
+        if ($connection["serverPort"]) {
+            $el_connection.SetAttribute("serverPort", $connection["serverPort"])
+        }
+        if ($connection["credentials"] -and ($connection["credentials"] -is [hashtable])) {
+            Add-TSCredentialsElement -Element $el_connection -Credentials $connection["credentials"]
+        } elseif ($connection["username"] -and $connection["password"]) {
+            Add-TSCredentialsElement -Element $el_connection -Credentials @{
+                username = $connection["username"]
+                password = $connection["password"]
+            }
+        }
+    }
+}
+
 ### API version methods
 # version mapping: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_versions.htm
 # what's new here: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_whats_new.htm
@@ -915,31 +968,110 @@ function Publish-TSWorkbook {
     [OutputType([PSCustomObject])]
     Param(
         [Parameter(Mandatory)][string] $InFile,
+        [Parameter(Mandatory)][string] $Name,
         [Parameter()][string] $FileName,
         [Parameter()][string] $FileType,
-        [Parameter()][string] $Name,
         # [Parameter()][string] $Description,
         [Parameter()][string] $ProjectId,
         [Parameter()][switch] $ShowTabs,
         [Parameter()][hashtable] $HideViews,
-        [Parameter()][string] $ThumbnailUserId,
+        [Parameter()][string] $ThumbnailsUserId,
         [Parameter()][switch] $Overwrite,
         [Parameter()][switch] $SkipConnectionCheck,
         [Parameter()][switch] $BackgroundTask,
         [Parameter()][switch] $Chunked,
-        [Parameter()][string] $ServerAddress,
-        [Parameter()][string] $ServerPort,
-        [Parameter()][string] $Username,
-        [Parameter()][securestring] $SecurePassword,
-        [Parameter()][switch] $EmbedPassword,
-        [Parameter()][switch] $EncryptExtracts,
-        [Parameter()][switch] $OAuth,
+        [Parameter()][hashtable] $Credentials,
+        [Parameter()][hashtable[]] $Connections,
+        # [Parameter()][switch] $EncryptExtracts,
         [Parameter()][switch] $ShowProgress
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
+    $boundaryString = (New-Guid).ToString("N")
+    $fileItem = Get-Item $InFile
+    if (-Not $FileName) {
+        $FileName = $fileItem.Name
+    }
+    if (-Not $FileType) {
+        $FileType = $fileItem.Extension.Substring(1)
+    }
+    if ($FileType -eq 'zip') {
+        $FileType = 'twbx'
+    } elseif ($FileType -eq 'xml') {
+        $FileType = 'twb'
+    }
+    if (-Not ($FileType -In @("twb", "twbx"))) {
+        throw "File type unsupported (supported types are: twb, twbx)"
+    }
+    if ($fileItem.Length -ge $script:TSRestApiFileSizeLimit) {
+        $Chunked = $true
+    }
     $uri = Get-TSRequestUri -Endpoint Workbook
+    $uri += "?workbookType=$FileType"
+    if ($Overwrite) {
+        $uri += "&overwrite=true"
+    }
+    if ($SkipConnectionCheck) {
+        $uri += "&skipConnectionCheck=true"
+    }
+    if ($BackgroundTask) {
+        Assert-TSRestApiVersion -AtLeast 3.0
+        $uri += "&asJob=true"
+    }
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_workbook = $tsRequest.AppendChild($xml.CreateElement("workbook"))
+    $el_workbook.SetAttribute("name", $Name)
+    # if ($Description) {
+    #     $el_workbook.SetAttribute("description", $Description)
+    # }
+    if ($ShowTabs) {
+        $el_workbook.SetAttribute("showTabs", "true")
+    }
+    if ($ThumbnailsUserId) {
+        $el_workbook.SetAttribute("thumbnailsUserId", $ThumbnailsUserId)
+    }
+    if ($Credentials) {
+        Add-TSCredentialsElement -Element $el_workbook -Credentials $Credentials
+    }
+    if ($Connections) {
+        Assert-TSRestApiVersion -AtLeast 2.8
+        Add-TSConnectionsElement -Element $el_workbook -Connections $Connections
+    }
+    if ($ProjectId) {
+        $el_project = $el_workbook.AppendChild($xml.CreateElement("project"))
+        $el_project.SetAttribute("id", $ProjectId)
+    }
+    if ($HideViews) {
+        $el_views = $el_workbook.AppendChild($xml.CreateElement("views"))
+        $HideViews.GetEnumerator() | ForEach-Object {
+            $el_view = $el_views.AppendChild($xml.CreateElement("view"))
+            $el_view.SetAttribute("name", $_.Key)
+            $el_view.SetAttribute("hidden", $_.Value)
+        }
+    }
     try {
-        Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict) -TimeoutSec 600
+        $multipartContent = New-Object System.Net.Http.MultipartFormDataContent($boundaryString)
+        [void]$multipartContent.Headers.Remove("Content-Type")
+        [void]$multipartContent.Headers.TryAddWithoutValidation("Content-Type", "multipart/mixed; boundary=$boundaryString")
+        $stringContent = New-Object System.Net.Http.StringContent($xml.OuterXml, "text/xml")
+        $stringContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
+        $stringContent.Headers.ContentDisposition.Name = "request_payload"
+        $multipartContent.Add($stringContent)
+        if ($Chunked) {
+            $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName -ShowProgress:$ShowProgress
+            $uri += "&uploadSessionId=$uploadSessionId"
+            $response = Invoke-RestMethod -Uri $uri -Body $multipartContent -Method Post -Headers (Get-TSRequestHeaderDict)
+        } else {
+            $fileContent = New-Object System.Net.Http.StreamContent(New-Object System.IO.FileStream($InFile, [System.IO.FileMode]::Open))
+            $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream")
+            $fileContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
+            $fileContent.Headers.ContentDisposition.Name = "tableau_workbook"
+            $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`"" # TODO check/escape filenames with special chars, e.g. using Uri.EscapeDataString()
+            # $fn = [System.Net.WebUtility]::UrlEncode($FileName)
+            $multipartContent.Add($fileContent)
+            $response = Invoke-RestMethod -Uri $uri -Body $multipartContent -Method Post -Headers (Get-TSRequestHeaderDict)
+        }
+        return $response.tsResponse.workbook
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
@@ -1185,12 +1317,9 @@ function Publish-TSDatasource {
         [Parameter()][switch] $Append,
         [Parameter()][switch] $BackgroundTask,
         [Parameter()][switch] $Chunked,
-        [Parameter()][string] $Username,
-        [Parameter()][securestring] $SecurePassword,
-        [Parameter()][switch] $EmbedPassword,
-        [Parameter()][switch] $OAuth,
         [Parameter()][switch] $UseRemoteQueryAgent,
-        [Parameter()][hashtable] $Connections, # TODO
+        [Parameter()][hashtable] $Credentials,
+        [Parameter()][hashtable[]] $Connections,
         [Parameter()][switch] $ShowProgress
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
@@ -1235,24 +1364,15 @@ function Publish-TSDatasource {
     if ($UseRemoteQueryAgent) {
         $el_datasource.SetAttribute("useRemoteQueryAgent", "true")
     }
-    if ($Username -or $SecurePassword) {
-        $el_connection = $el_datasource.AppendChild($xml.CreateElement("connectionCredentials"))
-        if ($Username) {
-            $el_connection.SetAttribute("name", $Username)
-        }
-        if ($SecurePassword) {
-            $private:PlainPassword = (New-Object System.Net.NetworkCredential("", $SecurePassword)).Password
-            $el_connection.SetAttribute("password", $private:PlainPassword)
-        }
-        if ($EmbedPassword) {
-            $el_connection.SetAttribute("embed", "true")
-        }
-        if ($OAuth) {
-            $el_connection.SetAttribute("oAuth", "true")
-        }
+    if ($Connections -and $Credentials) {
+        Write-Error "You cannot provide both Connections and Credentials inputs" -Category InvalidArgument -ErrorAction Stop
+    }
+    if ($Credentials) {
+        Add-TSCredentialsElement -Element $el_datasource -Credentials $Credentials
     }
     if ($Connections) {
         Assert-TSRestApiVersion -AtLeast 2.8
+        Add-TSConnectionsElement -Element $el_datasource -Connections $Connections
     }
     if ($ProjectId) {
         $el_project = $el_datasource.AppendChild($xml.CreateElement("project"))
