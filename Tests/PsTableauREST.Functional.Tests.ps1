@@ -480,15 +480,15 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     {Publish-TSDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/Datasource.txt" -ProjectId $samplesProjectId} | Should -Throw
                 }
                 It "Publish datasource with invalid contents on <ConfigFile.server>" {
-                    {Publish-TSDatasource -Name "invalid" -InFile "Tests/Assets/Misc/invalid.zip.tdsx" -ProjectId $samplesProjectId} | Should -Throw
+                    {Publish-TSDatasource -Name "invalid" -InFile "Tests/Assets/Misc/invalid.tdsx" -ProjectId $samplesProjectId} | Should -Throw
                 }
                 It "Publish datasource with append option on <ConfigFile.server>" {
-                    $datasource = Publish-TSDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/stops_append.hyper" -ProjectId $samplesProjectId -Overwrite
+                    $datasource = Publish-TSDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/append.hyper" -ProjectId $samplesProjectId -Overwrite
                     $datasource.id | Should -BeOfType String
-                    {Publish-TSDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/stops_append.hyper" -ProjectId $samplesProjectId -Overwrite -Append} | Should -Throw
-                    $datasource = Publish-TSDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/stops_append.hyper" -ProjectId $samplesProjectId -Append
+                    {Publish-TSDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/append.hyper" -ProjectId $samplesProjectId -Overwrite -Append} | Should -Throw
+                    $datasource = Publish-TSDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/append.hyper" -ProjectId $samplesProjectId -Append
                     $datasource.id | Should -BeOfType String
-                    $datasource = Publish-TSDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/stops_append.hyper" -ProjectId $samplesProjectId -Append -Chunked
+                    $datasource = Publish-TSDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/append.hyper" -ProjectId $samplesProjectId -Append -Chunked
                     $datasource.id | Should -BeOfType String
                 }
                 It "Publish datasource with connections on <ConfigFile.server>" -Skip {

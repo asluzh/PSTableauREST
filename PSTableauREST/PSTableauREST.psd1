@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.1.3'
+ModuleVersion = '0.1.4'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -24,7 +24,7 @@ GUID = '2b5cbae2-d2e6-418a-af90-f8c7ddf8a3e4'
 Author = 'Andrey Sluzhivoy'
 
 # Company or vendor of this module
-CompanyName = ''
+CompanyName = 'D ONE'
 
 # Copyright statement for this module
 Copyright = '(c) Andrey Sluzhivoy. All rights reserved.'

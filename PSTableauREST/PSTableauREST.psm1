@@ -1898,9 +1898,9 @@ Export-ModuleMember -Function Get-TSSite
 Export-ModuleMember -Function Add-TSSite
 Export-ModuleMember -Function Update-TSSite
 Export-ModuleMember -Function Remove-TSSite
+# Get Recently Viewed for Site
 # Get Data Acceleration Report for a Site
 # Get Embedding Settings for a Site
-# Get Recently Viewed for Site
 # Update Embedding Settings for Site
 
 ### Projects methods
@@ -1954,10 +1954,10 @@ Export-ModuleMember -Function Update-TSDatasourceNow
 # Update Data in Hyper Data Source
 
 ### Views methods
-# Get View
-# Get View by Path
 # Query Views for Site
+# Get View
 # Query Views for Workbook
+# Get View by Path
 # Download View Crosstab Excel
 # Query View Data
 # Query View Image
@@ -1981,165 +1981,164 @@ Export-ModuleMember -Function Update-TSDatasourceNow
 # Delete Tag from Data Source
 
 ### Flow methods
-# Add Flow Permissions
-# Add Flow Task to Schedule
-# Cancel Flow Run
+# Query Flows for a Site
+# Query Flow
+# Query Flows for User
+# Query Flow Connections
+# Update Flow
+# Update Flow Connection
 # Delete Flow
-# Delete Flow Permission
 # Download Flow
+# Publish Flow
+# Get Flow Run Task
+# Get Flow Run Tasks
 # Publish Flow
 # Get Flow Run
 # Get Flow Runs
-# Get Flow Run Task
-# Get Flow Run Tasks
-# Get Linked Task
-# Get Linked Tasks
-# Publish Flow
-# Query Flow
-# Query Flows for a Site
-# Query Flows for User
-# Query Flow Connections
-# Query Flow Permissions
 # Run Flow Now
 # Run Flow Task
+# Get Linked Task
+# Get Linked Tasks
 # Run Linked Task Now
-# Update Flow
-# Update Flow Connection
+# Cancel Flow Run
 
 ### Permissions methods
-# Add Ask Data Lens Permissions
-# Add Data Source Permissions
-# Add Default Permissions
-# Add Project Permissions
-# Add View Permissions
-# Add Workbook Permissions
-# Add Workbook to Server Schedule
-# Delete Ask Data Lens Permission
-# Delete Data Source Permission
-# Delete Default Permission
-# Delete Project Permission
-# Delete View Permission
-# Delete Workbook Permission
-# List Ask Data Lens Permissions
-# Query Data Source Permissions
 # Query Default Permissions
-# Query Project Permissions
-# Query View Permissions
 # Query Workbook Permissions
+# Query View Permissions
+# Query Data Source Permissions
+# Query Project Permissions
+# Query Flow Permissions
+# Add Default Permissions
+# Add Workbook Permissions
+# Add View Permissions
+# Add Data Source Permissions
+# Add Project Permissions
+# Add Flow Permissions
+# Delete Default Permission
+# Delete Workbook Permission
+# Delete View Permission
+# Delete Data Source Permission
+# Delete Project Permission
+# Delete Flow Permission
+# List Ask Data Lens Permissions
+# Add Ask Data Lens Permissions
+# Delete Ask Data Lens Permission
 
 ### Jobs, Tasks and Schedules methods
-# Add Data Source to Server Schedule
-# Add Workbook to Server Schedule
-# Cancel Job
-# Create Server Schedule
-# Delete Data Acceleration Task
-# Delete Server Schedule
-# Get Data Acceleration Tasks in a Site
+# List Server Schedules
 # Get Server Schedule
+# Create Server Schedule
+# Update Server Schedule
+# Delete Server Schedule
+# Add Workbook to Server Schedule
+# Add Data Source to Server Schedule
+# Add Flow Task to Schedule
 # Query Job
 # Query Jobs
-# List Server Schedules
-# Update Server Schedule
+# Cancel Job
+# Get Data Acceleration Tasks in a Site
+# Delete Data Acceleration Task
 
 ### Extract and Encryption methods
-# Create Cloud Extract Refresh Task
-# Create Extracts for Embedded Data Sources in a Workbook
-# Create an Extract for a Data Source
-# Decrypt Extracts in a Site
-# Delete Extracts of Embedded Data Sources from a Workbook
-# Delete the Extract from a Data Source
-# Delete Extract Refresh Task
-# Encrypt Extracts in a Site
-# Get Extract Refresh Task
 # List Extract Refresh Tasks in Site
 # List Extract Refresh Tasks in Server Schedule
-# Reencrypt Extracts in a Site
+# Get Extract Refresh Task
 # Run Extract Refresh Task
+# Delete Extract Refresh Task
+# Encrypt Extracts in a Site
+# Reencrypt Extracts in a Site
+# Decrypt Extracts in a Site
+# Create an Extract for a Data Source
+# Delete the Extract from a Data Source
+# Create Cloud Extract Refresh Task
 # Update Cloud extract refresh task
+# Create Extracts for Embedded Data Sources in a Workbook
+# Delete Extracts of Embedded Data Sources from a Workbook
 
 ### Favorites methods
-# Add Data Source to Favorites
-# Add Flow to Favorites
-# Add Metric to Favorites
-# Add Project to Favorites
-# Add View to Favorites
-# Add Workbook to Favorites
-# Delete Data Source from Favorites
-# Delete Flow from Favorites
-# Delete Project from Favorites
-# Delete View from Favorites
-# Delete Workbook from Favorites
 # Get Favorites for User
 # Organize Favorites
+# Add Workbook to Favorites
+# Add View to Favorites
+# Add Data Source to Favorites
+# Add Project to Favorites
+# Add Flow to Favorites
+# Add Metric to Favorites
+# Delete Workbook from Favorites
+# Delete View from Favorites
+# Delete Data Source from Favorites
+# Delete Project from Favorites
+# Delete Flow from Favorites
 
 ### Subscription methods
-# Create Subscription
-# Delete Subscription
-# Get Subscription
 # List Subscriptions
+# Get Subscription
+# Create Subscription
 # Update Subscription
+# Delete Subscription
 
 ### Dashboard Extensions Settings methods
-# Block dashboard extension on server
-# Allow dashboard extension on site
-# Unblock dashboard extension on server
-# Get blocked dashboard extension on server
-# List blocked dashboard extensions on server
-# List allowed dashboard extensions on site
 # List settings for dashboard extensions on server
-# Update dashboard extensions settings of server
-# Disallow dashboard extension on site
-# Get allowed dashboard extension on site
+# List allowed dashboard extensions on site
+# List blocked dashboard extensions on server
 # List dashboard extension settings of site
+# Update dashboard extensions settings of server
+# Get allowed dashboard extension on site
+# Get blocked dashboard extension on server
+# Allow dashboard extension on site
+# Disallow dashboard extension on site
+# Block dashboard extension on server
+# Unblock dashboard extension on server
 # Update settings for allowed dashboard extension on site
 # Update dashboard extension settings of site
 
 ### Analytics Extensions Settings methods
-# Add analytics extension connection to site
-# Delete analytics extension connection from site
-# Remove current analytics extension connection for workbook
-# Get analytics extension details
 # List analytics extension connections on site
-# Get enabled state of analytics extensions on server
+# Add analytics extension connection to site
+# Update analytics extension connection of site
+# Delete analytics extension connection from site
 # Get enabled state of analytics extensions on site
+# Update enabled state of analytics extensions on site
+# Get enabled state of analytics extensions on server
+# Enable or disable analytics extensions on server
+# Get analytics extension details
 # List analytics extension connections of workbook
 # Get current analytics extension for workbook
-# Update analytics extension connection of site
-# Enable or disable analytics extensions on server
-# Update enabled state of analytics extensions on site
 # Update analytics extension for workbook
+# Remove current analytics extension connection for workbook
 
 ### Connected App methods
-# Create Connected App
-# Register EAS
-# Create Connected App Secret
-# Delete Connected App
-# Delete EAS
-# Delete Connected App Secret
-# Get Connected App
 # List Connected Apps
+# Get Connected App
+# Create Connected App
+# Delete Connected App
+# Update Connected App
+# Get Connected App Secret
+# Create Connected App Secret
+# Delete Connected App Secret
 # List All Registered EAS
 # List Registered EAS
-# Get Connected App Secret
-# Update Connected App
+# Register EAS
 # Update EAS
+# Delete EAS
 
 ### Notifications methods
-# Add User to Data-Driven Alert
-# Create Data Driven Alert
-# Create a Webhook
-# Delete Data-Driven Alert
-# Delete User from Data-Driven Alert
-# Delete a Webhook
-# Get User Notification Preferences
-# Get a Webhook
 # List Webhooks
+# Get a Webhook
+# Create a Webhook
+# Test a Webhook
+# Update a Webhook
+# Delete a Webhook
 # List Data-Driven Alerts on Site
 # Get Data-Driven Alert
-# Test a Webhook
+# Create Data Driven Alert
 # Update Data-Driven Alert
+# Delete Data-Driven Alert
+# Add User to Data-Driven Alert
+# Delete User from Data-Driven Alert
+# Get User Notification Preferences
 # Update User Notification Preferences
-# Update a Webhook
 
 ### Content Exploration methods
 # Get content Suggestions
@@ -2148,34 +2147,34 @@ Export-ModuleMember -Function Update-TSDatasourceNow
 # Get usage statistics for content item
 
 ### Ask Data Lens methods
-# Create ask data lens
-# Delete ask data lens
-# Get ask data lens
-# Import ask data lens
 # List ask data lenses in site
+# Get ask data lens
+# Create ask data lens
+# Import ask data lens
+# Delete ask data lens
 
 ### Metrics methods
-# Delete Metric
+# List Metrics for Site
 # Get Metric
 # Get Metric Data
-# List Metrics for Site
 # Update Metric
+# Delete Metric
 
 ### Identity Pools methods
-# Add User to Identity Pool
-# Delete Authentication Configuration
-# Remove User from Identity Pool
-# Delete Identity Pool
-# Delete Identity Store
-# Get Identity Pool
 # List Authentication Configurations
-# List Identity Pools
-# List Identity Stores
 # Create Authentication Configuration
-# Create Identity Pool
-# Configure Identity Store
 # Update Authentication Configuration
+# Delete Authentication Configuration
+# List Identity Pools
+# Get Identity Pool
+# Create Identity Pool
 # Update Identity Pool
+# Delete Identity Pool
+# Add User to Identity Pool
+# Remove User from Identity Pool
+# List Identity Stores
+# Configure Identity Store
+# Delete Identity Store
 
 ### Virtual Connections methods
 # List Virtual Connections
