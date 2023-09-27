@@ -412,6 +412,7 @@ function Get-TSProject {
     Param(
         # [Parameter()][PSCustomObject[]] $FilterOptions, # TODO https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm
         # [Parameter()][PSCustomObject[]] $SortOptions,
+        # [Parameter()][PSCustomObject[]] $FieldOptions,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
@@ -528,6 +529,7 @@ function Get-TSUser {
         [Parameter()][string] $UserId,
         # [Parameter()][PSCustomObject[]] $FilterOptions, # TODO https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm
         # [Parameter()][PSCustomObject[]] $SortOptions,
+        # [Parameter()][PSCustomObject[]] $FieldOptions,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
@@ -645,6 +647,7 @@ function Get-TSGroup {
     Param(
         # [Parameter()][PSCustomObject[]] $FilterOptions, # TODO https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm
         # [Parameter()][PSCustomObject[]] $SortOptions,
+        # [Parameter()][PSCustomObject[]] $FieldOptions,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
@@ -916,6 +919,7 @@ function Get-TSWorkbook {
         [Parameter()][switch] $Revisions,
         # [Parameter()][PSCustomObject[]] $FilterOptions, # TODO https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm
         # [Parameter()][PSCustomObject[]] $SortOptions,
+        # [Parameter()][PSCustomObject[]] $FieldOptions,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
@@ -1370,6 +1374,7 @@ function Get-TSDatasource {
         [Parameter()][switch] $Revisions,
         # [Parameter()][PSCustomObject[]] $FilterOptions, # TODO https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm
         # [Parameter()][PSCustomObject[]] $SortOptions,
+        # [Parameter()][PSCustomObject[]] $FieldOptions,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
@@ -1735,6 +1740,49 @@ function Update-TSDatasourceNow {
     }
 }
 
+### Views methods
+function Get-TSView {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter()][string] $ViewId,
+        [Parameter()][string] $WorkbookId,
+        [Parameter()][switch] $IncludeUsageStatistics,
+        # [Parameter()][PSCustomObject[]] $FilterOptions, # TODO https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm
+        # [Parameter()][PSCustomObject[]] $SortOptions,
+        # [Parameter()][PSCustomObject[]] $FieldOptions,
+        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+    )
+    # Assert-TSRestApiVersion -AtLeast 2.2
+    try {
+        if ($ViewId) { # Get View
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint View -Param $ViewId) -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response.tsResponse.view
+        } elseif ($WorkbookId) { # Query Views for Workbook
+            $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/views
+            if ($IncludeUsageStatistics) {
+                $uri += "&includeUsageStatistics=true"
+            }
+            $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response.tsResponse.views.view
+        } else { # Query Views for Site
+            $pageNumber = 0
+            do {
+                $pageNumber += 1
+                $uri = Get-TSRequestUri -Endpoint View
+                $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+                if ($IncludeUsageStatistics) {
+                    $uri += "&includeUsageStatistics=true"
+                }
+                $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+                $totalAvailable = $response.tsResponse.pagination.totalAvailable
+                $response.tsResponse.views.view
+            } until ($PageSize*$pageNumber -ge $totalAvailable)
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
 ### Metadata methods
 function Get-TSDatabase {
     [OutputType([PSCustomObject[]])]
@@ -1888,8 +1936,8 @@ Export-ModuleMember -Function Switch-TSSite
 Export-ModuleMember -Function Close-TSSignOut
 Export-ModuleMember -Function Revoke-TSServerAdminPAT
 Export-ModuleMember -Function Get-TSCurrentUserId
-# Delete Server Session
 # Get Current Server Session
+# Delete Server Session
 # List Server Active Directory Domains
 # Update Server Active Directory Domain
 
@@ -1922,8 +1970,8 @@ Export-ModuleMember -Function Add-TSUserToGroup
 Export-ModuleMember -Function Remove-TSUserFromGroup
 Export-ModuleMember -Function Get-TSUsersInGroup
 Export-ModuleMember -Function Get-TSGroupsForUser
-# Import Users to Site from CSV
-# Delete Users from Site with CSV
+# Import Users to Site from CSV - request body with multipart
+# Delete Users from Site with CSV - request body with multipart
 
 ### Publishing methods
 Export-ModuleMember -Function Send-TSFileUpload
@@ -1950,14 +1998,11 @@ Export-ModuleMember -Function Update-TSDatasource
 Export-ModuleMember -Function Update-TSDatasourceConnection
 Export-ModuleMember -Function Remove-TSDatasource
 Export-ModuleMember -Function Update-TSDatasourceNow
-# Update Data in Hyper Connection
-# Update Data in Hyper Data Source
+# Update Data in Hyper Connection - requires json body
+# Update Data in Hyper Data Source - requires json body
 
 ### Views methods
-# Query Views for Site
-# Get View
-# Query Views for Workbook
-# Get View by Path
+Export-ModuleMember -Function Get-TSView
 # Download View Crosstab Excel
 # Query View Data
 # Query View Image
