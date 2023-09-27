@@ -1284,6 +1284,56 @@ function Get-TSWorkbookDowngradeInfo {
     }
 }
 
+function Export-TSWorkbookAs {
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $WorkbookId,
+        [Parameter(Mandatory)][ValidateSet('pdf','powerpoint','image')][string] $Format,
+        [Parameter()][validateset('A3','A4','A5','B5','Executive','Folio','Ledger','Legal','Letter','Note','Quarto','Tabloid')][string] $PageType = "A4",
+        [Parameter()][validateset('Portrait','Landscape')][string] $PageOrientation = "Portrait",
+        [Parameter()][int] $MaxAge, # The maximum number of minutes a workbook preview will be cached before being refreshed
+        [Parameter()][string] $OutFile,
+        [Parameter()][switch] $ShowProgress
+    )
+    $OutFileParam = @{}
+    if ($OutFile) {
+        $OutFileParam.Add("OutFile", $OutFile)
+    }
+    $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId
+    if ($Format -eq 'pdf') {
+        Assert-TSRestApiVersion -AtLeast 3.4
+        $uri += "/pdf?type=$PageType&orientation=$PageOrientation"
+        if ($MaxAge) {
+            $uri += "&maxAge=$MaxAge"
+        }
+        # $fileType = 'pdf'
+    } elseif ($Format -eq 'powerpoint') {
+        Assert-TSRestApiVersion -AtLeast 3.8
+        $uri += "/powerpoint"
+        if ($MaxAge) {
+            $uri += "?maxAge=$MaxAge"
+        }
+        # $fileType = 'pptx'
+    } elseif ($Format -eq 'image') {
+        # Assert-TSRestApiVersion -AtLeast 2.0
+        $uri += "/previewImage"
+        # $fileType = 'png'
+    }
+    $prevProgressPreference = $global:ProgressPreference
+    try {
+        if ($ShowProgress) {
+            $global:ProgressPreference = 'Continue'
+        } else {
+            $global:ProgressPreference = 'SilentlyContinue'
+        }
+        Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict) -TimeoutSec 600 @OutFileParam
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    } finally {
+        $global:ProgressPreference = $prevProgressPreference
+    }
+}
+
 ### Datasources methods
 function Get-TSDatasource {
     [OutputType([PSCustomObject[]])]
@@ -1836,9 +1886,7 @@ Export-ModuleMember -Function Update-TSWorkbook
 Export-ModuleMember -Function Update-TSWorkbookConnection
 Export-ModuleMember -Function Remove-TSWorkbook
 Export-ModuleMember -Function Get-TSWorkbookDowngradeInfo
-# Query Workbook Preview Image
-# Download Workbook PDF
-# Download Workbook PowerPoint
+Export-ModuleMember -Function Export-TSWorkbookAs
 # Update Workbook Now
 
 ### Datasources methods
