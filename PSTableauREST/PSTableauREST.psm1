@@ -847,7 +847,62 @@ function Get-TSGroupsForUser {
     }
 }
 
-### Workbooks, Views and Datasources methods
+### Publishing methods
+function Send-TSFileUpload {
+    [OutputType([string])]
+    Param(
+        [Parameter(Mandatory)][string] $InFile,
+        [Parameter()][string] $FileName = "file",
+        [Parameter()][switch] $ShowProgress
+    )
+    # Assert-TSRestApiVersion -AtLeast 2.0
+    try {
+        $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint FileUpload) -Method Post -Headers (Get-TSRequestHeaderDict)
+        $uploadSessionId = $response.tsResponse.fileUpload.GetAttribute("uploadSessionId")
+        $chunkNumber = 0
+        $buffer = New-Object System.Byte[]($script:TSRestApiChunkSize)
+        $fileStream = New-Object System.IO.FileStream($InFile, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read)
+        $byteReader = New-Object System.IO.BinaryReader($fileStream)
+        # $totalChunks = [Math]::Ceiling($fileItem.Length / $script:TSRestApiChunkSize)
+        $totalSizeMb = [Math]::Round($fileItem.Length / 1048576)
+        $bytesUploaded = 0
+        do {
+            $chunkNumber += 1
+            $boundaryString = (New-Guid).ToString("N")
+            $multipartContent = New-Object System.Net.Http.MultipartFormDataContent($boundaryString)
+            [void]$multipartContent.Headers.Remove("Content-Type")
+            [void]$multipartContent.Headers.TryAddWithoutValidation("Content-Type", "multipart/mixed; boundary=$boundaryString")
+            $stringContent = New-Object System.Net.Http.StringContent("", "text/xml")
+            $stringContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
+            $stringContent.Headers.ContentDisposition.Name = "request_payload"
+            $multipartContent.Add($stringContent)
+            # read (next) chunk of the file into memory
+            $bytesRead = $byteReader.Read($buffer, 0, $buffer.Length)
+            $memoryStream = New-Object System.IO.MemoryStream($buffer, 0, $bytesRead)
+            $fileContent = New-Object System.Net.Http.StreamContent($memoryStream)
+            $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream")
+            $fileContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
+            $fileContent.Headers.ContentDisposition.Name = "tableau_file"
+            $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`"" # TODO check/escape filenames with special chars, e.g. using Uri.EscapeDataString()
+            $multipartContent.Add($fileContent)
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint FileUpload -Param $uploadSessionId) -Body $multipartContent -Method Put -Headers (Get-TSRequestHeaderDict)
+            $bytesUploaded += $bytesRead
+            if ($ShowProgress) {
+                $uploadedSizeMb = [Math]::Round($bytesUploaded / 1048576)
+                $percentCompleted = [Math]::Round($bytesUploaded / $fileItem.Length * 100)
+                Write-Progress -Activity "Uploading file $FileName" -Status "$uploadedSizeMb / $totalSizeMb MB uploaded ($percentCompleted%)" -PercentComplete $percentCompleted
+            }
+        } until ($script:TSRestApiChunkSize*$chunkNumber -ge $fileItem.Length)
+        if ($ShowProgress) {
+            Write-Progress -Activity "Uploading file $FileName" -Status "$totalSizeMb MB uploaded" -Completed
+        }
+        return $uploadSessionId
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+### Workbooks methods
 function Get-TSWorkbook {
     [OutputType([PSCustomObject[]])]
     Param(
@@ -1214,6 +1269,22 @@ function Remove-TSWorkbook {
     }
 }
 
+function Get-TSWorkbookDowngradeInfo {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter(Mandatory)][string] $WorkbookId,
+        [Parameter(Mandatory)][version] $DowngradeVersion
+    )
+    Assert-TSRestApiVersion -AtLeast 3.5
+    try {
+        $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/downGradeInfo?productVersion=$DowngradeVersion) -Method Get -Headers (Get-TSRequestHeaderDict)
+        $response.tsResponse.downgradeInfo
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+### Datasources methods
 function Get-TSDatasource {
     [OutputType([PSCustomObject[]])]
     Param(
@@ -1562,61 +1633,6 @@ function Remove-TSDatasource {
     }
 }
 
-# Publishing methods
-function Send-TSFileUpload {
-    [OutputType([string])]
-    Param(
-        [Parameter(Mandatory)][string] $InFile,
-        [Parameter()][string] $FileName = "file",
-        [Parameter()][switch] $ShowProgress
-    )
-    # Assert-TSRestApiVersion -AtLeast 2.0
-    try {
-        $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint FileUpload) -Method Post -Headers (Get-TSRequestHeaderDict)
-        $uploadSessionId = $response.tsResponse.fileUpload.GetAttribute("uploadSessionId")
-        $chunkNumber = 0
-        $buffer = New-Object System.Byte[]($script:TSRestApiChunkSize)
-        $fileStream = New-Object System.IO.FileStream($InFile, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read)
-        $byteReader = New-Object System.IO.BinaryReader($fileStream)
-        # $totalChunks = [Math]::Ceiling($fileItem.Length / $script:TSRestApiChunkSize)
-        $totalSizeMb = [Math]::Round($fileItem.Length / 1048576)
-        $bytesUploaded = 0
-        do {
-            $chunkNumber += 1
-            $boundaryString = (New-Guid).ToString("N")
-            $multipartContent = New-Object System.Net.Http.MultipartFormDataContent($boundaryString)
-            [void]$multipartContent.Headers.Remove("Content-Type")
-            [void]$multipartContent.Headers.TryAddWithoutValidation("Content-Type", "multipart/mixed; boundary=$boundaryString")
-            $stringContent = New-Object System.Net.Http.StringContent("", "text/xml")
-            $stringContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
-            $stringContent.Headers.ContentDisposition.Name = "request_payload"
-            $multipartContent.Add($stringContent)
-            # read (next) chunk of the file into memory
-            $bytesRead = $byteReader.Read($buffer, 0, $buffer.Length)
-            $memoryStream = New-Object System.IO.MemoryStream($buffer, 0, $bytesRead)
-            $fileContent = New-Object System.Net.Http.StreamContent($memoryStream)
-            $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream")
-            $fileContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
-            $fileContent.Headers.ContentDisposition.Name = "tableau_file"
-            $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`"" # TODO check/escape filenames with special chars, e.g. using Uri.EscapeDataString()
-            $multipartContent.Add($fileContent)
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint FileUpload -Param $uploadSessionId) -Body $multipartContent -Method Put -Headers (Get-TSRequestHeaderDict)
-            $bytesUploaded += $bytesRead
-            if ($ShowProgress) {
-                $uploadedSizeMb = [Math]::Round($bytesUploaded / 1048576)
-                $percentCompleted = [Math]::Round($bytesUploaded / $fileItem.Length * 100)
-                Write-Progress -Activity "Uploading file $FileName" -Status "$uploadedSizeMb / $totalSizeMb MB uploaded ($percentCompleted%)" -PercentComplete $percentCompleted
-            }
-        } until ($script:TSRestApiChunkSize*$chunkNumber -ge $fileItem.Length)
-        if ($ShowProgress) {
-            Write-Progress -Activity "Uploading file $FileName" -Status "$totalSizeMb MB uploaded" -Completed
-        }
-        return $uploadSessionId
-    } catch {
-        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
-    }
-}
-
 ### Metadata methods
 function Get-TSDatabase {
     [OutputType([PSCustomObject[]])]
@@ -1783,7 +1799,6 @@ Export-ModuleMember -Function Remove-TSSite
 # Get Data Acceleration Report for a Site
 # Get Embedding Settings for a Site
 # Get Recently Viewed for Site
-# Query Views for Site
 # Update Embedding Settings for Site
 
 ### Projects methods
@@ -1808,7 +1823,10 @@ Export-ModuleMember -Function Get-TSGroupsForUser
 # Import Users to Site from CSV
 # Delete Users from Site with CSV
 
-### Workbooks, Views and Datasources methods
+### Publishing methods
+Export-ModuleMember -Function Send-TSFileUpload
+
+### Workbooks methods
 Export-ModuleMember -Function Get-TSWorkbook
 Export-ModuleMember -Function Get-TSWorkbooksForUser
 Export-ModuleMember -Function Get-TSWorkbookConnection
@@ -1817,6 +1835,13 @@ Export-ModuleMember -Function Publish-TSWorkbook
 Export-ModuleMember -Function Update-TSWorkbook
 Export-ModuleMember -Function Update-TSWorkbookConnection
 Export-ModuleMember -Function Remove-TSWorkbook
+Export-ModuleMember -Function Get-TSWorkbookDowngradeInfo
+# Query Workbook Preview Image
+# Download Workbook PDF
+# Download Workbook PowerPoint
+# Update Workbook Now
+
+### Datasources methods
 Export-ModuleMember -Function Get-TSDatasource
 Export-ModuleMember -Function Get-TSDatasourceConnection
 Export-ModuleMember -Function Export-TSDatasource
@@ -1824,37 +1849,62 @@ Export-ModuleMember -Function Publish-TSDatasource
 Export-ModuleMember -Function Update-TSDatasource
 Export-ModuleMember -Function Update-TSDatasourceConnection
 Export-ModuleMember -Function Remove-TSDatasource
-# Download View Crosstab Excel
-# Download Workbook PDF
-# Download Workbook PowerPoint
+# Update Data Source Now
+# Update Data in Hyper Connection
+# Update Data in Hyper Data Source
+
+### Views methods
 # Get View
 # Get View by Path
-# Get Recommendations for Views
-# Get Workbook Downgrade Info
-# Hide a Recommendation for a View
-# Query Workbook Preview Image
 # Query Views for Site
 # Query Views for Workbook
+# Download View Crosstab Excel
 # Query View Data
 # Query View Image
 # Query View PDF
 # Query View Preview Image
+# Get Recommendations for Views
+# Hide a Recommendation for a View
 # Unhide a Recommendation for a View
-# Update Workbook Now
-# Update Data Source Now
-# Update Data in Hyper Connection
-# Update Data in Hyper Data Source
 # List Custom Views
 # Get Custom View
 # Get Custom View Image
 # Update Custom View
 # Delete Custom View
+
+### Tags methods
 # Add Tags to View
 # Add Tags to Workbook
 # Add Tags to Data Source
 # Delete Tag from View
 # Delete Tag from Workbook
 # Delete Tag from Data Source
+
+### Flow methods
+# Add Flow Permissions
+# Add Flow Task to Schedule
+# Cancel Flow Run
+# Delete Flow
+# Delete Flow Permission
+# Download Flow
+# Publish Flow
+# Get Flow Run
+# Get Flow Runs
+# Get Flow Run Task
+# Get Flow Run Tasks
+# Get Linked Task
+# Get Linked Tasks
+# Publish Flow
+# Query Flow
+# Query Flows for a Site
+# Query Flows for User
+# Query Flow Connections
+# Query Flow Permissions
+# Run Flow Now
+# Run Flow Task
+# Run Linked Task Now
+# Update Flow
+# Update Flow Connection
 
 ### Permissions methods
 # Add Ask Data Lens Permissions
@@ -1876,10 +1926,6 @@ Export-ModuleMember -Function Remove-TSDatasource
 # Query Project Permissions
 # Query View Permissions
 # Query Workbook Permissions
-
-### Publishing methods
-Export-ModuleMember -Function Send-TSFileUpload
-# Publish Flow
 
 ### Jobs, Tasks and Schedules methods
 # Add Data Source to Server Schedule
@@ -1910,31 +1956,6 @@ Export-ModuleMember -Function Send-TSFileUpload
 # Reencrypt Extracts in a Site
 # Run Extract Refresh Task
 # Update Cloud extract refresh task
-
-### Flow methods
-# Add Flow Permissions
-# Add Flow Task to Schedule
-# Cancel Flow Run
-# Delete Flow
-# Delete Flow Permission
-# Download Flow
-# Get Flow Run
-# Get Flow Runs
-# Get Flow Run Task
-# Get Flow Run Tasks
-# Get Linked Task
-# Get Linked Tasks
-# Publish Flow
-# Query Flow
-# Query Flows for a Site
-# Query Flows for User
-# Query Flow Connections
-# Query Flow Permissions
-# Run Flow Now
-# Run Flow Task
-# Run Linked Task Now
-# Update Flow
-# Update Flow Connection
 
 ### Favorites methods
 # Add Data Source to Favorites
