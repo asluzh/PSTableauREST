@@ -866,6 +866,7 @@ function Send-TSFileUpload {
         # $totalChunks = [Math]::Ceiling($fileItem.Length / $script:TSRestApiChunkSize)
         $totalSizeMb = [Math]::Round($fileItem.Length / 1048576)
         $bytesUploaded = 0
+        $startTime = Get-Date
         do {
             $chunkNumber += 1
             $boundaryString = (New-Guid).ToString("N")
@@ -887,13 +888,18 @@ function Send-TSFileUpload {
             $multipartContent.Add($fileContent)
             $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint FileUpload -Param $uploadSessionId) -Body $multipartContent -Method Put -Headers (Get-TSRequestHeaderDict)
             $bytesUploaded += $bytesRead
+            $elapsedTime = $(Get-Date) - $startTime
+            $remainingTime = $elapsedTime * ($fileItem.Length / $bytesUploaded - 1)
             if ($ShowProgress) {
                 $uploadedSizeMb = [Math]::Round($bytesUploaded / 1048576)
                 $percentCompleted = [Math]::Round($bytesUploaded / $fileItem.Length * 100)
-                Write-Progress -Activity "Uploading file $FileName" -Status "$uploadedSizeMb / $totalSizeMb MB uploaded ($percentCompleted%)" -PercentComplete $percentCompleted
+                Write-Progress -Activity "Uploading file $FileName" -Status "$uploadedSizeMb / $totalSizeMb MB uploaded ($percentCompleted%)" -PercentComplete $percentCompleted -SecondsRemaining $remainingTime.TotalSeconds
             }
         } until ($script:TSRestApiChunkSize*$chunkNumber -ge $fileItem.Length)
+        $fileStream.Close()
         if ($ShowProgress) {
+            Write-Progress -Activity "Uploading file $FileName" -Status "$totalSizeMb / $totalSizeMb MB uploaded (100%)" -PercentComplete 100
+			Start-Sleep -m 100
             Write-Progress -Activity "Uploading file $FileName" -Status "$totalSizeMb MB uploaded" -Completed
         }
         return $uploadSessionId
@@ -1127,13 +1133,15 @@ function Publish-TSWorkbook {
             $uri += "&uploadSessionId=$uploadSessionId"
             $response = Invoke-RestMethod -Uri $uri -Body $multipartContent -Method Post -Headers (Get-TSRequestHeaderDict)
         } else {
-            $fileContent = New-Object System.Net.Http.StreamContent(New-Object System.IO.FileStream($InFile, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read))
+            $fileStream = New-Object System.IO.FileStream($InFile, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read)
+            $fileContent = New-Object System.Net.Http.StreamContent($fileStream)
             $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream")
             $fileContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
             $fileContent.Headers.ContentDisposition.Name = "tableau_workbook"
             $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`""
             $multipartContent.Add($fileContent)
             $response = Invoke-RestMethod -Uri $uri -Body $multipartContent -Method Post -Headers (Get-TSRequestHeaderDict)
+            $fileStream.Close()
         }
         return $response.tsResponse.workbook
     } catch {
@@ -1546,15 +1554,17 @@ function Publish-TSDatasource {
             $response = Invoke-RestMethod -Uri $uri -Body $multipartContent -Method Post -Headers (Get-TSRequestHeaderDict)
             # write-error (new-object System.IO.StreamReader($multipartContent.ReadAsStream())).ReadToEnd()
         } else {
-            $fileContent = New-Object System.Net.Http.StreamContent(New-Object System.IO.FileStream($InFile, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read))
+            $fileStream = New-Object System.IO.FileStream($InFile, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read)
+            $fileContent = New-Object System.Net.Http.StreamContent($fileStream)
             $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream")
             $fileContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
             $fileContent.Headers.ContentDisposition.Name = "tableau_datasource"
             $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`""
             $multipartContent.Add($fileContent)
             $response = Invoke-RestMethod -Uri $uri -Body $multipartContent -Method Post -Headers (Get-TSRequestHeaderDict)
+            $fileStream.Close()
 
-            # alternative approach, doesn't work yet for binary files
+            # alternative approach, to be tested for binary files
             # https://stackoverflow.com/questions/25075010/upload-multiple-files-from-powershell-script
             # possible solution: saving the request body in a file and using -InFile parameter for Invoke-RestMethod
             # https://hochwald.net/upload-file-powershell-invoke-restmethod/
@@ -1567,8 +1577,10 @@ function Publish-TSDatasource {
             #     "--$boundaryString",
             #     "Content-Type: application/octet-stream",
             #     "Content-Disposition: form-data; name=tableau_datasource; filename=""$FileName""",
+            # should be: [System.Text.Encoding]::Default.GetString($buffer)
             #     "",
             #     (Get-Content $InFile -Raw),
+            # should be: $FilenameUrlEncoded = [System.Net.WebUtility]::UrlEncode($FileName)
             #     "--$boundaryString--"
             # ) -join "`r`n"
             # Invoke-RestMethod -Uri $uri -Body $requestBody -Method Post -Headers (Get-TSRequestHeaderDict) -ContentType "multipart/mixed; boundary=$boundaryString"
