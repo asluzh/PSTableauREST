@@ -1334,6 +1334,26 @@ function Export-TSWorkbookAs {
     }
 }
 
+function Update-TSWorkbookNow {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $WorkbookId
+    )
+    Assert-TSRestApiVersion -AtLeast 2.8
+    $xml = New-Object System.Xml.XmlDocument
+    $xml.AppendChild($xml.CreateElement("tsRequest"))
+    try {
+        if ($PSCmdlet.ShouldProcess($WorkbookId)) {
+            $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/refresh
+            $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+            return $response.tsResponse.job
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
 ### Datasources methods
 function Get-TSDatasource {
     [OutputType([PSCustomObject[]])]
@@ -1683,6 +1703,26 @@ function Remove-TSDatasource {
     }
 }
 
+function Update-TSDatasourceNow {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $DatasourceId
+    )
+    Assert-TSRestApiVersion -AtLeast 2.8
+    $xml = New-Object System.Xml.XmlDocument
+    $xml.AppendChild($xml.CreateElement("tsRequest"))
+    try {
+        if ($PSCmdlet.ShouldProcess($DatasourceId)) {
+            $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/refresh
+            $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+            return $response.tsResponse.job
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
 ### Metadata methods
 function Get-TSDatabase {
     [OutputType([PSCustomObject[]])]
@@ -1887,7 +1927,7 @@ Export-ModuleMember -Function Update-TSWorkbookConnection
 Export-ModuleMember -Function Remove-TSWorkbook
 Export-ModuleMember -Function Get-TSWorkbookDowngradeInfo
 Export-ModuleMember -Function Export-TSWorkbookAs
-# Update Workbook Now
+Export-ModuleMember -Function Update-TSWorkbookNow
 
 ### Datasources methods
 Export-ModuleMember -Function Get-TSDatasource
@@ -1897,7 +1937,7 @@ Export-ModuleMember -Function Publish-TSDatasource
 Export-ModuleMember -Function Update-TSDatasource
 Export-ModuleMember -Function Update-TSDatasourceConnection
 Export-ModuleMember -Function Remove-TSDatasource
-# Update Data Source Now
+Export-ModuleMember -Function Update-TSDatasourceNow
 # Update Data in Hyper Connection
 # Update Data in Hyper Data Source
 
