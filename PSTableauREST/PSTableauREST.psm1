@@ -1296,7 +1296,7 @@ function Get-TSWorkbookDowngradeInfo {
     }
 }
 
-function Export-TSWorkbookAs {
+function Export-TSWorkbookIntoFormat {
     [OutputType([PSCustomObject])]
     Param(
         [Parameter(Mandatory)][string] $WorkbookId,
@@ -1783,6 +1783,24 @@ function Get-TSView {
     }
 }
 
+function Get-TSViewPreviewImage {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter(Mandatory)][string] $ViewId,
+        [Parameter(Mandatory)][string] $WorkbookId
+    )
+    # Assert-TSRestApiVersion -AtLeast 2.0
+    $OutFileParam = @{}
+    if ($OutFile) {
+        $OutFileParam.Add("OutFile", $OutFile)
+    }
+    try {
+        Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/views/$ViewId/previewImage) -Method Get -Headers (Get-TSRequestHeaderDict) -TimeoutSec 600 @OutFileParam
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
 ### Metadata methods
 function Get-TSDatabase {
     [OutputType([PSCustomObject[]])]
@@ -1986,7 +2004,7 @@ Export-ModuleMember -Function Update-TSWorkbook
 Export-ModuleMember -Function Update-TSWorkbookConnection
 Export-ModuleMember -Function Remove-TSWorkbook
 Export-ModuleMember -Function Get-TSWorkbookDowngradeInfo
-Export-ModuleMember -Function Export-TSWorkbookAs
+Export-ModuleMember -Function Export-TSWorkbookIntoFormat
 Export-ModuleMember -Function Update-TSWorkbookNow
 
 ### Datasources methods
@@ -2003,11 +2021,11 @@ Export-ModuleMember -Function Update-TSDatasourceNow
 
 ### Views methods
 Export-ModuleMember -Function Get-TSView
-# Download View Crosstab Excel
-# Query View Data
-# Query View Image
-# Query View PDF
-# Query View Preview Image
+Export-ModuleMember -Function Get-TSViewPreviewImage
+# Download View Crosstab Excel -vf
+# Query View Data -vf
+# Query View Image -vf
+# Query View PDF -vf
 # Get Recommendations for Views
 # Hide a Recommendation for a View
 # Unhide a Recommendation for a View
