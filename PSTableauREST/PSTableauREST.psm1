@@ -780,7 +780,7 @@ function Add-TSUserToGroup {
     $el_user = $tsRequest.AppendChild($xml.CreateElement("user"))
     $el_user.SetAttribute("id", $UserId)
     try {
-        if ($PSCmdlet.ShouldProcess("add user $UserId into group $GroupId")) {
+        if ($PSCmdlet.ShouldProcess("add user $UserId to group $GroupId")) {
             $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Group -Param $GroupId/users) -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
             return $response.tsResponse.user
         }
@@ -1296,13 +1296,13 @@ function Get-TSWorkbookDowngradeInfo {
     }
 }
 
-function Export-TSWorkbookIntoFormat {
+function Export-TSWorkbookToFormat {
     [OutputType([PSCustomObject])]
     Param(
         [Parameter(Mandatory)][string] $WorkbookId,
         [Parameter(Mandatory)][ValidateSet('pdf','powerpoint','image')][string] $Format,
-        [Parameter()][validateset('A3','A4','A5','B5','Executive','Folio','Ledger','Legal','Letter','Note','Quarto','Tabloid')][string] $PageType = "A4",
-        [Parameter()][validateset('Portrait','Landscape')][string] $PageOrientation = "Portrait",
+        [Parameter()][ValidateSet('A3','A4','A5','B4','B5','Executive','Folio','Ledger','Legal','Letter','Note','Quarto','Tabloid','Unspecified')][string] $PageType = "A4",
+        [Parameter()][ValidateSet('Portrait','Landscape')][string] $PageOrientation = "Portrait",
         [Parameter()][int] $MaxAge, # The maximum number of minutes a workbook preview will be cached before being refreshed
         [Parameter()][string] $OutFile,
         [Parameter()][switch] $ShowProgress
@@ -1752,12 +1752,13 @@ function Get-TSView {
         # [Parameter()][PSCustomObject[]] $FieldOptions,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
-    # Assert-TSRestApiVersion -AtLeast 2.2
     try {
         if ($ViewId) { # Get View
+            Assert-TSRestApiVersion -AtLeast 3.0
             $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint View -Param $ViewId) -Method Get -Headers (Get-TSRequestHeaderDict)
             $response.tsResponse.view
         } elseif ($WorkbookId) { # Query Views for Workbook
+            # Assert-TSRestApiVersion -AtLeast 2.0
             $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/views
             if ($IncludeUsageStatistics) {
                 $uri += "&includeUsageStatistics=true"
@@ -1765,6 +1766,7 @@ function Get-TSView {
             $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
             $response.tsResponse.views.view
         } else { # Query Views for Site
+            # Assert-TSRestApiVersion -AtLeast 2.2
             $pageNumber = 0
             do {
                 $pageNumber += 1
@@ -1783,21 +1785,104 @@ function Get-TSView {
     }
 }
 
-function Get-TSViewPreviewImage {
+function Export-TSViewPreviewImage {
     [OutputType([PSCustomObject[]])]
     Param(
         [Parameter(Mandatory)][string] $ViewId,
-        [Parameter(Mandatory)][string] $WorkbookId
+        [Parameter(Mandatory)][string] $WorkbookId,
+        [Parameter()][string] $OutFile,
+        [Parameter()][switch] $ShowProgress
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
     $OutFileParam = @{}
     if ($OutFile) {
         $OutFileParam.Add("OutFile", $OutFile)
     }
+    $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/views/$ViewId/previewImage
+    $prevProgressPreference = $global:ProgressPreference
     try {
-        Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/views/$ViewId/previewImage) -Method Get -Headers (Get-TSRequestHeaderDict) -TimeoutSec 600 @OutFileParam
+        if ($ShowProgress) {
+            $global:ProgressPreference = 'Continue'
+        } else {
+            $global:ProgressPreference = 'SilentlyContinue'
+        }
+        Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict) -TimeoutSec 600 @OutFileParam
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    } finally {
+        $global:ProgressPreference = $prevProgressPreference
+    }
+}
+
+function Export-TSViewToFormat {
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $ViewId,
+        [Parameter(Mandatory)][ValidateSet('pdf','image','csv','excel')][string] $Format,
+        [Parameter()][ValidateSet('A3','A4','A5','B4','B5','Executive','Folio','Ledger','Legal','Letter','Note','Quarto','Tabloid','Unspecified')][string] $PageType = "A4",
+        [Parameter()][ValidateSet('Portrait','Landscape')][string] $PageOrientation = "Portrait",
+        [Parameter()][int] $MaxAge, # The maximum number of minutes a view pdf/image/data/crosstab will be cached before being refreshed
+        # The height/width of the rendered pdf image in pixels; these parameter determine its resolution and aspect ratio
+        [Parameter()][int] $VizHeight,
+        [Parameter()][int] $VizWidth,
+        # The resolution of the image. Image width and actual pixel density are determined by the display context of the image.
+        # Aspect ratio is always preserved. Set the value to high to ensure maximum pixel density.
+        [Parameter()][ValidateSet('standard','high')][string] $Resolution = "high",
+        [Parameter()][string] $OutFile,
+        # https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#Filter-query-views
+        [Parameter()][hashtable] $ViewFilters,
+        [Parameter()][switch] $ShowProgress
+    )
+    $OutFileParam = @{}
+    if ($OutFile) {
+        $OutFileParam.Add("OutFile", $OutFile)
+    }
+    $uri = Get-TSRequestUri -Endpoint View -Param $ViewId
+    $uriParam = @{}
+    if ($Format -eq 'pdf') {
+        Assert-TSRestApiVersion -AtLeast 2.8
+        $uri += "/pdf"
+        $uriParam.Add('type', $PageType)
+        $uriParam.Add('orientation', $PageOrientation)
+        if ($VizHeight) {
+            $uriParam.Add('vizHeight', $VizHeight)
+        }
+        if ($VizWidth) {
+            $uriParam.Add('vizWidth', $VizWidth)
+        }
+        # $fileType = 'pdf'
+    } elseif ($Format -eq 'image') {
+        Assert-TSRestApiVersion -AtLeast 2.5
+        $uri += "/image"
+        $uriParam.Add('resolution', $Resolution)
+        # $fileType = 'png'
+    } elseif ($Format -eq 'csv') {
+        Assert-TSRestApiVersion -AtLeast 2.8
+        $uri += "/data"
+        # $fileType = 'csv'
+    } elseif ($Format -eq 'excel') {
+        Assert-TSRestApiVersion -AtLeast 3.9
+        $uri += "/crosstab/excel"
+        # $fileType = 'xlsx'
+    }
+    if ($MaxAge) {
+        $uriParam.Add('maxAge', $MaxAge)
+    }
+    $ViewFilters.GetEnumerator() | ForEach-Object { # TODO test this
+        $uriParam.Add("vf_"+$_.Key, $_.Value)
+    }
+    $prevProgressPreference = $global:ProgressPreference
+    try {
+        if ($ShowProgress) {
+            $global:ProgressPreference = 'Continue'
+        } else {
+            $global:ProgressPreference = 'SilentlyContinue'
+        }
+        Invoke-RestMethod -Uri $uri -Body $uriParam -Method Get -Headers (Get-TSRequestHeaderDict) -TimeoutSec 600 @OutFileParam
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    } finally {
+        $global:ProgressPreference = $prevProgressPreference
     }
 }
 
@@ -2004,7 +2089,7 @@ Export-ModuleMember -Function Update-TSWorkbook
 Export-ModuleMember -Function Update-TSWorkbookConnection
 Export-ModuleMember -Function Remove-TSWorkbook
 Export-ModuleMember -Function Get-TSWorkbookDowngradeInfo
-Export-ModuleMember -Function Export-TSWorkbookIntoFormat
+Export-ModuleMember -Function Export-TSWorkbookToFormat
 Export-ModuleMember -Function Update-TSWorkbookNow
 
 ### Datasources methods
@@ -2021,7 +2106,9 @@ Export-ModuleMember -Function Update-TSDatasourceNow
 
 ### Views methods
 Export-ModuleMember -Function Get-TSView
-Export-ModuleMember -Function Get-TSViewPreviewImage
+# Get View by Path - alias to using filter
+Export-ModuleMember -Function Export-TSViewPreviewImage
+Export-ModuleMember -Function Export-TSViewToFormat
 # Download View Crosstab Excel -vf
 # Query View Data -vf
 # Query View Image -vf
@@ -2034,6 +2121,29 @@ Export-ModuleMember -Function Get-TSViewPreviewImage
 # Get Custom View Image
 # Update Custom View
 # Delete Custom View
+
+### Permissions methods
+# Query Default Permissions
+# Query Workbook Permissions
+# Query View Permissions
+# Query Data Source Permissions
+# Query Project Permissions
+# Query Flow Permissions
+# Add Default Permissions
+# Add Workbook Permissions
+# Add View Permissions
+# Add Data Source Permissions
+# Add Project Permissions
+# Add Flow Permissions
+# Delete Default Permission
+# Delete Workbook Permission
+# Delete View Permission
+# Delete Data Source Permission
+# Delete Project Permission
+# Delete Flow Permission
+# List Ask Data Lens Permissions
+# Add Ask Data Lens Permissions
+# Delete Ask Data Lens Permission
 
 ### Tags methods
 # Add Tags to View
@@ -2064,29 +2174,6 @@ Export-ModuleMember -Function Get-TSViewPreviewImage
 # Get Linked Tasks
 # Run Linked Task Now
 # Cancel Flow Run
-
-### Permissions methods
-# Query Default Permissions
-# Query Workbook Permissions
-# Query View Permissions
-# Query Data Source Permissions
-# Query Project Permissions
-# Query Flow Permissions
-# Add Default Permissions
-# Add Workbook Permissions
-# Add View Permissions
-# Add Data Source Permissions
-# Add Project Permissions
-# Add Flow Permissions
-# Delete Default Permission
-# Delete Workbook Permission
-# Delete View Permission
-# Delete Data Source Permission
-# Delete Project Permission
-# Delete Flow Permission
-# List Ask Data Lens Permissions
-# Add Ask Data Lens Permissions
-# Delete Ask Data Lens Permission
 
 ### Jobs, Tasks and Schedules methods
 # List Server Schedules
