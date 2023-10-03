@@ -338,11 +338,12 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 ($revisions | Measure-Object).Count | Should -BeGreaterThan 0
                 $revisions | Select-Object -First 1 -ExpandProperty revisionNumber | Should -BeGreaterThan 0
             }
-            Context "Publish, download, workbook revisions on <ConfigFile.server>" {
+            Context "Publish, download, revisions for sample workbook on <ConfigFile.server>" {
                 BeforeAll {
                     $project = Add-TSProject -Name (New-Guid)
                     Update-TSProject -ProjectId $project.id -PublishSamples
                     $script:samplesProjectId = $project.id
+                    $script:samplesProjectName = $project.name
                 }
                 AfterAll {
                     if ($script:samplesProjectId) {
@@ -351,7 +352,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     }
                 }
                 It "Download sample workbook from <ConfigFile.server>" {
-                    $workbook = Get-TSWorkbook | Where-Object -FilterScript { $_.project.id -eq $script:samplesProjectId } | Select-Object -First 1
+                    $workbook = Get-TSWorkbook -Filter "projectName:eq:$samplesProjectName","name:eq:Superstore" | Select-Object -First 1
                     $script:sampleWorkbookId = $workbook.id
                     $script:sampleWorkbookName = $workbook.name
                     {Export-TSWorkbook -WorkbookId $sampleWorkbookId -OutFile "Tests/Output/$sampleWorkbookName.twbx"} | Should -Not -Throw
@@ -382,9 +383,20 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 It "Publish sample workbook on <ConfigFile.server>" {
                     $workbook = Publish-TSWorkbook -Name $sampleWorkbookName -InFile "Tests/Output/$sampleWorkbookName.twbx" -ProjectId $samplesProjectId -Overwrite
                     $workbook.id | Should -BeOfType String
+                    $script:sampleWorkbookId = $workbook.id
                 }
-                It "Publish/overwrite sample workbook on <ConfigFile.server> (chunks)" {
+                It "Publish sample workbook (chunks) on <ConfigFile.server>" {
                     $workbook = Publish-TSWorkbook -Name $sampleWorkbookName -InFile "Tests/Output/$sampleWorkbookName.twbx" -ProjectId $samplesProjectId -Overwrite -Chunked
+                    $workbook.id | Should -BeOfType String
+                    $script:sampleWorkbookId = $workbook.id
+                }
+                It "Publish sample workbook (hidden views) on <ConfigFile.server>" {
+                    $workbook = Publish-TSWorkbook -Name $sampleWorkbookName -InFile "Tests/Output/$sampleWorkbookName.twbx" -ProjectId $samplesProjectId -Overwrite -HideViews @{Shipping="true";Performance="true";Forecast="true"}
+                    $workbook.id | Should -BeOfType String
+                    $script:sampleWorkbookId = $workbook.id
+                }
+                It "Publish sample workbook (with options) on <ConfigFile.server>" {
+                    $workbook = Publish-TSWorkbook -Name $sampleWorkbookName -InFile "Tests/Output/$sampleWorkbookName.twbx" -ProjectId $samplesProjectId -Overwrite -ShowTabs -ThumbnailsUserId (Get-TSCurrentUserId)
                     $workbook.id | Should -BeOfType String
                     $script:sampleWorkbookId = $workbook.id
                 }
@@ -411,9 +423,6 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 }
                 It "Publish workbook with invalid contents on <ConfigFile.server>" {
                     {Publish-TSWorkbook -Name "invalid" -InFile "Tests/Assets/Misc/invalid.twbx" -ProjectId $samplesProjectId} | Should -Throw
-                }
-                It "Publish workbook with workbook options on <ConfigFile.server>" -Skip {
-                    Publish-TSWorkbook -Name "Workbook" -InFile "Tests/Assets/Misc/Workbook.txt" -ProjectId $samplesProjectId
                 }
                 It "Publish workbook with connections on <ConfigFile.server>" -Skip {
                     Publish-TSWorkbook -Name "Workbook" -InFile "Tests/Assets/Misc/Workbook.txt" -ProjectId $samplesProjectId
@@ -478,11 +487,12 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 ($revisions | Measure-Object).Count | Should -BeGreaterThan 0
                 $revisions | Select-Object -First 1 -ExpandProperty revisionNumber | Should -BeGreaterThan 0
             }
-            Context "Publish, download, datasource revisions on <ConfigFile.server>" {
+            Context "Publish, download, revisions for sample datasource on <ConfigFile.server>" {
                 BeforeAll {
                     $project = Add-TSProject -Name (New-Guid)
                     Update-TSProject -ProjectId $project.id -PublishSamples
                     $script:samplesProjectId = $project.id
+                    $script:samplesProjectName = $project.name
                 }
                 AfterAll {
                     if ($script:samplesProjectId) {
@@ -491,7 +501,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     }
                 }
                 It "Download sample datasource from <ConfigFile.server>" {
-                    $datasource = Get-TSDatasource | Where-Object -FilterScript { $_.project.id -eq $script:samplesProjectId } | Select-Object -First 1
+                    $datasource = Get-TSDatasource -Filter "projectName:eq:$samplesProjectName" | Select-Object -First 1
                     $script:sampleDatasourceId = $datasource.id
                     $script:sampleDatasourceName = $datasource.name
                     {Export-TSDatasource -DatasourceId $sampleDatasourceId -OutFile "Tests/Output/$sampleDatasourceName.tdsx"} | Should -Not -Throw
@@ -603,7 +613,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 }
                 AfterAll {
                     if ($script:samplesProjectId) {
-                        # Remove-TSProject -ProjectId $script:samplesProjectId
+                        Remove-TSProject -ProjectId $script:samplesProjectId
                         $script:samplesProjectId = $null
                     }
                 }
