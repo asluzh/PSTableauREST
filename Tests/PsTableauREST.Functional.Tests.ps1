@@ -175,6 +175,12 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 ($projects | Measure-Object).Count | Should -BeGreaterThan 0
                 $projects | Where-Object id -eq $script:testProjectId | Should -Not -BeNullOrEmpty
             }
+            It "Query projects with options on <ConfigFile.server>" {
+                $projectName = Get-TSProject | Where-Object id -eq $script:testProjectId | Select-Object -First 1 -ExpandProperty name
+                $projects = Get-TSProject -FilterOptions "name:eq:$projectName" -SortOptions name:asc -FieldsOptions id,name,description
+                ($projects | Measure-Object).Count | Should -Be 1
+                ($projects | Get-Member -MemberType Property | Measure-Object).Count | Should -Be 3
+            }
             It "Delete project <testProjectId> on <ConfigFile.server>" {
                 $response = Remove-TSProject -ProjectId $script:testProjectId
                 $response | Should -BeOfType String
@@ -217,6 +223,12 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 $user = Get-TSUser -UserId $script:testUserId
                 $user.id | Should -Be $script:testUserId
             }
+            It "Query users with options on <ConfigFile.server>" {
+                $userName = Get-TSUser | Where-Object id -eq $script:testUserId | Select-Object -First 1 -ExpandProperty name
+                $users = Get-TSUser -FilterOptions "name:eq:$userName" -SortOptions name:asc -FieldsOptions _all_
+                ($users | Measure-Object).Count | Should -Be 1
+                ($users | Get-Member -MemberType Property | Measure-Object).Count | Should -BeGreaterThan 5
+            }
             It "Remove user <testUserId> on <ConfigFile.server>" {
                 $response = Remove-TSUser -UserId $script:testUserId
                 $response | Should -BeOfType String
@@ -240,6 +252,12 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 $groups = Get-TSGroup
                 ($groups | Measure-Object).Count | Should -BeGreaterThan 0
                 $groups | Where-Object id -eq $script:testGroupId | Should -Not -BeNullOrEmpty
+            }
+            It "Query groups with options on <ConfigFile.server>" {
+                $groupName = Get-TSGroup | Where-Object id -eq $script:testGroupId | Select-Object -First 1 -ExpandProperty name
+                $groups = Get-TSGroup -FilterOptions "name:eq:$groupName" -SortOptions name:asc -FieldsOptions id,name
+                ($groups | Measure-Object).Count | Should -Be 1
+                ($groups | Get-Member -MemberType Property | Measure-Object).Count | Should -BeGreaterOrEqual 2
             }
             It "Remove group <testGroupId> on <ConfigFile.server>" {
                 $response = Remove-TSGroup -GroupId $script:testGroupId
@@ -294,6 +312,12 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 $workbook.id | Should -Be $workbookId
                 $workbookConnections = Get-TSWorkbookConnection -WorkbookId $workbookId
                 ($workbookConnections | Measure-Object).Count | Should -BeGreaterThan 0
+            }
+            It "Query workbooks with options on <ConfigFile.server>" {
+                $workbookName = Get-TSWorkbook | Select-Object -First 1 -ExpandProperty name
+                $workbooks = Get-TSWorkbook -FilterOptions "name:eq:$workbookName" -SortOptions name:asc -FieldsOptions id,name
+                ($workbooks | Measure-Object).Count | Should -BeGreaterOrEqual 1
+                ($workbooks | Get-Member -MemberType Property | Measure-Object).Count | Should -BeGreaterOrEqual 2
             }
             It "Query workbooks for current user on <ConfigFile.server>" {
                 $workbooks = Get-TSWorkbooksForUser -UserId (Get-TSCurrentUserId)
@@ -417,6 +441,12 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 $datasource.id | Should -Be $datasourceId
                 $datasourceConnections = Get-TSDatasourceConnection -DatasourceId $datasourceId
                 ($datasourceConnections | Measure-Object).Count | Should -BeGreaterThan 0
+            }
+            It "Query datasources with options on <ConfigFile.server>" {
+                $datasourceName = Get-TSDatasource | Select-Object -First 1 -ExpandProperty name
+                $datasources = Get-TSDatasource -FilterOptions "name:eq:$datasourceName" -SortOptions name:asc -FieldsOptions id,name
+                ($datasources | Measure-Object).Count | Should -BeGreaterOrEqual 1
+                ($datasources | Get-Member -MemberType Property | Measure-Object).Count | Should -BeGreaterOrEqual 2
             }
             It "Get datasource connections on <ConfigFile.server>" {
                 $datasourceId = Get-TSDatasource | Select-Object -First 1 -ExpandProperty id
