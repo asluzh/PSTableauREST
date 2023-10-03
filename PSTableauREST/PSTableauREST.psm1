@@ -410,9 +410,9 @@ function Remove-TSSite {
 function Get-TSProject {
     [OutputType([PSCustomObject[]])]
     Param(
-        # [Parameter()][PSCustomObject[]] $FilterOptions, # TODO https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm
-        # [Parameter()][PSCustomObject[]] $SortOptions,
-        # [Parameter()][PSCustomObject[]] $FieldOptions,
+        [Parameter()][string[]] $FilterOptions, # https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm
+        [Parameter()][string[]] $SortOptions,
+        [Parameter()][string[]] $FieldsOptions, # https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_fields.htm#query_projects
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
@@ -421,8 +421,21 @@ function Get-TSProject {
         do {
             $pageNumber += 1
             $uri = Get-TSRequestUri -Endpoint Project
-            $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-            $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+            $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
+            $uriParam.Add("pageSize", $PageSize)
+            $uriParam.Add("pageNumber", $pageNumber)
+            if ($FilterOptions) {
+                $uriParam.Add("filter", $FilterOptions -join ',')
+            }
+            if ($SortOptions) {
+                $uriParam.Add("sort", $SortOptions -join ',')
+            }
+            if ($FieldsOptions) {
+                $uriParam.Add("fields", $FieldsOptions -join ',')
+            }
+            $uriRequest = [System.UriBuilder]$uri
+            $uriRequest.Query = $uriParam.ToString()
+            $response = Invoke-RestMethod -Uri $uriRequest.Uri.OriginalString -Method Get -Headers (Get-TSRequestHeaderDict)
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.projects.project
         } until ($PageSize*$pageNumber -ge $totalAvailable)
@@ -527,9 +540,9 @@ function Get-TSUser {
     [OutputType([PSCustomObject[]])]
     Param(
         [Parameter()][string] $UserId,
-        # [Parameter()][PSCustomObject[]] $FilterOptions, # TODO https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm
-        # [Parameter()][PSCustomObject[]] $SortOptions,
-        # [Parameter()][PSCustomObject[]] $FieldOptions,
+        [Parameter()][string[]] $FilterOptions,
+        [Parameter()][string[]] $SortOptions,
+        [Parameter()][string[]] $FieldsOptions,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
@@ -542,8 +555,21 @@ function Get-TSUser {
             do {
                 $pageNumber += 1
                 $uri = Get-TSRequestUri -Endpoint User
-                $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-                $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+                $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
+                $uriParam.Add("pageSize", $PageSize)
+                $uriParam.Add("pageNumber", $pageNumber)
+                if ($FilterOptions) {
+                    $uriParam.Add("filter", $FilterOptions -join ',')
+                }
+                if ($SortOptions) {
+                    $uriParam.Add("sort", $SortOptions -join ',')
+                }
+                if ($FieldsOptions) {
+                    $uriParam.Add("fields", $FieldsOptions -join ',')
+                }
+                $uriRequest = [System.UriBuilder]$uri
+                $uriRequest.Query = $uriParam.ToString()
+                $response = Invoke-RestMethod -Uri $uriRequest.Uri.OriginalString -Method Get -Headers (Get-TSRequestHeaderDict)
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.users.user
             } until ($PageSize*$pageNumber -ge $totalAvailable)
@@ -645,9 +671,9 @@ function Remove-TSUser {
 function Get-TSGroup {
     [OutputType([PSCustomObject[]])]
     Param(
-        # [Parameter()][PSCustomObject[]] $FilterOptions, # TODO https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm
-        # [Parameter()][PSCustomObject[]] $SortOptions,
-        # [Parameter()][PSCustomObject[]] $FieldOptions,
+        [Parameter()][string[]] $FilterOptions,
+        [Parameter()][string[]] $SortOptions,
+        [Parameter()][string[]] $FieldsOptions,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
@@ -656,8 +682,21 @@ function Get-TSGroup {
         do {
             $pageNumber += 1
             $uri = Get-TSRequestUri -Endpoint Group
-            $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-            $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+            $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
+            $uriParam.Add("pageSize", $PageSize)
+            $uriParam.Add("pageNumber", $pageNumber)
+            if ($FilterOptions) {
+                $uriParam.Add("filter", $FilterOptions -join ',')
+            }
+            if ($SortOptions) {
+                $uriParam.Add("sort", $SortOptions -join ',')
+            }
+            if ($FieldsOptions) {
+                $uriParam.Add("fields", $FieldsOptions -join ',')
+            }
+            $uriRequest = [System.UriBuilder]$uri
+            $uriRequest.Query = $uriParam.ToString()
+            $response = Invoke-RestMethod -Uri $uriRequest.Uri.OriginalString -Method Get -Headers (Get-TSRequestHeaderDict)
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.groups.group
         } until ($PageSize*$pageNumber -ge $totalAvailable)
@@ -917,9 +956,9 @@ function Get-TSWorkbook {
     Param(
         [Parameter()][string] $WorkbookId,
         [Parameter()][switch] $Revisions,
-        # [Parameter()][PSCustomObject[]] $FilterOptions, # TODO https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm
-        # [Parameter()][PSCustomObject[]] $SortOptions,
-        # [Parameter()][PSCustomObject[]] $FieldOptions,
+        [Parameter()][string[]] $FilterOptions,
+        [Parameter()][string[]] $SortOptions,
+        [Parameter()][string[]] $FieldsOptions,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
@@ -945,8 +984,21 @@ function Get-TSWorkbook {
             do {
                 $pageNumber += 1
                 $uri = Get-TSRequestUri -Endpoint Workbook
-                $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-                $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+                $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
+                $uriParam.Add("pageSize", $PageSize)
+                $uriParam.Add("pageNumber", $pageNumber)
+                if ($FilterOptions) {
+                    $uriParam.Add("filter", $FilterOptions -join ',')
+                }
+                if ($SortOptions) {
+                    $uriParam.Add("sort", $SortOptions -join ',')
+                }
+                if ($FieldsOptions) {
+                    $uriParam.Add("fields", $FieldsOptions -join ',')
+                }
+                $uriRequest = [System.UriBuilder]$uri
+                $uriRequest.Query = $uriParam.ToString()
+                $response = Invoke-RestMethod -Uri $uriRequest.Uri.OriginalString -Method Get -Headers (Get-TSRequestHeaderDict)
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.workbooks.workbook
             } until ($PageSize*$pageNumber -ge $totalAvailable)
@@ -1372,9 +1424,9 @@ function Get-TSDatasource {
     Param(
         [Parameter()][string] $DatasourceId,
         [Parameter()][switch] $Revisions,
-        # [Parameter()][PSCustomObject[]] $FilterOptions, # TODO https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm
-        # [Parameter()][PSCustomObject[]] $SortOptions,
-        # [Parameter()][PSCustomObject[]] $FieldOptions,
+        [Parameter()][string[]] $FilterOptions,
+        [Parameter()][string[]] $SortOptions,
+        [Parameter()][string[]] $FieldsOptions,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
@@ -1400,8 +1452,21 @@ function Get-TSDatasource {
             do {
                 $pageNumber += 1
                 $uri = Get-TSRequestUri -Endpoint Datasource
-                $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-                $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+                $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
+                $uriParam.Add("pageSize", $PageSize)
+                $uriParam.Add("pageNumber", $pageNumber)
+                if ($FilterOptions) {
+                    $uriParam.Add("filter", $FilterOptions -join ',')
+                }
+                if ($SortOptions) {
+                    $uriParam.Add("sort", $SortOptions -join ',')
+                }
+                if ($FieldsOptions) {
+                    $uriParam.Add("fields", $FieldsOptions -join ',')
+                }
+                $uriRequest = [System.UriBuilder]$uri
+                $uriRequest.Query = $uriParam.ToString()
+                $response = Invoke-RestMethod -Uri $uriRequest.Uri.OriginalString -Method Get -Headers (Get-TSRequestHeaderDict)
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.datasources.datasource
             } until ($PageSize*$pageNumber -ge $totalAvailable)
@@ -1747,9 +1812,9 @@ function Get-TSView {
         [Parameter()][string] $ViewId,
         [Parameter()][string] $WorkbookId,
         [Parameter()][switch] $IncludeUsageStatistics,
-        # [Parameter()][PSCustomObject[]] $FilterOptions, # TODO https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm
-        # [Parameter()][PSCustomObject[]] $SortOptions,
-        # [Parameter()][PSCustomObject[]] $FieldOptions,
+        [Parameter()][string[]] $FilterOptions,
+        [Parameter()][string[]] $SortOptions,
+        [Parameter()][string[]] $FieldsOptions,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
     try {
@@ -1771,11 +1836,24 @@ function Get-TSView {
             do {
                 $pageNumber += 1
                 $uri = Get-TSRequestUri -Endpoint View
-                $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+                $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
+                $uriParam.Add("pageSize", $PageSize)
+                $uriParam.Add("pageNumber", $pageNumber)
                 if ($IncludeUsageStatistics) {
-                    $uri += "&includeUsageStatistics=true"
+                    $uriParam.Add("includeUsageStatistics", "true")
                 }
-                $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+                if ($FilterOptions) {
+                    $uriParam.Add("filter", $FilterOptions -join ',')
+                }
+                if ($SortOptions) {
+                    $uriParam.Add("sort", $SortOptions -join ',')
+                }
+                if ($FieldsOptions) {
+                    $uriParam.Add("fields", $FieldsOptions -join ',')
+                }
+                $uriRequest = [System.UriBuilder]$uri
+                $uriRequest.Query = $uriParam.ToString()
+                $response = Invoke-RestMethod -Uri $uriRequest.Uri.OriginalString -Method Get -Headers (Get-TSRequestHeaderDict)
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.views.view
             } until ($PageSize*$pageNumber -ge $totalAvailable)
@@ -2109,10 +2187,6 @@ Export-ModuleMember -Function Get-TSView
 # Get View by Path - alias to using filter
 Export-ModuleMember -Function Export-TSViewPreviewImage
 Export-ModuleMember -Function Export-TSViewToFormat
-# Download View Crosstab Excel -vf
-# Query View Data -vf
-# Query View Image -vf
-# Query View PDF -vf
 # Get Recommendations for Views
 # Hide a Recommendation for a View
 # Unhide a Recommendation for a View
