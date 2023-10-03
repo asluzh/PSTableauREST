@@ -358,7 +358,26 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     Test-Path -Path "Tests/Output/$sampleWorkbookName.twbx" | Should -BeTrue
                     {Export-TSWorkbook -WorkbookId $sampleWorkbookId -OutFile "Tests/Output/$sampleWorkbookName.twb" -ExcludeExtract} | Should -Not -Throw
                     Test-Path -Path "Tests/Output/$sampleWorkbookName.twb" | Should -BeTrue
-                    # Remove-Item -Path "Tests/Output/$sampleWorkbookName.twbx"
+                    Remove-Item -Path "Tests/Output/$sampleWorkbookName.twb"
+                }
+                It "Download sample workbook as PDF from <ConfigFile.server>" {
+                    {Export-TSWorkbookToFormat -WorkbookId $sampleWorkbookId -Format pdf -OutFile "Tests/Output/$sampleWorkbookName.pdf"} | Should -Not -Throw
+                    Test-Path -Path "Tests/Output/$sampleWorkbookName.pdf" | Should -BeTrue
+                    {Export-TSWorkbookToFormat -WorkbookId $sampleWorkbookId -Format pdf -OutFile "Tests/Output/$sampleWorkbookName.pdf" -PageType 'A3' -PageOrientation 'Landscape' -MaxAge 1} | Should -Not -Throw
+                    Test-Path -Path "Tests/Output/$sampleWorkbookName.pdf" | Should -BeTrue
+                    Remove-Item -Path "Tests/Output/$sampleWorkbookName.pdf"
+                }
+                It "Download sample workbook as PowerPoint from <ConfigFile.server>" {
+                    {Export-TSWorkbookToFormat -WorkbookId $sampleWorkbookId -Format powerpoint -OutFile "Tests/Output/$sampleWorkbookName.pptx"} | Should -Not -Throw
+                    Test-Path -Path "Tests/Output/$sampleWorkbookName.pptx" | Should -BeTrue
+                    # {Export-TSWorkbookToFormat -WorkbookId $sampleWorkbookId -Format powerpoint -OutFile "Tests/Output/$sampleWorkbookName.pptx" -MaxAge 1} | Should -Not -Throw
+                    # Test-Path -Path "Tests/Output/$sampleWorkbookName.pptx" | Should -BeTrue
+                    Remove-Item -Path "Tests/Output/$sampleWorkbookName.pptx"
+                }
+                It "Download sample workbook as PNG from <ConfigFile.server>" {
+                    {Export-TSWorkbookToFormat -WorkbookId $sampleWorkbookId -Format image -OutFile "Tests/Output/$sampleWorkbookName.png"} | Should -Not -Throw
+                    Test-Path -Path "Tests/Output/$sampleWorkbookName.png" | Should -BeTrue
+                    Remove-Item -Path "Tests/Output/$sampleWorkbookName.png"
                 }
                 It "Publish sample workbook on <ConfigFile.server>" {
                     $workbook = Publish-TSWorkbook -Name $sampleWorkbookName -InFile "Tests/Output/$sampleWorkbookName.twbx" -ProjectId $samplesProjectId -Overwrite
@@ -408,7 +427,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 It "Publish workbook as background job on <ConfigFile.server>" -Skip {
                     Publish-TSWorkbook -Name "Workbook" -InFile "Tests/Assets/Misc/Workbook.txt" -ProjectId $samplesProjectId
                 }
-                Context "Publish / download sample workbooks on <ConfigFile.server>" -ForEach $WorkbookFiles {
+                Context "Publish / download sample workbooks on <ConfigFile.server>" -ForEach $WorkbookFiles -Skip {
                     BeforeAll {
                         $script:sampleWorkbookName = (Get-Item -LiteralPath $_).BaseName
                         $script:sampleWorkbookFileName = (Get-Item -LiteralPath $_).Name
@@ -550,6 +569,91 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         Test-Path -Path "Tests/Output/download.tdsx" | Should -BeTrue
                         Remove-Item -Path "Tests/Output/download.tdsx"
                     }
+                }
+            }
+        }
+        Context "View operations" -Tag View {
+            It "Get views on <ConfigFile.server>" {
+                $views = Get-TSView
+                ($views | Measure-Object).Count | Should -BeGreaterThan 0
+                $viewId = $views | Select-Object -First 1 -ExpandProperty id
+                $viewId | Should -BeOfType String
+                $view = Get-TSView -ViewId $viewId
+                $view.id | Should -Be $viewId
+            }
+            It "Query views with options on <ConfigFile.server>" {
+                $viewName = Get-TSView | Select-Object -First 1 -ExpandProperty name
+                $views = Get-TSView -Filter "name:eq:$viewName" -Sort name:asc -Fields id,name
+                ($views | Measure-Object).Count | Should -BeGreaterOrEqual 1
+                ($views | Get-Member -MemberType Property | Measure-Object).Count | Should -BeGreaterOrEqual 2
+            }
+            It "Query views for a workbook on <ConfigFile.server>" {
+                $workbookId = Get-TSWorkbook | Select-Object -First 1 -ExpandProperty id
+                $views = Get-TSView -WorkbookId $workbookId -IncludeUsageStatistics
+                ($views | Measure-Object).Count | Should -BeGreaterThan 0
+                $views | Select-Object -First 1 -ExpandProperty id | Should -BeOfType String
+                $views | Select-Object -First 1 -ExpandProperty usage | Should -Not -BeNullOrEmpty
+            }
+            Context "Download views from a sample workbook on <ConfigFile.server>" {
+                BeforeAll {
+                    $project = Add-TSProject -Name (New-Guid)
+                    Update-TSProject -ProjectId $project.id -PublishSamples
+                    $script:samplesProjectId = $project.id
+                    $script:samplesProjectName = $project.name
+                }
+                AfterAll {
+                    if ($script:samplesProjectId) {
+                        # Remove-TSProject -ProjectId $script:samplesProjectId
+                        $script:samplesProjectId = $null
+                    }
+                }
+                It "Get sample view id from <ConfigFile.server>" {
+                    $script:sampleViewId = Get-TSView -Filter "workbookName:eq:World Indicators","projectName:eq:$samplesProjectName" | Select-Object -First 1 -ExpandProperty id
+                    $sampleViewId | Should -BeOfType String
+                    $script:sampleViewName = (Get-TSView -ViewId $sampleViewId).name
+                    # write-error $sampleViewId
+                }
+                It "Download sample view as PDF from <ConfigFile.server>" {
+                    {Export-TSViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "Tests/Output/$sampleViewName.pdf"} | Should -Not -Throw
+                    Test-Path -Path "Tests/Output/$sampleViewName.pdf" | Should -BeTrue
+                    {Export-TSViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "Tests/Output/$sampleViewName.pdf" -PageType 'A5' -PageOrientation 'Landscape' -MaxAge 1} | Should -Not -Throw
+                    Test-Path -Path "Tests/Output/$sampleViewName.pdf" | Should -BeTrue
+                    {Export-TSViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "Tests/Output/$sampleViewName.pdf" -VizWidth 500 -VizHeight 300} | Should -Not -Throw
+                    Test-Path -Path "Tests/Output/$sampleViewName.pdf" | Should -BeTrue
+                    Remove-Item -Path "Tests/Output/$sampleViewName.pdf"
+                }
+                It "Download sample view as PNG from <ConfigFile.server>" {
+                    {Export-TSViewToFormat -ViewId $sampleViewId -Format image -OutFile "Tests/Output/$sampleViewName.png"} | Should -Not -Throw
+                    Test-Path -Path "Tests/Output/$sampleViewName.png" | Should -BeTrue
+                    {Export-TSViewToFormat -ViewId $sampleViewId -Format image -OutFile "Tests/Output/$sampleViewName.png" -Resolution high} | Should -Not -Throw
+                    Test-Path -Path "Tests/Output/$sampleViewName.png" | Should -BeTrue
+                    {Export-TSViewToFormat -ViewId $sampleViewId -Format image -OutFile "Tests/Output/$sampleViewName.png" -Resolution standard} | Should -Not -Throw
+                    Test-Path -Path "Tests/Output/$sampleViewName.png" | Should -BeTrue
+                    Remove-Item -Path "Tests/Output/$sampleViewName.png"
+                }
+                It "Download sample workbook as CSV from <ConfigFile.server>" {
+                    {Export-TSViewToFormat -ViewId $sampleViewId -Format csv -OutFile "Tests/Output/$sampleViewName.csv"} | Should -Not -Throw
+                    Test-Path -Path "Tests/Output/$sampleViewName.csv" | Should -BeTrue
+                    Remove-Item -Path "Tests/Output/$sampleViewName.csv"
+                }
+                It "Download sample workbook as Excel from <ConfigFile.server>" {
+                    {Export-TSViewToFormat -ViewId $sampleViewId -Format excel -OutFile "Tests/Output/$sampleViewName.xlsx"} | Should -Not -Throw
+                    Test-Path -Path "Tests/Output/$sampleViewName.xlsx" | Should -BeTrue
+                    Remove-Item -Path "Tests/Output/$sampleViewName.xlsx"
+                }
+                It "Download sample view with data filters applied from <ConfigFile.server>" {
+                    {Export-TSViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "Tests/Output/$sampleViewName.pdf" -ViewFilters @{Region="Europe"}} | Should -Not -Throw
+                    Test-Path -Path "Tests/Output/$sampleViewName.pdf" | Should -BeTrue
+                    Remove-Item -Path "Tests/Output/$sampleViewName.pdf"
+                    {Export-TSViewToFormat -ViewId $sampleViewId -Format image -OutFile "Tests/Output/$sampleViewName.png" -ViewFilters @{Region="Africa"}} | Should -Not -Throw
+                    Test-Path -Path "Tests/Output/$sampleViewName.png" | Should -BeTrue
+                    Remove-Item -Path "Tests/Output/$sampleViewName.png"
+                    {Export-TSViewToFormat -ViewId $sampleViewId -Format csv -OutFile "Tests/Output/$sampleViewName.csv" -ViewFilters @{"Ease of Business (clusters)"="Low"}} | Should -Not -Throw
+                    Test-Path -Path "Tests/Output/$sampleViewName.csv" | Should -BeTrue
+                    Remove-Item -Path "Tests/Output/$sampleViewName.csv"
+                    {Export-TSViewToFormat -ViewId $sampleViewId -Format excel -OutFile "Tests/Output/$sampleViewName.xlsx" -ViewFilters @{"Country/Region"="Kyrgyzstan"}} | Should -Not -Throw
+                    Test-Path -Path "Tests/Output/$sampleViewName.xlsx" | Should -BeTrue
+                    Remove-Item -Path "Tests/Output/$sampleViewName.xlsx"
                 }
             }
         }

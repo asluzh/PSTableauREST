@@ -1826,7 +1826,7 @@ function Get-TSView {
             # Assert-TSRestApiVersion -AtLeast 2.0
             $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/views
             if ($IncludeUsageStatistics) {
-                $uri += "&includeUsageStatistics=true"
+                $uri += "?includeUsageStatistics=true"
             }
             $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
             $response.tsResponse.views.view
@@ -1901,8 +1901,8 @@ function Export-TSViewToFormat {
         [Parameter()][ValidateSet('Portrait','Landscape')][string] $PageOrientation = "Portrait",
         [Parameter()][int] $MaxAge, # The maximum number of minutes a view pdf/image/data/crosstab will be cached before being refreshed
         # The height/width of the rendered pdf image in pixels; these parameter determine its resolution and aspect ratio
-        [Parameter()][int] $VizHeight,
         [Parameter()][int] $VizWidth,
+        [Parameter()][int] $VizHeight,
         # The resolution of the image. Image width and actual pixel density are determined by the display context of the image.
         # Aspect ratio is always preserved. Set the value to high to ensure maximum pixel density.
         [Parameter()][ValidateSet('standard','high')][string] $Resolution = "high",
@@ -1922,17 +1922,19 @@ function Export-TSViewToFormat {
         $uri += "/pdf"
         $uriParam.Add('type', $PageType)
         $uriParam.Add('orientation', $PageOrientation)
-        if ($VizHeight) {
-            $uriParam.Add('vizHeight', $VizHeight)
-        }
         if ($VizWidth) {
             $uriParam.Add('vizWidth', $VizWidth)
+        }
+        if ($VizHeight) {
+            $uriParam.Add('vizHeight', $VizHeight)
         }
         # $fileType = 'pdf'
     } elseif ($Format -eq 'image') {
         Assert-TSRestApiVersion -AtLeast 2.5
         $uri += "/image"
-        $uriParam.Add('resolution', $Resolution)
+        if ($Resolution -eq "high") {
+            $uriParam.Add('resolution', $Resolution)
+        }
         # $fileType = 'png'
     } elseif ($Format -eq 'csv') {
         Assert-TSRestApiVersion -AtLeast 2.8
@@ -1946,8 +1948,10 @@ function Export-TSViewToFormat {
     if ($MaxAge) {
         $uriParam.Add('maxAge', $MaxAge)
     }
-    $ViewFilters.GetEnumerator() | ForEach-Object { # TODO test this
-        $uriParam.Add("vf_"+$_.Key, $_.Value)
+    if ($ViewFilters) {
+        $ViewFilters.GetEnumerator() | ForEach-Object {
+            $uriParam.Add("vf_"+$_.Key, $_.Value)
+        }
     }
     $prevProgressPreference = $global:ProgressPreference
     try {
