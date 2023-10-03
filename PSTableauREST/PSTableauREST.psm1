@@ -410,9 +410,9 @@ function Remove-TSSite {
 function Get-TSProject {
     [OutputType([PSCustomObject[]])]
     Param(
-        [Parameter()][string[]] $FilterOptions, # https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm
-        [Parameter()][string[]] $SortOptions,
-        [Parameter()][string[]] $FieldsOptions, # https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_fields.htm#query_projects
+        [Parameter()][string[]] $Filter, # https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm
+        [Parameter()][string[]] $Sort,
+        [Parameter()][string[]] $Fields, # https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_fields.htm#query_projects
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
@@ -424,14 +424,14 @@ function Get-TSProject {
             $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
             $uriParam.Add("pageSize", $PageSize)
             $uriParam.Add("pageNumber", $pageNumber)
-            if ($FilterOptions) {
-                $uriParam.Add("filter", $FilterOptions -join ',')
+            if ($Filter) {
+                $uriParam.Add("filter", $Filter -join ',')
             }
-            if ($SortOptions) {
-                $uriParam.Add("sort", $SortOptions -join ',')
+            if ($Sort) {
+                $uriParam.Add("sort", $Sort -join ',')
             }
-            if ($FieldsOptions) {
-                $uriParam.Add("fields", $FieldsOptions -join ',')
+            if ($Fields) {
+                $uriParam.Add("fields", $Fields -join ',')
             }
             $uriRequest = [System.UriBuilder]$uri
             $uriRequest.Query = $uriParam.ToString()
@@ -540,9 +540,9 @@ function Get-TSUser {
     [OutputType([PSCustomObject[]])]
     Param(
         [Parameter()][string] $UserId,
-        [Parameter()][string[]] $FilterOptions,
-        [Parameter()][string[]] $SortOptions,
-        [Parameter()][string[]] $FieldsOptions,
+        [Parameter()][string[]] $Filter,
+        [Parameter()][string[]] $Sort,
+        [Parameter()][string[]] $Fields,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
@@ -558,14 +558,14 @@ function Get-TSUser {
                 $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
                 $uriParam.Add("pageSize", $PageSize)
                 $uriParam.Add("pageNumber", $pageNumber)
-                if ($FilterOptions) {
-                    $uriParam.Add("filter", $FilterOptions -join ',')
+                if ($Filter) {
+                    $uriParam.Add("filter", $Filter -join ',')
                 }
-                if ($SortOptions) {
-                    $uriParam.Add("sort", $SortOptions -join ',')
+                if ($Sort) {
+                    $uriParam.Add("sort", $Sort -join ',')
                 }
-                if ($FieldsOptions) {
-                    $uriParam.Add("fields", $FieldsOptions -join ',')
+                if ($Fields) {
+                    $uriParam.Add("fields", $Fields -join ',')
                 }
                 $uriRequest = [System.UriBuilder]$uri
                 $uriRequest.Query = $uriParam.ToString()
@@ -671,9 +671,9 @@ function Remove-TSUser {
 function Get-TSGroup {
     [OutputType([PSCustomObject[]])]
     Param(
-        [Parameter()][string[]] $FilterOptions,
-        [Parameter()][string[]] $SortOptions,
-        [Parameter()][string[]] $FieldsOptions,
+        [Parameter()][string[]] $Filter,
+        [Parameter()][string[]] $Sort,
+        [Parameter()][string[]] $Fields,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
@@ -685,14 +685,14 @@ function Get-TSGroup {
             $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
             $uriParam.Add("pageSize", $PageSize)
             $uriParam.Add("pageNumber", $pageNumber)
-            if ($FilterOptions) {
-                $uriParam.Add("filter", $FilterOptions -join ',')
+            if ($Filter) {
+                $uriParam.Add("filter", $Filter -join ',')
             }
-            if ($SortOptions) {
-                $uriParam.Add("sort", $SortOptions -join ',')
+            if ($Sort) {
+                $uriParam.Add("sort", $Sort -join ',')
             }
-            if ($FieldsOptions) {
-                $uriParam.Add("fields", $FieldsOptions -join ',')
+            if ($Fields) {
+                $uriParam.Add("fields", $Fields -join ',')
             }
             $uriRequest = [System.UriBuilder]$uri
             $uriRequest.Query = $uriParam.ToString()
@@ -956,9 +956,9 @@ function Get-TSWorkbook {
     Param(
         [Parameter()][string] $WorkbookId,
         [Parameter()][switch] $Revisions,
-        [Parameter()][string[]] $FilterOptions,
-        [Parameter()][string[]] $SortOptions,
-        [Parameter()][string[]] $FieldsOptions,
+        [Parameter()][string[]] $Filter,
+        [Parameter()][string[]] $Sort,
+        [Parameter()][string[]] $Fields,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
@@ -987,14 +987,14 @@ function Get-TSWorkbook {
                 $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
                 $uriParam.Add("pageSize", $PageSize)
                 $uriParam.Add("pageNumber", $pageNumber)
-                if ($FilterOptions) {
-                    $uriParam.Add("filter", $FilterOptions -join ',')
+                if ($Filter) {
+                    $uriParam.Add("filter", $Filter -join ',')
                 }
-                if ($SortOptions) {
-                    $uriParam.Add("sort", $SortOptions -join ',')
+                if ($Sort) {
+                    $uriParam.Add("sort", $Sort -join ',')
                 }
-                if ($FieldsOptions) {
-                    $uriParam.Add("fields", $FieldsOptions -join ',')
+                if ($Fields) {
+                    $uriParam.Add("fields", $Fields -join ',')
                 }
                 $uriRequest = [System.UriBuilder]$uri
                 $uriRequest.Query = $uriParam.ToString()
@@ -1424,9 +1424,9 @@ function Get-TSDatasource {
     Param(
         [Parameter()][string] $DatasourceId,
         [Parameter()][switch] $Revisions,
-        [Parameter()][string[]] $FilterOptions,
-        [Parameter()][string[]] $SortOptions,
-        [Parameter()][string[]] $FieldsOptions,
+        [Parameter()][string[]] $Filter,
+        [Parameter()][string[]] $Sort,
+        [Parameter()][string[]] $Fields,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
@@ -1455,14 +1455,14 @@ function Get-TSDatasource {
                 $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
                 $uriParam.Add("pageSize", $PageSize)
                 $uriParam.Add("pageNumber", $pageNumber)
-                if ($FilterOptions) {
-                    $uriParam.Add("filter", $FilterOptions -join ',')
+                if ($Filter) {
+                    $uriParam.Add("filter", $Filter -join ',')
                 }
-                if ($SortOptions) {
-                    $uriParam.Add("sort", $SortOptions -join ',')
+                if ($Sort) {
+                    $uriParam.Add("sort", $Sort -join ',')
                 }
-                if ($FieldsOptions) {
-                    $uriParam.Add("fields", $FieldsOptions -join ',')
+                if ($Fields) {
+                    $uriParam.Add("fields", $Fields -join ',')
                 }
                 $uriRequest = [System.UriBuilder]$uri
                 $uriRequest.Query = $uriParam.ToString()
@@ -1812,9 +1812,9 @@ function Get-TSView {
         [Parameter()][string] $ViewId,
         [Parameter()][string] $WorkbookId,
         [Parameter()][switch] $IncludeUsageStatistics,
-        [Parameter()][string[]] $FilterOptions,
-        [Parameter()][string[]] $SortOptions,
-        [Parameter()][string[]] $FieldsOptions,
+        [Parameter()][string[]] $Filter,
+        [Parameter()][string[]] $Sort,
+        [Parameter()][string[]] $Fields,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
     try {
@@ -1842,14 +1842,14 @@ function Get-TSView {
                 if ($IncludeUsageStatistics) {
                     $uriParam.Add("includeUsageStatistics", "true")
                 }
-                if ($FilterOptions) {
-                    $uriParam.Add("filter", $FilterOptions -join ',')
+                if ($Filter) {
+                    $uriParam.Add("filter", $Filter -join ',')
                 }
-                if ($SortOptions) {
-                    $uriParam.Add("sort", $SortOptions -join ',')
+                if ($Sort) {
+                    $uriParam.Add("sort", $Sort -join ',')
                 }
-                if ($FieldsOptions) {
-                    $uriParam.Add("fields", $FieldsOptions -join ',')
+                if ($Fields) {
+                    $uriParam.Add("fields", $Fields -join ',')
                 }
                 $uriRequest = [System.UriBuilder]$uri
                 $uriRequest.Query = $uriParam.ToString()

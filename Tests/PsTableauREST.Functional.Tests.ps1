@@ -177,7 +177,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             }
             It "Query projects with options on <ConfigFile.server>" {
                 $projectName = Get-TSProject | Where-Object id -eq $script:testProjectId | Select-Object -First 1 -ExpandProperty name
-                $projects = Get-TSProject -FilterOptions "name:eq:$projectName" -SortOptions name:asc -FieldsOptions id,name,description
+                $projects = Get-TSProject -Filter "name:eq:$projectName" -Sort name:asc -Fields id,name,description
                 ($projects | Measure-Object).Count | Should -Be 1
                 ($projects | Get-Member -MemberType Property | Measure-Object).Count | Should -Be 3
             }
@@ -225,7 +225,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             }
             It "Query users with options on <ConfigFile.server>" {
                 $userName = Get-TSUser | Where-Object id -eq $script:testUserId | Select-Object -First 1 -ExpandProperty name
-                $users = Get-TSUser -FilterOptions "name:eq:$userName" -SortOptions name:asc -FieldsOptions _all_
+                $users = Get-TSUser -Filter "name:eq:$userName" -Sort name:asc -Fields _all_
                 ($users | Measure-Object).Count | Should -Be 1
                 ($users | Get-Member -MemberType Property | Measure-Object).Count | Should -BeGreaterThan 5
             }
@@ -255,7 +255,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             }
             It "Query groups with options on <ConfigFile.server>" {
                 $groupName = Get-TSGroup | Where-Object id -eq $script:testGroupId | Select-Object -First 1 -ExpandProperty name
-                $groups = Get-TSGroup -FilterOptions "name:eq:$groupName" -SortOptions name:asc -FieldsOptions id,name
+                $groups = Get-TSGroup -Filter "name:eq:$groupName" -Sort name:asc -Fields id,name
                 ($groups | Measure-Object).Count | Should -Be 1
                 ($groups | Get-Member -MemberType Property | Measure-Object).Count | Should -BeGreaterOrEqual 2
             }
@@ -315,7 +315,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             }
             It "Query workbooks with options on <ConfigFile.server>" {
                 $workbookName = Get-TSWorkbook | Select-Object -First 1 -ExpandProperty name
-                $workbooks = Get-TSWorkbook -FilterOptions "name:eq:$workbookName" -SortOptions name:asc -FieldsOptions id,name
+                $workbooks = Get-TSWorkbook -Filter "name:eq:$workbookName" -Sort name:asc -Fields id,name
                 ($workbooks | Measure-Object).Count | Should -BeGreaterOrEqual 1
                 ($workbooks | Get-Member -MemberType Property | Measure-Object).Count | Should -BeGreaterOrEqual 2
             }
@@ -444,7 +444,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             }
             It "Query datasources with options on <ConfigFile.server>" {
                 $datasourceName = Get-TSDatasource | Select-Object -First 1 -ExpandProperty name
-                $datasources = Get-TSDatasource -FilterOptions "name:eq:$datasourceName" -SortOptions name:asc -FieldsOptions id,name
+                $datasources = Get-TSDatasource -Filter "name:eq:$datasourceName" -Sort name:asc -Fields id,name
                 ($datasources | Measure-Object).Count | Should -BeGreaterOrEqual 1
                 ($datasources | Get-Member -MemberType Property | Measure-Object).Count | Should -BeGreaterOrEqual 2
             }
