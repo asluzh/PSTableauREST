@@ -1968,6 +1968,133 @@ function Export-TSViewToFormat {
     }
 }
 
+### Tags methods
+function Add-TSTagsToWorkbook {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $WorkbookId,
+        [Parameter(Mandatory)][string[]] $Tags
+    )
+    # Assert-TSRestApiVersion -AtLeast 2.0
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_tags = $tsRequest.AppendChild($xml.CreateElement("tags"))
+    foreach ($tag in $Tags) {
+        $el_tag = $el_tags.AppendChild($xml.CreateElement("tag"))
+        $el_tag.SetAttribute("label", $tag)
+    }
+    try {
+        if ($PSCmdlet.ShouldProcess("add tags $($Tags -join ' ') to workbook $WorkbookId")) {
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/tags) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            return $response.tsResponse.tags.tag
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Remove-TSTagFromWorkbook {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $WorkbookId,
+        [Parameter(Mandatory)][string] $Tag
+    )
+    # Assert-TSRestApiVersion -AtLeast 2.0
+    try {
+        if ($PSCmdlet.ShouldProcess("remove tag $Tag from workbook $WorkbookId")) {
+            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/tags/$Tag) -Method Delete -Headers (Get-TSRequestHeaderDict)
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Add-TSTagsToDatasource {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $DatasourceId,
+        [Parameter(Mandatory)][string[]] $Tags
+    )
+    # Assert-TSRestApiVersion -AtLeast 2.0
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_tags = $tsRequest.AppendChild($xml.CreateElement("tags"))
+    foreach ($tag in $Tags) {
+        $el_tag = $el_tags.AppendChild($xml.CreateElement("tag"))
+        $el_tag.SetAttribute("label", $tag)
+    }
+    try {
+        if ($PSCmdlet.ShouldProcess("add tags $($Tags -join ' ') to datasource $DatasourceId")) {
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/tags) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            return $response.tsResponse.tags.tag
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Remove-TSTagFromDatasource {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $DatasourceId,
+        [Parameter(Mandatory)][string] $Tag
+    )
+    # Assert-TSRestApiVersion -AtLeast 2.0
+    try {
+        if ($PSCmdlet.ShouldProcess("remove tag $Tag from datasource $DatasourceId")) {
+            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/tags/$Tag) -Method Delete -Headers (Get-TSRequestHeaderDict)
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Add-TSTagsToView {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $ViewId,
+        [Parameter(Mandatory)][string[]] $Tags
+    )
+    # Assert-TSRestApiVersion -AtLeast 2.0
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_tags = $tsRequest.AppendChild($xml.CreateElement("tags"))
+    foreach ($tag in $Tags) {
+        $el_tag = $el_tags.AppendChild($xml.CreateElement("tag"))
+        $el_tag.SetAttribute("label", $tag)
+    }
+    try {
+        if ($PSCmdlet.ShouldProcess("add tags $($Tags -join ' ') to view $ViewId")) {
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint View -Param $ViewId/tags) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            return $response.tsResponse.tags.tag
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Remove-TSTagFromView {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $ViewId,
+        [Parameter(Mandatory)][string] $Tag
+    )
+    # Assert-TSRestApiVersion -AtLeast 2.0
+    try {
+        if ($PSCmdlet.ShouldProcess("remove tag $Tag from view $ViewId")) {
+            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint View -Param $ViewId/tags/$Tag) -Method Delete -Headers (Get-TSRequestHeaderDict)
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
 ### Metadata methods
 function Get-TSDatabase {
     [OutputType([PSCustomObject[]])]
@@ -2224,12 +2351,12 @@ Export-ModuleMember -Function Export-TSViewToFormat
 # Delete Ask Data Lens Permission
 
 ### Tags methods
-# Add Tags to View
-# Add Tags to Workbook
-# Add Tags to Data Source
-# Delete Tag from View
-# Delete Tag from Workbook
-# Delete Tag from Data Source
+Export-ModuleMember -Function Add-TSTagsToWorkbook
+Export-ModuleMember -Function Remove-TSTagFromWorkbook
+Export-ModuleMember -Function Add-TSTagsToDatasource
+Export-ModuleMember -Function Remove-TSTagFromDatasource
+Export-ModuleMember -Function Add-TSTagsToView
+Export-ModuleMember -Function Remove-TSTagFromView
 
 ### Flow methods
 # Query Flows for a Site

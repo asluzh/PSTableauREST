@@ -351,10 +351,13 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         $script:samplesProjectId = $null
                     }
                 }
-                It "Download sample workbook from <ConfigFile.server>" {
+                It "Get sample workbook id from <ConfigFile.server>" {
                     $workbook = Get-TSWorkbook -Filter "projectName:eq:$samplesProjectName","name:eq:Superstore" | Select-Object -First 1
                     $script:sampleWorkbookId = $workbook.id
                     $script:sampleWorkbookName = $workbook.name
+                    $sampleWorkbookId | Should -BeOfType String
+                }
+                It "Download sample workbook from <ConfigFile.server>" {
                     {Export-TSWorkbook -WorkbookId $sampleWorkbookId -OutFile "Tests/Output/$sampleWorkbookName.twbx"} | Should -Not -Throw
                     Test-Path -Path "Tests/Output/$sampleWorkbookName.twbx" | Should -BeTrue
                     {Export-TSWorkbook -WorkbookId $sampleWorkbookId -OutFile "Tests/Output/$sampleWorkbookName.twb" -ExcludeExtract} | Should -Not -Throw
@@ -417,6 +420,14 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     {Export-TSWorkbook -WorkbookId $sampleWorkbookId -Revision $revision -OutFile "Tests/Output/download_revision.twbx"} | Should -Not -Throw
                     Test-Path -Path "Tests/Output/download_revision.twbx" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/download_revision.twbx"
+                }
+                It "Add/remove tags for sample workbook on <ConfigFile.server>" {
+                    {Add-TSTagsToWorkbook -WorkbookId $sampleWorkbookId -Tags "active","test"} | Should -Not -Throw
+                    ((Get-TSWorkbook -WorkbookId $sampleWorkbookId).tags.tag | Measure-Object).Count | Should -Be 2
+                    {Remove-TSTagFromWorkbook -WorkbookId $sampleWorkbookId -Tag "test"} | Should -Not -Throw
+                    ((Get-TSWorkbook -WorkbookId $sampleWorkbookId).tags.tag | Measure-Object).Count | Should -Be 1
+                    {Remove-TSTagFromWorkbook -WorkbookId $sampleWorkbookId -Tag "active"} | Should -Not -Throw
+                    (Get-TSWorkbook -WorkbookId $sampleWorkbookId).tags | Should -BeNullOrEmpty
                 }
                 It "Publish workbook with invalid extension on <ConfigFile.server>" {
                     {Publish-TSWorkbook -Name "Workbook" -InFile "Tests/Assets/Misc/Workbook.txt" -ProjectId $samplesProjectId} | Should -Throw
@@ -500,10 +511,13 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         $script:samplesProjectId = $null
                     }
                 }
-                It "Download sample datasource from <ConfigFile.server>" {
+                It "Get sample datasource id from <ConfigFile.server>" {
                     $datasource = Get-TSDatasource -Filter "projectName:eq:$samplesProjectName" | Select-Object -First 1
                     $script:sampleDatasourceId = $datasource.id
                     $script:sampleDatasourceName = $datasource.name
+                    $sampleDatasourceId | Should -BeOfType String
+                }
+                It "Download sample datasource from <ConfigFile.server>" {
                     {Export-TSDatasource -DatasourceId $sampleDatasourceId -OutFile "Tests/Output/$sampleDatasourceName.tdsx"} | Should -Not -Throw
                     Test-Path -Path "Tests/Output/$sampleDatasourceName.tdsx" | Should -BeTrue
                     # Remove-Item -Path "Tests/Output/$sampleDatasourceName.tdsx"
@@ -549,6 +563,14 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $datasource.id | Should -BeOfType String
                     $datasource = Publish-TSDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/append.hyper" -ProjectId $samplesProjectId -Append -Chunked
                     $datasource.id | Should -BeOfType String
+                }
+                It "Add/remove tags for sample datasource on <ConfigFile.server>" {
+                    {Add-TSTagsToDatasource -DatasourceId $sampleDatasourceId -Tags "active","test"} | Should -Not -Throw
+                    ((Get-TSDatasource -DatasourceId $sampleDatasourceId).tags.tag | Measure-Object).Count | Should -Be 2
+                    {Remove-TSTagFromDatasource -DatasourceId $sampleDatasourceId -Tag "test"} | Should -Not -Throw
+                    ((Get-TSDatasource -DatasourceId $sampleDatasourceId).tags.tag | Measure-Object).Count | Should -Be 1
+                    {Remove-TSTagFromDatasource -DatasourceId $sampleDatasourceId -Tag "active"} | Should -Not -Throw
+                    (Get-TSDatasource -DatasourceId $sampleDatasourceId).tags | Should -BeNullOrEmpty
                 }
                 It "Publish datasource with connections on <ConfigFile.server>" -Skip {
                     Publish-TSDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/Datasource.txt" -ProjectId $samplesProjectId
@@ -621,7 +643,6 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $script:sampleViewId = Get-TSView -Filter "workbookName:eq:World Indicators","projectName:eq:$samplesProjectName" | Select-Object -First 1 -ExpandProperty id
                     $sampleViewId | Should -BeOfType String
                     $script:sampleViewName = (Get-TSView -ViewId $sampleViewId).name
-                    # write-error $sampleViewId
                 }
                 It "Download sample view as PDF from <ConfigFile.server>" {
                     {Export-TSViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "Tests/Output/$sampleViewName.pdf"} | Should -Not -Throw
@@ -664,6 +685,14 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     {Export-TSViewToFormat -ViewId $sampleViewId -Format excel -OutFile "Tests/Output/$sampleViewName.xlsx" -ViewFilters @{"Country/Region"="Kyrgyzstan"}} | Should -Not -Throw
                     Test-Path -Path "Tests/Output/$sampleViewName.xlsx" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/$sampleViewName.xlsx"
+                }
+                It "Add/remove tags for sample view on <ConfigFile.server>" {
+                    {Add-TSTagsToView -ViewId $sampleViewId -Tags "active","test"} | Should -Not -Throw
+                    ((Get-TSView -ViewId $sampleViewId).tags.tag | Measure-Object).Count | Should -Be 2
+                    {Remove-TSTagFromView -ViewId $sampleViewId -Tag "test"} | Should -Not -Throw
+                    ((Get-TSView -ViewId $sampleViewId).tags.tag | Measure-Object).Count | Should -Be 1
+                    {Remove-TSTagFromView -ViewId $sampleViewId -Tag "active"} | Should -Not -Throw
+                    (Get-TSView -ViewId $sampleViewId).tags | Should -BeNullOrEmpty
                 }
             }
         }
