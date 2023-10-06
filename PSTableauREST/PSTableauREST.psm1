@@ -26,7 +26,7 @@ function Get-TSRequestHeaderDict {
 function Get-TSRequestUri {
     [OutputType([string])]
     Param(
-        [Parameter(Mandatory)][ValidateSet('Auth','Site','Project','User','Group','Workbook','Datasource','View','FileUpload','Database','Table','GraphQL')][string] $Endpoint,
+        [Parameter(Mandatory)][ValidateSet('Auth','Site','Project','User','Group','Workbook','Datasource','View','FileUpload','Favorite','OrderFavorites','Database','Table','GraphQL')][string] $Endpoint,
         [Parameter()][string] $Param
     )
     $Uri = "$script:TSServerUrl/api/$script:TSRestApiVersion/"
@@ -41,6 +41,10 @@ function Get-TSRequestUri {
         }
         "FileUpload" {
             $Uri += "sites/$script:TSSiteId/fileUploads"
+            if ($Param) { $Uri += "/$Param" }
+        }
+        "OrderFavorites" {
+            $Uri += "sites/$script:TSSiteId/orderFavorites"
             if ($Param) { $Uri += "/$Param" }
         }
         default {
@@ -819,7 +823,7 @@ function Add-TSUserToGroup {
     $el_user = $tsRequest.AppendChild($xml.CreateElement("user"))
     $el_user.SetAttribute("id", $UserId)
     try {
-        if ($PSCmdlet.ShouldProcess("add user $UserId to group $GroupId")) {
+        if ($PSCmdlet.ShouldProcess("user:$UserId, group:$GroupId")) {
             $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Group -Param $GroupId/users) -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
             return $response.tsResponse.user
         }
@@ -837,7 +841,7 @@ function Remove-TSUserFromGroup {
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
     try {
-        if ($PSCmdlet.ShouldProcess("remove user $UserId from group $GroupId")) {
+        if ($PSCmdlet.ShouldProcess("user:$UserId, group:$GroupId")) {
             Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Group -Param $GroupId/users/$UserId) -Method Delete -Headers (Get-TSRequestHeaderDict)
         }
     } catch {
@@ -1985,7 +1989,7 @@ function Add-TSTagsToWorkbook {
         $el_tag.SetAttribute("label", $tag)
     }
     try {
-        if ($PSCmdlet.ShouldProcess("add tags $($Tags -join ' ') to workbook $WorkbookId")) {
+        if ($PSCmdlet.ShouldProcess("workbook:$WorkbookId, tags:"+($Tags -join ' '))) {
             $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/tags) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
             return $response.tsResponse.tags.tag
         }
@@ -2003,7 +2007,7 @@ function Remove-TSTagFromWorkbook {
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
     try {
-        if ($PSCmdlet.ShouldProcess("remove tag $Tag from workbook $WorkbookId")) {
+        if ($PSCmdlet.ShouldProcess("workbook:$WorkbookId, tag:$Tag")) {
             Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/tags/$Tag) -Method Delete -Headers (Get-TSRequestHeaderDict)
         }
     } catch {
@@ -2027,7 +2031,7 @@ function Add-TSTagsToDatasource {
         $el_tag.SetAttribute("label", $tag)
     }
     try {
-        if ($PSCmdlet.ShouldProcess("add tags $($Tags -join ' ') to datasource $DatasourceId")) {
+        if ($PSCmdlet.ShouldProcess("datasource:$DatasourceId, tags:"+($Tags -join ' '))) {
             $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/tags) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
             return $response.tsResponse.tags.tag
         }
@@ -2045,7 +2049,7 @@ function Remove-TSTagFromDatasource {
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
     try {
-        if ($PSCmdlet.ShouldProcess("remove tag $Tag from datasource $DatasourceId")) {
+        if ($PSCmdlet.ShouldProcess("datasource:$DatasourceId, tag:$Tag")) {
             Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/tags/$Tag) -Method Delete -Headers (Get-TSRequestHeaderDict)
         }
     } catch {
@@ -2069,7 +2073,7 @@ function Add-TSTagsToView {
         $el_tag.SetAttribute("label", $tag)
     }
     try {
-        if ($PSCmdlet.ShouldProcess("add tags $($Tags -join ' ') to view $ViewId")) {
+        if ($PSCmdlet.ShouldProcess("view:$ViewId, tags:"+($Tags -join ' '))) {
             $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint View -Param $ViewId/tags) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
             return $response.tsResponse.tags.tag
         }
@@ -2087,8 +2091,170 @@ function Remove-TSTagFromView {
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
     try {
-        if ($PSCmdlet.ShouldProcess("remove tag $Tag from view $ViewId")) {
+        if ($PSCmdlet.ShouldProcess("view:$ViewId, tag:$Tag")) {
             Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint View -Param $ViewId/tags/$Tag) -Method Delete -Headers (Get-TSRequestHeaderDict)
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+### Favorites methods
+function Get-TSUserFavorite {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter(Mandatory)][string] $UserId,
+        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+    )
+    try {
+        Assert-TSRestApiVersion -AtLeast 2.5
+        $pageNumber = 0
+        do {
+            $pageNumber += 1
+            $uri = Get-TSRequestUri -Endpoint Favorite -Param $UserId
+            $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+            $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+            $totalAvailable = $response.tsResponse.pagination.totalAvailable
+            $response.tsResponse.favorites.favorite
+        } until ($PageSize*$pageNumber -ge $totalAvailable)
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Add-TSUserFavorite {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $UserId,
+        [Parameter()][string] $Label,
+        [Parameter(Mandatory,ParameterSetName='Workbook')][string] $WorkbookId,
+        [Parameter(Mandatory,ParameterSetName='Datasource')][string] $DatasourceId,
+        [Parameter(Mandatory,ParameterSetName='View')][string] $ViewId,
+        [Parameter(Mandatory,ParameterSetName='Project')][string] $ProjectId
+    )
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_favorite = $tsRequest.AppendChild($xml.CreateElement("favorite"))
+    try {
+        if ($WorkbookId) {
+            # Assert-TSRestApiVersion -AtLeast 2.0
+            $el_favorite.AppendChild($xml.CreateElement("workbook")).SetAttribute("id", $WorkbookId)
+            if ($Label) {
+                $el_favorite.SetAttribute("label", $Label)
+            } else {
+                $el_favorite.SetAttribute("label", (Get-TSWorkbook -WorkbookId $WorkbookId | Select-Object -First 1 -ExpandProperty name))
+            }
+            if ($PSCmdlet.ShouldProcess("user:$UserId, workbook:$WorkbookId")) {
+                $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Favorite -Param $UserId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+                return $response.tsResponse.favorites.favorite
+            }
+        } elseif ($DatasourceId) {
+            # Assert-TSRestApiVersion -AtLeast 2.3
+            $el_favorite.AppendChild($xml.CreateElement("datasource")).SetAttribute("id", $DatasourceId)
+            if ($Label) {
+                $el_favorite.SetAttribute("label", $Label)
+            } else {
+                $el_favorite.SetAttribute("label", (Get-TSDatasource -DatasourceId $DatasourceId | Select-Object -First 1 -ExpandProperty name))
+            }
+            if ($PSCmdlet.ShouldProcess("user:$UserId, datasource:$DatasourceId")) {
+                $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Favorite -Param $UserId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+                return $response.tsResponse.favorites.favorite
+            }
+        } elseif ($ViewId) {
+            # Assert-TSRestApiVersion -AtLeast 2.0
+            $el_favorite.AppendChild($xml.CreateElement("view")).SetAttribute("id", $ViewId)
+            if ($Label) {
+                $el_favorite.SetAttribute("label", $Label)
+            } else {
+                $el_favorite.SetAttribute("label", (Get-TSView -ViewId $ViewId | Select-Object -First 1 -ExpandProperty name))
+            }
+            if ($PSCmdlet.ShouldProcess("user:$UserId, view:$ViewId")) {
+                $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Favorite -Param $UserId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+                return $response.tsResponse.favorites.favorite
+            }
+        } elseif ($ProjectId) {
+            Assert-TSRestApiVersion -AtLeast 3.1
+            $el_favorite.AppendChild($xml.CreateElement("project")).SetAttribute("id", $ProjectId)
+            if ($Label) {
+                $el_favorite.SetAttribute("label", $Label)
+            } else {
+                $el_favorite.SetAttribute("label", (Get-TSProject -Filter id:eq:$ProjectId | Select-Object -First 1 -ExpandProperty name))
+            }
+            if ($PSCmdlet.ShouldProcess("user:$UserId, project:$ProjectId")) {
+                $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Favorite -Param $UserId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+                return $response.tsResponse.favorites.favorite
+            }
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Remove-TSUserFavorite {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $UserId,
+        [Parameter(Mandatory,ParameterSetName='Workbook')][string] $WorkbookId,
+        [Parameter(Mandatory,ParameterSetName='Datasource')][string] $DatasourceId,
+        [Parameter(Mandatory,ParameterSetName='View')][string] $ViewId,
+        [Parameter(Mandatory,ParameterSetName='Project')][string] $ProjectId
+    )
+    try {
+        if ($WorkbookId) {
+            # Assert-TSRestApiVersion -AtLeast 2.0
+            $uri = Get-TSRequestUri -Endpoint Favorite -Param $UserId/workbooks/$WorkbookId
+            if ($PSCmdlet.ShouldProcess("user:$UserId, workbook:$WorkbookId")) {
+                Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
+            }
+        } elseif ($DatasourceId) {
+            # Assert-TSRestApiVersion -AtLeast 2.3
+            $uri = Get-TSRequestUri -Endpoint Favorite -Param $UserId/datasources/$DatasourceId
+            if ($PSCmdlet.ShouldProcess("user:$UserId, datasource:$DatasourceId")) {
+                Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
+            }
+        } elseif ($ViewId) {
+            # Assert-TSRestApiVersion -AtLeast 2.0
+            $uri = Get-TSRequestUri -Endpoint Favorite -Param $UserId/views/$ViewId
+            if ($PSCmdlet.ShouldProcess("user:$UserId, view:$ViewId")) {
+                Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
+            }
+        } elseif ($ProjectId) {
+            Assert-TSRestApiVersion -AtLeast 3.1
+            $uri = Get-TSRequestUri -Endpoint Favorite -Param $UserId/projects/$ProjectId
+            if ($PSCmdlet.ShouldProcess("user:$UserId, project:$ProjectId")) {
+                Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
+            }
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Move-TSUserFavorite {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $UserId,
+        [Parameter(Mandatory)][string] $FavoriteId,
+        [Parameter(Mandatory)][ValidateSet('Workbook','Datasource','View','Project','Flow')][string] $FavoriteType,
+        [Parameter(Mandatory)][string] $AfterFavoriteId,
+        [Parameter(Mandatory)][ValidateSet('Workbook','Datasource','View','Project','Flow')][string] $AfterFavoriteType
+    )
+    Assert-TSRestApiVersion -AtLeast 3.8
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_fos = $tsRequest.AppendChild($xml.CreateElement("favoriteOrderings"))
+    $el_fo = $el_fos.AppendChild($xml.CreateElement("favoriteOrdering"))
+    $el_fo.SetAttribute("favoriteId", $FavoriteId)
+    $el_fo.SetAttribute("favoriteType", $FavoriteType.ToLower())
+    $el_fo.SetAttribute("favoriteIdMoveAfter", $AfterFavoriteId)
+    $el_fo.SetAttribute("favoriteTypeMoveAfter", $AfterFavoriteType.ToLower())
+    try {
+        if ($PSCmdlet.ShouldProcess("user:$UserId, favorite($FavoriteType):$FavoriteId, after($AfterFavoriteType):$AfterFavoriteId")) {
+            write-error $xml.OuterXml
+            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint OrderFavorites -Param $UserId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
         }
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
@@ -2412,18 +2578,12 @@ Export-ModuleMember -Function Remove-TSTagFromView
 # Delete Extracts of Embedded Data Sources from a Workbook
 
 ### Favorites methods
-# Get Favorites for User
-# Organize Favorites
-# Add Workbook to Favorites
-# Add View to Favorites
-# Add Data Source to Favorites
-# Add Project to Favorites
+Export-ModuleMember -Function Get-TSUserFavorite
+Export-ModuleMember -Function Add-TSUserFavorite
+Export-ModuleMember -Function Remove-TSUserFavorite
+Export-ModuleMember -Function Move-TSUserFavorite
 # Add Flow to Favorites
-# Add Metric to Favorites
-# Delete Workbook from Favorites
-# Delete View from Favorites
-# Delete Data Source from Favorites
-# Delete Project from Favorites
+# Add Metric to Favorites - Retired in API 3.22
 # Delete Flow from Favorites
 
 ### Subscription methods
