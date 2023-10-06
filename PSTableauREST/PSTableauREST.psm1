@@ -26,7 +26,7 @@ function Get-TSRequestHeaderDict {
 function Get-TSRequestUri {
     [OutputType([string])]
     Param(
-        [Parameter(Mandatory)][ValidateSet('Auth','Site','Project','User','Group','Workbook','Datasource','View','FileUpload','Favorite','OrderFavorites','Database','Table','GraphQL')][string] $Endpoint,
+        [Parameter(Mandatory)][ValidateSet('Auth','Site','Project','User','Group','Workbook','Datasource','View','Flow','FileUpload','Favorite','OrderFavorites','Database','Table','GraphQL')][string] $Endpoint,
         [Parameter()][string] $Param
     )
     $Uri = "$script:TSServerUrl/api/$script:TSRestApiVersion/"
@@ -1026,7 +1026,7 @@ function Get-TSWorkbooksForUser {
             $pageNumber += 1
             $uri = Get-TSRequestUri -Endpoint User -Param $UserId/workbooks
             $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-            if ($IsOwner) { $uri += "&isOwner=true" }
+            if ($IsOwner) { $uri += "&ownedBy=true" }
             $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.workbooks.workbook
@@ -1972,6 +1972,336 @@ function Export-TSViewToFormat {
     }
 }
 
+### Flows methods
+function Get-TSFlow {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter()][string] $FlowId,
+        # [Parameter()][switch] $Revisions, #TODO
+        [Parameter()][switch] $OutputSteps,
+        [Parameter()][string[]] $Filter,
+        [Parameter()][string[]] $Sort,
+        [Parameter()][string[]] $Fields,
+        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+    )
+    Assert-TSRestApiVersion -AtLeast 3.3
+    try {
+        if ($FlowId) {
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param $FlowId) -Method Get -Headers (Get-TSRequestHeaderDict)
+            if ($OutputSteps) { # Get Flow, return output steps
+                $response.tsResponse.flowOutputSteps.flowOutputStep
+            } else { # Get Flow
+                $response.tsResponse.flow
+            }
+        } else { # Query Flows on Site
+            $pageNumber = 0
+            do {
+                $pageNumber += 1
+                $uri = Get-TSRequestUri -Endpoint Flow
+                $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
+                $uriParam.Add("pageSize", $PageSize)
+                $uriParam.Add("pageNumber", $pageNumber)
+                if ($Filter) {
+                    $uriParam.Add("filter", $Filter -join ',')
+                }
+                if ($Sort) {
+                    $uriParam.Add("sort", $Sort -join ',')
+                }
+                if ($Fields) {
+                    $uriParam.Add("fields", $Fields -join ',')
+                }
+                $uriRequest = [System.UriBuilder]$uri
+                $uriRequest.Query = $uriParam.ToString()
+                $response = Invoke-RestMethod -Uri $uriRequest.Uri.OriginalString -Method Get -Headers (Get-TSRequestHeaderDict)
+                $totalAvailable = $response.tsResponse.pagination.totalAvailable
+                $response.tsResponse.flows.flow
+            } until ($PageSize*$pageNumber -ge $totalAvailable)
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Get-TSFlowsForUser {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter(Mandatory)][string] $UserId,
+        [Parameter()][switch] $IsOwner,
+        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+    )
+    Assert-TSRestApiVersion -AtLeast 3.3
+    try {
+        $pageNumber = 0
+        do {
+            $pageNumber += 1
+            $uri = Get-TSRequestUri -Endpoint User -Param $UserId/flows
+            $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+            if ($IsOwner) { $uri += "&ownedBy=true" }
+            $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+            $totalAvailable = $response.tsResponse.pagination.totalAvailable
+            $response.tsResponse.flows.flow
+        } until ($PageSize*$pageNumber -ge $totalAvailable)
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Get-TSFlowConnection {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter(Mandatory)][string] $FlowId
+    )
+    Assert-TSRestApiVersion -AtLeast 3.3
+    try {
+        $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param $FlowId/connections) -Method Get -Headers (Get-TSRequestHeaderDict)
+        $response.tsResponse.connections.connection
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Export-TSFlow {
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $FlowId,
+        [Parameter()][string] $OutFile,
+        # [Parameter()][int] $Revision #TODO
+        [Parameter()][switch] $ShowProgress
+    )
+    Assert-TSRestApiVersion -AtLeast 3.3
+    $OutFileParam = @{}
+    if ($OutFile) {
+        $OutFileParam.Add("OutFile", $OutFile)
+    }
+    $uri = Get-TSRequestUri -Endpoint Flow -Param $FlowId/content
+    $prevProgressPreference = $global:ProgressPreference
+    try {
+        if ($ShowProgress) {
+            $global:ProgressPreference = 'Continue'
+        } else {
+            $global:ProgressPreference = 'SilentlyContinue'
+        }
+        Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict) -TimeoutSec 600 @OutFileParam
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    } finally {
+        $global:ProgressPreference = $prevProgressPreference
+    }
+}
+
+function Publish-TSFlow {
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $InFile,
+        [Parameter(Mandatory)][string] $Name,
+        [Parameter()][string] $FileName,
+        [Parameter()][string] $FileType,
+        [Parameter()][string] $ProjectId,
+        [Parameter()][switch] $Overwrite,
+        [Parameter()][switch] $Chunked,
+        [Parameter()][hashtable] $Credentials,
+        [Parameter()][hashtable[]] $Connections,
+        [Parameter()][switch] $ShowProgress
+    )
+    Assert-TSRestApiVersion -AtLeast 3.3
+    $boundaryString = (New-Guid).ToString("N")
+    $fileItem = Get-Item -LiteralPath $InFile
+    if (-Not $FileName) {
+        $FileName = $fileItem.Name -replace '["`]','' # remove special chars
+    }
+    if (-Not $FileType) {
+        $FileType = $fileItem.Extension.Substring(1)
+    }
+    if ($FileType -eq 'zip') {
+        $FileType = 'tflx'
+        $FileName = $FileName -ireplace 'zip$','tflx'
+    } elseif ($FileType -eq 'xml') {
+        $FileType = 'tfl'
+        $FileName = $FileName -ireplace 'xml$','tfl'
+    }
+    if (-Not ($FileType -In @("tfl", "tflx"))) {
+        throw "File type unsupported (supported types are: tfl, tflx)"
+    }
+    if ($fileItem.Length -ge $script:TSRestApiFileSizeLimit) {
+        $Chunked = $true
+    }
+    $uri = Get-TSRequestUri -Endpoint Flow
+    $uri += "?flowType=$FileType"
+    if ($Overwrite) {
+        $uri += "&overwrite=true"
+    }
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_flow = $tsRequest.AppendChild($xml.CreateElement("flow"))
+    $el_flow.SetAttribute("name", $Name)
+    if ($Credentials) {
+        Add-TSCredentialsElement -Element $el_flow -Credentials $Credentials
+    }
+    if ($Connections) {
+        Add-TSConnectionsElement -Element $el_flow -Connections $Connections
+    }
+    if ($ProjectId) {
+        $el_project = $el_flow.AppendChild($xml.CreateElement("project"))
+        $el_project.SetAttribute("id", $ProjectId)
+    }
+    try {
+        $multipartContent = New-Object System.Net.Http.MultipartFormDataContent($boundaryString)
+        [void]$multipartContent.Headers.Remove("Content-Type")
+        [void]$multipartContent.Headers.TryAddWithoutValidation("Content-Type", "multipart/mixed; boundary=$boundaryString")
+        $stringContent = New-Object System.Net.Http.StringContent($xml.OuterXml, "text/xml")
+        $stringContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
+        $stringContent.Headers.ContentDisposition.Name = "request_payload"
+        $multipartContent.Add($stringContent)
+        if ($Chunked) {
+            $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName -ShowProgress:$ShowProgress
+            $uri += "&uploadSessionId=$uploadSessionId"
+            $response = Invoke-RestMethod -Uri $uri -Body $multipartContent -Method Post -Headers (Get-TSRequestHeaderDict)
+        } else {
+            $fileStream = New-Object System.IO.FileStream($InFile, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read)
+            $fileContent = New-Object System.Net.Http.StreamContent($fileStream)
+            $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream")
+            $fileContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
+            $fileContent.Headers.ContentDisposition.Name = "tableau_flow"
+            $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`""
+            $multipartContent.Add($fileContent)
+            $response = Invoke-RestMethod -Uri $uri -Body $multipartContent -Method Post -Headers (Get-TSRequestHeaderDict)
+            $fileStream.Close()
+        }
+        return $response.tsResponse.flow
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Update-TSFlow {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $FlowId,
+        [Parameter()][string] $NewProjectId,
+        [Parameter()][string] $NewOwnerId
+    )
+    Assert-TSRestApiVersion -AtLeast 3.3
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_flow = $tsRequest.AppendChild($xml.CreateElement("flow"))
+    if ($NewProjectId) {
+        $el_project = $el_flow.AppendChild($xml.CreateElement("project"))
+        $el_project.SetAttribute("id", $NewProjectId)
+    }
+    if ($NewOwnerId) {
+        $el_owner = $el_flow.AppendChild($xml.CreateElement("owner"))
+        $el_owner.SetAttribute("id", $NewOwnerId)
+    }
+    try {
+        if ($PSCmdlet.ShouldProcess($FlowId)) {
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param $FlowId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            return $response.tsResponse.flow
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Update-TSFlowConnection {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $FlowId,
+        [Parameter(Mandatory)][string] $ConnectionId,
+        [Parameter()][string] $ServerAddress,
+        [Parameter()][string] $ServerPort,
+        [Parameter()][string] $Username,
+        [Parameter()][securestring] $SecurePassword,
+        [Parameter()][switch] $EmbedPassword
+    )
+    Assert-TSRestApiVersion -AtLeast 3.3
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_connection = $tsRequest.AppendChild($xml.CreateElement("connection"))
+    if ($ServerAddress) {
+        $el_connection.SetAttribute("serverAddress", $ServerAddress)
+    }
+    if ($ServerPort) {
+        $el_connection.SetAttribute("serverPort", $ServerPort)
+    }
+    if ($Username) {
+        $el_connection.SetAttribute("userName", $Username)
+    }
+    if ($SecurePassword) {
+        $private:PlainPassword = (New-Object System.Net.NetworkCredential("", $SecurePassword)).Password
+        $el_connection.SetAttribute("password", $private:PlainPassword)
+    }
+    if ($EmbedPassword) {
+        $el_connection.SetAttribute("embedPassword", "true")
+    }
+    try {
+        if ($PSCmdlet.ShouldProcess($ConnectionId)) {
+            $uri = Get-TSRequestUri -Endpoint Flow -Param $FlowId/connections/$ConnectionId
+            $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            return $response.tsResponse.connection
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Remove-TSFlow {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $FlowId
+        # [Parameter()][int] $Revision #TODO
+    )
+    Assert-TSRestApiVersion -AtLeast 3.3
+    try {
+        if ($PSCmdlet.ShouldProcess($FlowId)) {
+            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param $FlowId) -Method Delete -Headers (Get-TSRequestHeaderDict)
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Start-TSFlowNow {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $FlowId,
+        [Parameter()][ValidateSet('full','incremental')][string] $RunMode = "full", # TODO test
+        [Parameter()][string] $OutputStepId, # TODO test
+        [Parameter()][hashtable] $FlowParams # TODO test
+    )
+    Assert-TSRestApiVersion -AtLeast 3.3
+    $xml = New-Object System.Xml.XmlDocument
+    $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_flow = $tsRequest.AppendChild($xml.CreateElement("flowRunSpec"))
+    $el_flow.SetAttribute("flowId", $FlowId)
+    $el_flow.SetAttribute("runMode", $RunMode)
+    if ($OutputStepId) {
+        $el_steps = $el_flow.AppendChild($xml.CreateElement("flowOutputSteps"))
+        $el_step = $el_steps.AppendChild($xml.CreateElement("flowOutputStep"))
+        $el_step.SetAttribute("id", $OutputStepId)
+    }
+    if ($FlowParams) {
+        $el_params = $el_flow.AppendChild($xml.CreateElement("flowParameterSpecs"))
+        $FlowParams.GetEnumerator() | ForEach-Object {
+            $el_param = $el_params.AppendChild($xml.CreateElement("flowParameterSpec"))
+            $el_param.SetAttribute("parameterId", $_.Key)
+            $el_param.SetAttribute("overrideValue", $_.Value)
+        }
+    }
+    try {
+        if ($PSCmdlet.ShouldProcess($FlowId)) {
+            $uri = Get-TSRequestUri -Endpoint Flow -Param $FlowId/run
+            $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+            return $response.tsResponse.job
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
 ### Tags methods
 function Add-TSTagsToContent {
     [CmdletBinding(SupportsShouldProcess)]
@@ -1980,6 +2310,7 @@ function Add-TSTagsToContent {
         [Parameter(Mandatory,ParameterSetName='Workbook')][string] $WorkbookId,
         [Parameter(Mandatory,ParameterSetName='Datasource')][string] $DatasourceId,
         [Parameter(Mandatory,ParameterSetName='View')][string] $ViewId,
+        [Parameter(Mandatory,ParameterSetName='Flow')][string] $FlowId,
         [Parameter(Mandatory)][string[]] $Tags
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
@@ -2000,6 +2331,9 @@ function Add-TSTagsToContent {
         } elseif ($ViewId -and $PSCmdlet.ShouldProcess("view:$ViewId, tags:"+($Tags -join ' '))) {
             $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint View -Param $ViewId/tags) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
             return $response.tsResponse.tags.tag
+        } elseif ($FlowId -and $PSCmdlet.ShouldProcess("flow:$FlowId, tags:"+($Tags -join ' '))) {
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param $FlowId/tags) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            return $response.tsResponse.tags.tag
         }
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
@@ -2013,6 +2347,7 @@ function Remove-TSTagFromContent {
         [Parameter(Mandatory,ParameterSetName='Workbook')][string] $WorkbookId,
         [Parameter(Mandatory,ParameterSetName='Datasource')][string] $DatasourceId,
         [Parameter(Mandatory,ParameterSetName='View')][string] $ViewId,
+        [Parameter(Mandatory,ParameterSetName='Flow')][string] $FlowId,
         [Parameter(Mandatory)][string] $Tag
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
@@ -2023,6 +2358,8 @@ function Remove-TSTagFromContent {
             Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/tags/$Tag) -Method Delete -Headers (Get-TSRequestHeaderDict)
         } elseif ($ViewId -and $PSCmdlet.ShouldProcess("view:$ViewId, tag:$Tag")) {
             Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint View -Param $ViewId/tags/$Tag) -Method Delete -Headers (Get-TSRequestHeaderDict)
+        } elseif ($FlowId -and $PSCmdlet.ShouldProcess("flow:$FlowId, tag:$Tag")) {
+            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param $FlowId/tags/$Tag) -Method Delete -Headers (Get-TSRequestHeaderDict)
         }
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
@@ -2061,7 +2398,8 @@ function Add-TSUserFavorite {
         [Parameter(Mandatory,ParameterSetName='Workbook')][string] $WorkbookId,
         [Parameter(Mandatory,ParameterSetName='Datasource')][string] $DatasourceId,
         [Parameter(Mandatory,ParameterSetName='View')][string] $ViewId,
-        [Parameter(Mandatory,ParameterSetName='Project')][string] $ProjectId
+        [Parameter(Mandatory,ParameterSetName='Project')][string] $ProjectId,
+        [Parameter(Mandatory,ParameterSetName='Flow')][string] $FlowId
     )
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -2115,6 +2453,18 @@ function Add-TSUserFavorite {
                 $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Favorite -Param $UserId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
                 return $response.tsResponse.favorites.favorite
             }
+        } elseif ($FlowId) {
+            Assert-TSRestApiVersion -AtLeast 3.3
+            $el_favorite.AppendChild($xml.CreateElement("flow")).SetAttribute("id", $FlowId)
+            if ($Label) {
+                $el_favorite.SetAttribute("label", $Label)
+            } else {
+                $el_favorite.SetAttribute("label", $FlowId)
+            }
+            if ($PSCmdlet.ShouldProcess("user:$UserId, flow:$FlowId")) {
+                $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Favorite -Param $UserId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+                return $response.tsResponse.favorites.favorite
+            }
         }
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
@@ -2129,7 +2479,8 @@ function Remove-TSUserFavorite {
         [Parameter(Mandatory,ParameterSetName='Workbook')][string] $WorkbookId,
         [Parameter(Mandatory,ParameterSetName='Datasource')][string] $DatasourceId,
         [Parameter(Mandatory,ParameterSetName='View')][string] $ViewId,
-        [Parameter(Mandatory,ParameterSetName='Project')][string] $ProjectId
+        [Parameter(Mandatory,ParameterSetName='Project')][string] $ProjectId,
+        [Parameter(Mandatory,ParameterSetName='Flow')][string] $FlowId
     )
     try {
         if ($WorkbookId) {
@@ -2154,6 +2505,12 @@ function Remove-TSUserFavorite {
             Assert-TSRestApiVersion -AtLeast 3.1
             $uri = Get-TSRequestUri -Endpoint Favorite -Param $UserId/projects/$ProjectId
             if ($PSCmdlet.ShouldProcess("user:$UserId, project:$ProjectId")) {
+                Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
+            }
+        } elseif ($FlowId) {
+            Assert-TSRestApiVersion -AtLeast 3.3
+            $uri = Get-TSRequestUri -Endpoint Favorite -Param $UserId/flows/$FlowId
+            if ($PSCmdlet.ShouldProcess("user:$UserId, flow:$FlowId")) {
                 Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
             }
         }
@@ -2422,6 +2779,26 @@ Export-ModuleMember -Function Export-TSViewToFormat
 # Update Custom View
 # Delete Custom View
 
+### Flow methods
+Export-ModuleMember -Function Get-TSFlow
+Export-ModuleMember -Function Get-TSFlowsForUser
+Export-ModuleMember -Function Get-TSFlowConnection
+Export-ModuleMember -Function Export-TSFlow
+Export-ModuleMember -Function Publish-TSFlow
+Export-ModuleMember -Function Update-TSFlow
+Export-ModuleMember -Function Update-TSFlowConnection
+Export-ModuleMember -Function Remove-TSFlow
+Export-ModuleMember -Function Start-TSFlowNow
+# Get Flow Run Task
+# Get Flow Run Tasks
+# Get Flow Run
+# Get Flow Runs
+# Run Flow Task
+# Get Linked Task
+# Get Linked Tasks
+# Run Linked Task Now
+# Cancel Flow Run
+
 ### Permissions methods
 # Query Default Permissions
 # Query Workbook Permissions
@@ -2448,28 +2825,6 @@ Export-ModuleMember -Function Export-TSViewToFormat
 ### Tags methods
 Export-ModuleMember -Function Add-TSTagsToContent
 Export-ModuleMember -Function Remove-TSTagFromContent
-
-### Flow methods
-# Query Flows for a Site
-# Query Flow
-# Query Flows for User
-# Query Flow Connections
-# Update Flow
-# Update Flow Connection
-# Delete Flow
-# Download Flow
-# Publish Flow
-# Get Flow Run Task
-# Get Flow Run Tasks
-# Publish Flow
-# Get Flow Run
-# Get Flow Runs
-# Run Flow Now
-# Run Flow Task
-# Get Linked Task
-# Get Linked Tasks
-# Run Linked Task Now
-# Cancel Flow Run
 
 ### Jobs, Tasks and Schedules methods
 # List Server Schedules
@@ -2507,9 +2862,7 @@ Export-ModuleMember -Function Get-TSUserFavorite
 Export-ModuleMember -Function Add-TSUserFavorite
 Export-ModuleMember -Function Remove-TSUserFavorite
 Export-ModuleMember -Function Move-TSUserFavorite
-# Add Flow to Favorites
 # Add Metric to Favorites - Retired in API 3.22
-# Delete Flow from Favorites
 
 ### Subscription methods
 # List Subscriptions

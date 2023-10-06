@@ -4,6 +4,7 @@ BeforeDiscovery {
     $script:ConfigFiles = Get-ChildItem -Path "Tests/Config" -Filter "test_*.json" -Recurse
     $script:DatasourceFiles = Get-ChildItem -Path "Tests/Assets/Datasources" -Recurse
     $script:WorkbookFiles = Get-ChildItem -Path "Tests/Assets/Workbooks" -Recurse
+    $script:FlowFiles = Get-ChildItem -Path "Tests/Assets/Flows" -Recurse
 }
 BeforeAll {
     . ./Tests/Test.Functions.ps1
@@ -696,6 +697,118 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 }
             }
         }
+        Context "Flow operations" -Tag Flow {
+            Context "Get, publish, download sample flow on <ConfigFile.server>" {
+                BeforeAll {
+                    $project = Add-TSProject -Name (New-Guid)
+                    Update-TSProject -ProjectId $project.id -PublishSamples
+                    Start-Sleep -Seconds 2 # small delay is needed to finalize published samples
+                    $script:samplesProjectId = $project.id
+                    $script:samplesProjectName = $project.name
+                }
+                AfterAll {
+                    if ($script:samplesProjectId) {
+                        Remove-TSProject -ProjectId $script:samplesProjectId
+                        $script:samplesProjectId = $null
+                    }
+                }
+                It "Get sample flow id from <ConfigFile.server>" {
+                    $flow = Get-TSFlow -Filter "projectName:eq:$samplesProjectName" | Select-Object -First 1
+                    $script:sampleflowId = $flow.id
+                    $script:sampleFlowName = $flow.name
+                    $sampleflowId | Should -BeOfType String
+                }
+                It "Get flows on <ConfigFile.server>" {
+                    $flows = Get-TSFlow
+                    ($flows | Measure-Object).Count | Should -BeGreaterThan 0
+                    $flowId = $flows | Select-Object -First 1 -ExpandProperty id
+                    $flowId | Should -BeOfType String
+                    $flow = Get-TSFlow -FlowId $flowId
+                    $flow.id | Should -Be $flowId
+                    $connections = Get-TSFlowConnection -FlowId $flowId
+                    ($connections | Measure-Object).Count | Should -BeGreaterThan 0
+                }
+                It "Query flows with options on <ConfigFile.server>" {
+                    $flowName = Get-TSFlow | Select-Object -First 1 -ExpandProperty name
+                    $flows = Get-TSFlow -Filter "name:eq:$flowName" -Sort name:asc -Fields id,name
+                    ($flows | Measure-Object).Count | Should -BeGreaterOrEqual 1
+                    ($flows | Get-Member -MemberType Property | Measure-Object).Count | Should -BeGreaterOrEqual 2
+                }
+                It "Query flows for current user on <ConfigFile.server>" {
+                    $flows = Get-TSFlowsForUser -UserId (Get-TSCurrentUserId)
+                    ($flows | Measure-Object).Count | Should -BeGreaterThan 0
+                    $flows | Select-Object -First 1 -ExpandProperty id | Should -BeOfType String
+                    $flows = Get-TSFlowsForUser -UserId (Get-TSCurrentUserId) -IsOwner
+                    ($flows | Measure-Object).Count | Should -BeGreaterThan 0
+                    $flows | Select-Object -First 1 -ExpandProperty id | Should -BeOfType String
+                }
+                It "Download sample flow from <ConfigFile.server>" {
+                    {Export-TSFlow -FlowId $sampleflowId -OutFile "Tests/Output/$sampleFlowName.tflx"} | Should -Not -Throw
+                    Test-Path -Path "Tests/Output/$sampleFlowName.tflx" | Should -BeTrue
+                }
+                It "Publish sample flow on <ConfigFile.server>" {
+                    $flow = Publish-TSFlow -Name $sampleFlowName -InFile "Tests/Output/$sampleFlowName.tflx" -ProjectId $samplesProjectId -Overwrite
+                    $flow.id | Should -BeOfType String
+                    $script:sampleFlowId = $flow.id
+                }
+                It "Publish sample flow (chunks) on <ConfigFile.server>" {
+                    $flow = Publish-TSFlow -Name $sampleFlowName -InFile "Tests/Output/$sampleFlowName.tflx" -ProjectId $samplesProjectId -Overwrite -Chunked
+                    $flow.id | Should -BeOfType String
+                    $script:sampleFlowId = $flow.id
+                }
+                It "Add/remove tags for sample flow on <ConfigFile.server>" {
+                    {Add-TSTagsToContent -FlowId $sampleFlowId -Tags "active","test"} | Should -Not -Throw
+                    ((Get-TSFlow -FlowId $sampleFlowId).tags.tag | Measure-Object).Count | Should -Be 2
+                    {Remove-TSTagFromContent -FlowId $sampleFlowId -Tag "test"} | Should -Not -Throw
+                    ((Get-TSFlow -FlowId $sampleFlowId).tags.tag | Measure-Object).Count | Should -Be 1
+                    {Remove-TSTagFromContent -FlowId $sampleFlowId -Tag "active"} | Should -Not -Throw
+                    (Get-TSFlow -FlowId $sampleFlowId).tags | Should -BeNullOrEmpty
+                }
+                It "Remove sample flow on <ConfigFile.server>" {
+                    {Remove-TSFlow -FlowId $sampleFlowId} | Should -Not -Throw
+                }
+                It "Publish flow with invalid extension on <ConfigFile.server>" {
+                    {Publish-TSFlow -Name "Flow" -InFile "Tests/Assets/Misc/Flow.txt" -ProjectId $samplesProjectId} | Should -Throw
+                }
+                It "Publish flow with invalid contents on <ConfigFile.server>" {
+                    {Publish-TSFlow -Name "invalid" -InFile "Tests/Assets/Misc/invalid.tflx" -ProjectId $samplesProjectId} | Should -Throw
+                }
+                It "Publish and check flow with output steps on <ConfigFile.server>" -Skip {
+                    $flow = Publish-TSFlow -Name $sampleFlowName -InFile "Tests/Output/$sampleFlowName.tflx" -ProjectId $samplesProjectId -Overwrite
+                    $flow.id | Should -BeOfType String
+                    $outputSteps = Get-TSFlow -FlowId $flow.id -OutputSteps
+                    ($outputSteps | Measure-Object).Count | Should -BeGreaterThan 0
+                    $outputSteps.id | Select-Object -First 1 -ExpandProperty id | Should -BeOfType String
+                }
+                It "Publish flow with connections on <ConfigFile.server>" -Skip {
+                    Publish-TSFlow -Name "Flow" -InFile "Tests/Assets/Misc/Flow.txt" -ProjectId $samplesProjectId
+                }
+                It "Publish flow with credentials on <ConfigFile.server>" -Skip {
+                    Publish-TSFlow -Name "Flow" -InFile "Tests/Assets/Misc/Flow.txt" -ProjectId $samplesProjectId
+                }
+                Context "Publish / download sample flows on <ConfigFile.server>" -ForEach $FlowFiles -Skip {
+                    BeforeAll {
+                        $script:sampleFlowName = (Get-Item -LiteralPath $_).BaseName
+                        $script:sampleFlowFileName = (Get-Item -LiteralPath $_).Name
+                    }
+                    It "Publish file ""<sampleFlowFileName>"" into flow ""<sampleFlowName>"" on <ConfigFile.server>" {
+                        $flow = Publish-TSFlow -Name $sampleFlowName -InFile $_ -ProjectId $samplesProjectId -Overwrite -ShowProgress
+                        $flow.id | Should -BeOfType String
+                        $script:sampleflowId = $flow.id
+                    }
+                    It "Publish file ""<sampleFlowFileName>"" into flow ""<sampleFlowName>"" on <ConfigFile.server> (Chunked)" {
+                        $flow = Publish-TSFlow -Name $sampleFlowName -InFile $_ -ProjectId $samplesProjectId -Overwrite -ShowProgress -Chunked
+                        $flow.id | Should -BeOfType String
+                        $script:sampleflowId = $flow.id
+                    }
+                    It "Download flow ""<sampleFlowName>"" from <ConfigFile.server>" {
+                        {Export-TSFlow -FlowId $sampleflowId -OutFile "Tests/Output/download.tflx"} | Should -Not -Throw
+                        Test-Path -Path "Tests/Output/download.tflx" | Should -BeTrue
+                        Remove-Item -Path "Tests/Output/download.tflx"
+                    }
+                }
+            }
+        }
         Context "Favorite operations" -Tag Favorite {
             BeforeAll {
                 $project = Add-TSProject -Name (New-Guid)
@@ -719,6 +832,9 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 }
                 Get-TSView -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
                     {Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -ViewId $_.id} | Should -Not -Throw
+                }
+                Get-TSFlow -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
+                    {Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -FlowId $_.id} | Should -Not -Throw
                 }
             }
             It "Get/reorder user favorites for sample contents on <ConfigFile.server>" {
@@ -771,6 +887,9 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 }
                 Get-TSView -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
                     {Remove-TSUserFavorite -UserId (Get-TSCurrentUserId) -ViewId $_.id} | Should -Not -Throw
+                }
+                Get-TSFlow -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
+                    {Remove-TSUserFavorite -UserId (Get-TSCurrentUserId) -FlowId $_.id} | Should -Not -Throw
                 }
             }
         }
