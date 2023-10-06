@@ -2143,7 +2143,7 @@ function Add-TSUserFavorite {
             if ($Label) {
                 $el_favorite.SetAttribute("label", $Label)
             } else {
-                $el_favorite.SetAttribute("label", (Get-TSWorkbook -WorkbookId $WorkbookId | Select-Object -First 1 -ExpandProperty name))
+                $el_favorite.SetAttribute("label", $WorkbookId)
             }
             if ($PSCmdlet.ShouldProcess("user:$UserId, workbook:$WorkbookId")) {
                 $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Favorite -Param $UserId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
@@ -2155,7 +2155,7 @@ function Add-TSUserFavorite {
             if ($Label) {
                 $el_favorite.SetAttribute("label", $Label)
             } else {
-                $el_favorite.SetAttribute("label", (Get-TSDatasource -DatasourceId $DatasourceId | Select-Object -First 1 -ExpandProperty name))
+                $el_favorite.SetAttribute("label", $DatasourceId)
             }
             if ($PSCmdlet.ShouldProcess("user:$UserId, datasource:$DatasourceId")) {
                 $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Favorite -Param $UserId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
@@ -2167,7 +2167,7 @@ function Add-TSUserFavorite {
             if ($Label) {
                 $el_favorite.SetAttribute("label", $Label)
             } else {
-                $el_favorite.SetAttribute("label", (Get-TSView -ViewId $ViewId | Select-Object -First 1 -ExpandProperty name))
+                $el_favorite.SetAttribute("label", $ViewId)
             }
             if ($PSCmdlet.ShouldProcess("user:$UserId, view:$ViewId")) {
                 $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Favorite -Param $UserId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
@@ -2179,7 +2179,7 @@ function Add-TSUserFavorite {
             if ($Label) {
                 $el_favorite.SetAttribute("label", $Label)
             } else {
-                $el_favorite.SetAttribute("label", (Get-TSProject -Filter id:eq:$ProjectId | Select-Object -First 1 -ExpandProperty name))
+                $el_favorite.SetAttribute("label", $ProjectId)
             }
             if ($PSCmdlet.ShouldProcess("user:$UserId, project:$ProjectId")) {
                 $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Favorite -Param $UserId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
@@ -2253,7 +2253,6 @@ function Move-TSUserFavorite {
     $el_fo.SetAttribute("favoriteTypeMoveAfter", $AfterFavoriteType.ToLower())
     try {
         if ($PSCmdlet.ShouldProcess("user:$UserId, favorite($FavoriteType):$FavoriteId, after($AfterFavoriteType):$AfterFavoriteId")) {
-            write-error $xml.OuterXml
             Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint OrderFavorites -Param $UserId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
         }
     } catch {

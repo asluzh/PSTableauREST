@@ -696,6 +696,84 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 }
             }
         }
+        Context "Favorite operations" -Tag Favorite {
+            BeforeAll {
+                $project = Add-TSProject -Name (New-Guid)
+                Update-TSProject -ProjectId $project.id -PublishSamples
+                $script:samplesProjectId = $project.id
+                $script:samplesProjectName = $project.name
+            }
+            AfterAll {
+                if ($script:samplesProjectId) {
+                    Remove-TSProject -ProjectId $script:samplesProjectId
+                    $script:samplesProjectId = $null
+                }
+            }
+            It "Add sample contents to user favorites on <ConfigFile.server>" {
+                {Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -ProjectId $script:samplesProjectId} | Should -Not -Throw
+                Get-TSDatasource -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
+                    {Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -DatasourceId $_.id} | Should -Not -Throw
+                }
+                Get-TSWorkbook -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
+                    {Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -WorkbookId $_.id} | Should -Not -Throw
+                }
+                Get-TSView -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
+                    {Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -ViewId $_.id} | Should -Not -Throw
+                }
+            }
+            It "Get/reorder user favorites for sample contents on <ConfigFile.server>" {
+                $workbooks = Get-TSWorkbook -Filter "projectName:eq:$samplesProjectName"
+                $workbook_id = $workbooks | Select-Object -First 1 -ExpandProperty id
+                $datasources = Get-TSDatasource -Filter "projectName:eq:$samplesProjectName"
+                $datasource_id = $datasources | Select-Object -First 1 -ExpandProperty id
+                $views = Get-TSView -Filter "projectName:eq:$samplesProjectName"
+                $totalCount = $datasources.Length + $workbooks.Length + $views.Length
+                $favorites = Get-TSUserFavorite -UserId (Get-TSCurrentUserId)
+                ($favorites | Measure-Object).Count | Should -BeGreaterThan $totalCount
+                # swap favorites order for first workbook/datasource and sample
+                $pos_project = $favorites | Where-Object -FilterScript {$_.project.id -eq $script:samplesProjectId} | Select-Object -First 1 -ExpandProperty position
+                if ($workbook_id) {
+                    $pos_workbook = $favorites | Where-Object -FilterScript {$_.workbook.id -eq $workbook_id} | Select-Object -First 1 -ExpandProperty position
+                    $pos_workbook | Should -BeLessThan $pos_project
+                    {Move-TSUserFavorite -UserId (Get-TSCurrentUserId) -FavoriteId $workbook_id -FavoriteType Workbook -AfterFavoriteId $script:samplesProjectId -AfterFavoriteType Project} | Should -Not -Throw
+                    $favorites = Get-TSUserFavorite -UserId (Get-TSCurrentUserId)
+                    $pos_project = $favorites | Where-Object -FilterScript {$_.project.id -eq $script:samplesProjectId} | Select-Object -First 1 -ExpandProperty position
+                    $pos_workbook = $favorites | Where-Object -FilterScript {$_.workbook.id -eq $workbook_id} | Select-Object -First 1 -ExpandProperty position
+                    $pos_workbook | Should -BeGreaterThan $pos_project
+                }
+                if ($datasource_id) {
+                    $pos_datasource = $favorites | Where-Object -FilterScript {$_.datasource.id -eq $datasource_id} | Select-Object -First 1 -ExpandProperty position
+                    $pos_datasource | Should -BeLessThan $pos_project
+                    {Move-TSUserFavorite -UserId (Get-TSCurrentUserId) -FavoriteId $datasource_id -FavoriteType Datasource -AfterFavoriteId $script:samplesProjectId -AfterFavoriteType Project} | Should -Not -Throw
+                    $favorites = Get-TSUserFavorite -UserId (Get-TSCurrentUserId)
+                    $pos_project = $favorites | Where-Object -FilterScript {$_.project.id -eq $script:samplesProjectId} | Select-Object -First 1 -ExpandProperty position
+                    $pos_datasource = $favorites | Where-Object -FilterScript {$_.datasource.id -eq $datasource_id} | Select-Object -First 1 -ExpandProperty position
+                    $pos_datasource | Should -BeGreaterThan $pos_project
+                }
+                if ($views -and $views.Length -ge 2) {
+                    $pos_view0 = $favorites | Where-Object -FilterScript {$_.view.id -eq $views[0].id} | Select-Object -First 1 -ExpandProperty position
+                    $pos_view1 = $favorites | Where-Object -FilterScript {$_.view.id -eq $views[1].id} | Select-Object -First 1 -ExpandProperty position
+                    $pos_view1 | Should -BeLessThan $pos_view0
+                    {Move-TSUserFavorite -UserId (Get-TSCurrentUserId) -FavoriteId $views[1].id -FavoriteType View -AfterFavoriteId $views[0].id -AfterFavoriteType View} | Should -Not -Throw
+                    $favorites = Get-TSUserFavorite -UserId (Get-TSCurrentUserId)
+                    $pos_view0 = $favorites | Where-Object -FilterScript {$_.view.id -eq $views[0].id} | Select-Object -First 1 -ExpandProperty position
+                    $pos_view1 = $favorites | Where-Object -FilterScript {$_.view.id -eq $views[1].id} | Select-Object -First 1 -ExpandProperty position
+                    $pos_view1| Should -BeGreaterThan $pos_view0
+                }
+            }
+            It "Remove sample contents from user favorites on <ConfigFile.server>" {
+                {Remove-TSUserFavorite -UserId (Get-TSCurrentUserId) -ProjectId $script:samplesProjectId} | Should -Not -Throw
+                Get-TSDatasource -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
+                    {Remove-TSUserFavorite -UserId (Get-TSCurrentUserId) -DatasourceId $_.id} | Should -Not -Throw
+                }
+                Get-TSWorkbook -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
+                    {Remove-TSUserFavorite -UserId (Get-TSCurrentUserId) -WorkbookId $_.id} | Should -Not -Throw
+                }
+                Get-TSView -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
+                    {Remove-TSUserFavorite -UserId (Get-TSCurrentUserId) -ViewId $_.id} | Should -Not -Throw
+                }
+            }
+        }
         Context "Metadata operations" -Tag Metadata {
             It "Query databases on <ConfigFile.server>" {
                 $databases = Get-TSDatabase
