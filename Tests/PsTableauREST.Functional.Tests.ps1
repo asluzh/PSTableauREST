@@ -695,6 +695,10 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     {Remove-TSTagFromContent -ViewId $sampleViewId -Tag "active"} | Should -Not -Throw
                     (Get-TSView -ViewId $sampleViewId).tags | Should -BeNullOrEmpty
                 }
+                It "Get/hide/unhide view recommendations on <ConfigFile.server>" -Skip {
+                }
+            }
+            It "Get custom views on <ConfigFile.server>" -Skip {
             }
         }
         Context "Flow operations" -Tag Flow {

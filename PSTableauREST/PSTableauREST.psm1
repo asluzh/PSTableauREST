@@ -27,7 +27,7 @@ function Get-TSRequestUri {
     [OutputType([string])]
     Param(
         [Parameter(Mandatory)][ValidateSet('Auth','Site','Project','User','Group','Workbook','Datasource','View','Recommendation',
-            'Flow','FileUpload','Favorite','OrderFavorites','Database','Table','GraphQL')][string] $Endpoint,
+            'CustomView','Flow','FileUpload','Favorite','OrderFavorites','Database','Table','GraphQL')][string] $Endpoint,
         [Parameter()][string] $Param
     )
     $Uri = "$script:TSServerUrl/api/$script:TSRestApiVersion/"
@@ -2019,6 +2019,177 @@ function Show-TSViewRecommendation {
     }
 }
 
+function Get-TSCustomView {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter()][string] $CustomViewId,
+        [Parameter()][string[]] $Filter,
+        [Parameter()][string[]] $Sort,
+        [Parameter()][string[]] $Fields,
+        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+    )
+    Assert-TSRestApiVersion -AtLeast 3.18
+    try {
+        if ($CustomViewId) { # Get Custom View
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint CustomView -Param $CustomViewId) -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response.tsResponse.customView
+        } else { # List Custom Views
+            $pageNumber = 0
+            do {
+                $pageNumber += 1
+                $uri = Get-TSRequestUri -Endpoint CustomView
+                $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
+                $uriParam.Add("pageSize", $PageSize)
+                $uriParam.Add("pageNumber", $pageNumber)
+                if ($Filter) {
+                    $uriParam.Add("filter", $Filter -join ',')
+                }
+                if ($Sort) {
+                    $uriParam.Add("sort", $Sort -join ',')
+                }
+                if ($Fields) {
+                    $uriParam.Add("fields", $Fields -join ',')
+                }
+                $uriRequest = [System.UriBuilder]$uri
+                $uriRequest.Query = $uriParam.ToString()
+                $response = Invoke-RestMethod -Uri $uriRequest.Uri.OriginalString -Method Get -Headers (Get-TSRequestHeaderDict)
+                $totalAvailable = $response.tsResponse.pagination.totalAvailable
+                $response.tsResponse.customViews.customView
+            } until ($PageSize*$pageNumber -ge $totalAvailable)
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Get-TSCustomViewAsUserDefault {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter(Mandatory)][string] $CustomViewId
+    )
+    Assert-TSRestApiVersion -AtLeast 3.21
+    try {
+        $uri = Get-TSRequestUri -Endpoint CustomView -Param "default/users"
+        $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+        $response.tsResponse.users.user
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Set-TSCustomViewAsUserDefault {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter(Mandatory)][string] $CustomViewId,
+        [Parameter(Mandatory)][string[]] $UserId
+    )
+    Assert-TSRestApiVersion -AtLeast 3.21
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_users = $tsRequest.AppendChild($xml.CreateElement("users"))
+    foreach ($id in $UserId) {
+        $el_user = $el_users.AppendChild($xml.CreateElement("user"))
+        $el_user.SetAttribute("id", $id)
+    }
+    try {
+        $uri = Get-TSRequestUri -Endpoint CustomView -Param "default/users"
+        $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+        $response.tsResponse.customViewAsUserDefaultResults.customViewAsUserDefaultViewResult
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Export-TSCustomViewImage {
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $CustomViewId,
+        [Parameter()][int] $MaxAge,
+        [Parameter()][ValidateSet('standard','high')][string] $Resolution = "high",
+        [Parameter()][string] $OutFile,
+        [Parameter()][hashtable] $ViewFilters,
+        [Parameter()][switch] $ShowProgress
+    )
+    Assert-TSRestApiVersion -AtLeast 3.18
+    $OutFileParam = @{}
+    if ($OutFile) {
+        $OutFileParam.Add("OutFile", $OutFile)
+    }
+    $uri = Get-TSRequestUri -Endpoint CustomView -Param "$CustomViewId"
+    $uriParam = @{}
+    $uri += "/image"
+    if ($Resolution -eq "high") {
+        $uriParam.Add('resolution', $Resolution)
+    }
+    # $fileType = 'png'
+    if ($MaxAge) {
+        $uriParam.Add('maxAge', $MaxAge)
+    }
+    if ($ViewFilters) {
+        $ViewFilters.GetEnumerator() | ForEach-Object {
+            $uriParam.Add("vf_"+$_.Key, $_.Value)
+        }
+    }
+    $prevProgressPreference = $global:ProgressPreference
+    try {
+        if ($ShowProgress) {
+            $global:ProgressPreference = 'Continue'
+        } else {
+            $global:ProgressPreference = 'SilentlyContinue'
+        }
+        Invoke-RestMethod -Uri $uri -Body $uriParam -Method Get -Headers (Get-TSRequestHeaderDict) -TimeoutSec 600 @OutFileParam
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    } finally {
+        $global:ProgressPreference = $prevProgressPreference
+    }
+}
+
+function Update-TSCustomView {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $CustomViewId,
+        [Parameter()][string] $NewName,
+        [Parameter()][string] $NewOwnerId
+    )
+    Assert-TSRestApiVersion -AtLeast 3.18
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_cview = $tsRequest.AppendChild($xml.CreateElement("customView"))
+    if ($NewName) {
+        $el_cview.SetAttribute("name", $NewName)
+    }
+    if ($NewOwnerId) {
+        $el_owner = $el_cview.AppendChild($xml.CreateElement("owner"))
+        $el_owner.SetAttribute("id", $NewOwnerId)
+    }
+    try {
+        if ($PSCmdlet.ShouldProcess($CustomViewId)) {
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint CustomView -Param $CustomViewId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            return $response.tsResponse.customView
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Remove-TSCustomView {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $CustomViewId
+    )
+    Assert-TSRestApiVersion -AtLeast 3.18
+    try {
+        if ($PSCmdlet.ShouldProcess($CustomViewId)) {
+            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint CustomView -Param $CustomViewId) -Method Delete -Headers (Get-TSRequestHeaderDict)
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
 ### Flows methods
 function Get-TSFlow {
     [OutputType([PSCustomObject[]])]
@@ -2820,11 +2991,12 @@ Export-ModuleMember -Function Export-TSViewToFormat
 Export-ModuleMember -Function Get-TSViewRecommendation
 Export-ModuleMember -Function Hide-TSViewRecommendation
 Export-ModuleMember -Function Show-TSViewRecommendation
-# List Custom Views
-# Get Custom View
-# Get Custom View Image
-# Update Custom View
-# Delete Custom View
+Export-ModuleMember -Function Get-TSCustomView
+Export-ModuleMember -Function Get-TSCustomViewAsUserDefault
+Export-ModuleMember -Function Set-TSCustomViewAsUserDefault
+Export-ModuleMember -Function Export-TSCustomViewImage
+Export-ModuleMember -Function Update-TSCustomView
+Export-ModuleMember -Function Remove-TSCustomView
 
 ### Flow methods
 Export-ModuleMember -Function Get-TSFlow
