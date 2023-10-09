@@ -123,6 +123,8 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     ($sites | Measure-Object).Count | Should -Be 1
                     $sites | Where-Object id -eq $script:testSiteId | Should -Not -BeNullOrEmpty
                     $sites | Where-Object contentUrl -eq $script:testSite | Should -Not -BeNullOrEmpty
+                    $sites = Get-TSSite -Current -IncludeUsageStatistics
+                    ($sites | Measure-Object).Count | Should -Be 1
                 }
             }
             It "Delete site <testSite> on <ConfigFile.server>" {

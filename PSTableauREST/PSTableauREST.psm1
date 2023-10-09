@@ -290,12 +290,19 @@ function Get-TSSite {
     [OutputType([PSCustomObject[]])]
     Param(
         [Parameter()][switch] $Current,
+        # Note: it's also possible to use ?key=contentUrl to get site, but also works only with current site
+        # Note: it's also possible to use ?key=name to get site, but also works only with current site
+        # thus it doesn't make much sense to implement these options
+        [Parameter()][switch] $IncludeUsageStatistics,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
     try {
         if ($Current) { # get single (current) site
             $uri = Get-TSRequestUri -Endpoint Site -Param $script:TSSiteId
+            if ($IncludeUsageStatistics) {
+                $uri += "?includeUsageStatistics=true"
+            }
             $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
             return $response.tsResponse.site
         } else { # get all sites
