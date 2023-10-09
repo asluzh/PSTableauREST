@@ -2068,8 +2068,8 @@ function Get-TSCustomViewAsUserDefault {
         [Parameter(Mandatory)][string] $CustomViewId
     )
     Assert-TSRestApiVersion -AtLeast 3.21
+    $uri = Get-TSRequestUri -Endpoint CustomView -Param "$CustomViewId/default/users"
     try {
-        $uri = Get-TSRequestUri -Endpoint CustomView -Param "default/users"
         $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
         $response.tsResponse.users.user
     } catch {
@@ -2985,7 +2985,7 @@ Export-ModuleMember -Function Update-TSDatasourceNow
 
 ### Views methods
 Export-ModuleMember -Function Get-TSView
-# Get View by Path - alias to using filter
+# Get View by Path - use Get-TSView with filter viewUrlName:eq:<url>
 Export-ModuleMember -Function Export-TSViewPreviewImage
 Export-ModuleMember -Function Export-TSViewToFormat
 Export-ModuleMember -Function Get-TSViewRecommendation
