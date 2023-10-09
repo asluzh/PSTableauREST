@@ -786,7 +786,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 It "Publish flow with credentials on <ConfigFile.server>" -Skip {
                     Publish-TSFlow -Name "Flow" -InFile "Tests/Assets/Misc/Flow.txt" -ProjectId $samplesProjectId
                 }
-                Context "Publish / download sample flows on <ConfigFile.server>" -ForEach $FlowFiles -Skip {
+                Context "Publish / download sample flows on <ConfigFile.server>" -ForEach $FlowFiles {
                     BeforeAll {
                         $script:sampleFlowName = (Get-Item -LiteralPath $_).BaseName
                         $script:sampleFlowFileName = (Get-Item -LiteralPath $_).Name

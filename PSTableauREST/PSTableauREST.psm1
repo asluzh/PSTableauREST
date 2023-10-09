@@ -26,7 +26,8 @@ function Get-TSRequestHeaderDict {
 function Get-TSRequestUri {
     [OutputType([string])]
     Param(
-        [Parameter(Mandatory)][ValidateSet('Auth','Site','Project','User','Group','Workbook','Datasource','View','Flow','FileUpload','Favorite','OrderFavorites','Database','Table','GraphQL')][string] $Endpoint,
+        [Parameter(Mandatory)][ValidateSet('Auth','Site','Project','User','Group','Workbook','Datasource','View','Recommendation',
+            'Flow','FileUpload','Favorite','OrderFavorites','Database','Table','GraphQL')][string] $Endpoint,
         [Parameter()][string] $Param
     )
     $Uri = "$script:TSServerUrl/api/$script:TSRestApiVersion/"
@@ -1972,6 +1973,52 @@ function Export-TSViewToFormat {
     }
 }
 
+function Get-TSViewRecommendation {
+    [OutputType([PSCustomObject[]])]
+    Param()
+    Assert-TSRestApiVersion -AtLeast 3.7
+    try {
+        $uri = Get-TSRequestUri -Endpoint Recommendation -Param "?type=view"
+        $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+        $response.tsResponse.recommendations.recommendation
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Hide-TSViewRecommendation {
+    [OutputType([string])]
+    Param(
+        [Parameter(Mandatory)][string] $ViewId
+    )
+    # Assert-TSRestApiVersion -AtLeast 2.0
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_rd = $tsRequest.AppendChild($xml.CreateElement("recommendationDismissal"))
+    $el_view = $el_rd.AppendChild($xml.CreateElement("view"))
+    $el_view.SetAttribute("id", $ViewId)
+    $uri = Get-TSRequestUri -Endpoint Recommendation -Param dismissals
+    try {
+        Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Show-TSViewRecommendation {
+    [OutputType([string])]
+    Param(
+        [Parameter(Mandatory)][string] $ViewId
+    )
+    # Assert-TSRestApiVersion -AtLeast 2.0
+    $uri = Get-TSRequestUri -Endpoint Recommendation -Param "dismissals/?type=view&id=$ViewId"
+    try {
+        Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
 ### Flows methods
 function Get-TSFlow {
     [OutputType([PSCustomObject[]])]
@@ -2770,9 +2817,9 @@ Export-ModuleMember -Function Get-TSView
 # Get View by Path - alias to using filter
 Export-ModuleMember -Function Export-TSViewPreviewImage
 Export-ModuleMember -Function Export-TSViewToFormat
-# Get Recommendations for Views
-# Hide a Recommendation for a View
-# Unhide a Recommendation for a View
+Export-ModuleMember -Function Get-TSViewRecommendation
+Export-ModuleMember -Function Hide-TSViewRecommendation
+Export-ModuleMember -Function Show-TSViewRecommendation
 # List Custom Views
 # Get Custom View
 # Get Custom View Image
