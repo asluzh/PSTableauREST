@@ -463,7 +463,7 @@ function Add-TSProject {
         [Parameter(Mandatory)][string] $Name,
         [Parameter()][string] $Description,
         [Parameter()][ValidateSet('ManagedByOwner','LockedToProject','LockedToProjectWithoutNested')][string] $ContentPermissions,
-        [Parameter()][string] $OwnerId, # TODO test this
+        [Parameter()][string] $OwnerId,
         [Parameter()][string] $ParentProjectId
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
@@ -505,7 +505,7 @@ function Update-TSProject {
         [Parameter()][string] $Description,
         [Parameter()][ValidateSet('ManagedByOwner','LockedToProject','LockedToProjectWithoutNested')][string] $ContentPermissions,
         [Parameter()][string] $ParentProjectId,
-        [Parameter()][string] $OwnerId, # TODO test this
+        [Parameter()][string] $OwnerId,
         [Parameter()][switch] $PublishSamples
     )
     # Assert-TSRestApiVersion -AtLeast 2.0

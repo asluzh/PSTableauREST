@@ -189,13 +189,22 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 $response | Should -BeOfType String
                 $script:testProjectId = $null
             }
-            It "Create/update new project with samples on <ConfigFile.server>" -Skip {
+            It "Create/update new project with samples on <ConfigFile.server>" {
+                if ($ConfigFile.test_username) {
+                    $userName = $ConfigFile.test_username
+                } else {
+                    $userName = New-Guid
+                }
+                $user = Add-TSUser -Name $userName -SiteRole Explorer
+                $user.id | Should -BeOfType String
                 $projectNameSamples = New-Guid
-                $project = Add-TSProject -Name $projectNameSamples
+                $project = Add-TSProject -Name $projectNameSamples -OwnerId (Get-TSCurrentUserId) #$user.id
+                # Note: testing with a different OwnerId doesn't work with Dev Sandbox on Tableau Cloud
                 $project.id | Should -BeOfType String
                 $script:testProjectId = $project.id
-                $project = Update-TSProject -ProjectId $script:testProjectId -Name $projectNameSamples -PublishSamples
+                $project = Update-TSProject -ProjectId $script:testProjectId -Name $projectNameSamples -PublishSamples -OwnerId (Get-TSCurrentUserId)
                 $project.id | Should -BeOfType String
+                Remove-TSUser -UserId $user.id
             }
         }
         Context "User operations" -Tag User {
@@ -724,7 +733,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 }
                 AfterAll {
                     if ($script:samplesProjectId) {
-                        # Remove-TSProject -ProjectId $script:samplesProjectId
+                        Remove-TSProject -ProjectId $script:samplesProjectId
                         $script:samplesProjectId = $null
                     }
                 }
