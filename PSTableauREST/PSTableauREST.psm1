@@ -289,12 +289,12 @@ function Get-TSCurrentUserId {
 function Get-TSSite {
     [OutputType([PSCustomObject[]])]
     Param(
-        [Parameter()][switch] $Current,
+        [Parameter(Mandatory,ParameterSetName='CurrentSite')][switch] $Current,
         # Note: it's also possible to use ?key=contentUrl to get site, but also works only with current site
         # Note: it's also possible to use ?key=name to get site, but also works only with current site
         # thus it doesn't make much sense to implement these options
-        [Parameter()][switch] $IncludeUsageStatistics,
-        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+        [Parameter(ParameterSetName='CurrentSite')][switch] $IncludeUsageStatistics,
+        [Parameter(ParameterSetName='Sites')][ValidateRange(1,100)][int] $PageSize = 100
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
     try {
@@ -563,11 +563,11 @@ function Remove-TSProject {
 function Get-TSUser {
     [OutputType([PSCustomObject[]])]
     Param(
-        [Parameter()][string] $UserId,
-        [Parameter()][string[]] $Filter,
-        [Parameter()][string[]] $Sort,
-        [Parameter()][string[]] $Fields,
-        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+        [Parameter(Mandatory,ParameterSetName='UserById')][string] $UserId,
+        [Parameter(ParameterSetName='Users')][string[]] $Filter,
+        [Parameter(ParameterSetName='Users')][string[]] $Sort,
+        [Parameter(ParameterSetName='Users')][string[]] $Fields,
+        [Parameter(ParameterSetName='Users')][ValidateRange(1,100)][int] $PageSize = 100
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
     try {
@@ -1472,31 +1472,33 @@ function Update-TSWorkbookNow {
 function Get-TSDatasource {
     [OutputType([PSCustomObject[]])]
     Param(
-        [Parameter()][string] $DatasourceId,
-        [Parameter()][switch] $Revisions,
-        [Parameter()][string[]] $Filter,
-        [Parameter()][string[]] $Sort,
-        [Parameter()][string[]] $Fields,
-        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+        [Parameter(Mandatory,ParameterSetName='DatasourceById')]
+        [Parameter(Mandatory,ParameterSetName='DatasourceRevisions')]
+        [string] $DatasourceId,
+        [Parameter(Mandatory,ParameterSetName='DatasourceRevisions')][Parameter()][switch] $Revisions,
+        [Parameter(ParameterSetName='Datasources')][string[]] $Filter,
+        [Parameter(ParameterSetName='Datasources')][string[]] $Sort,
+        [Parameter(ParameterSetName='Datasources')][string[]] $Fields,
+        [Parameter(ParameterSetName='Datasources')]
+        [Parameter(ParameterSetName='DatasourceRevisions')]
+        [ValidateRange(1,100)][int] $PageSize = 100
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
     try {
-        if ($DatasourceId) {
-            if ($Revisions) { # Get Data Source Revisions
-                # Assert-TSRestApiVersion -AtLeast 2.3
-                $pageNumber = 0
-                do {
-                    $pageNumber += 1
-                    $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/revisions
-                    $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-                    $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
-                    $totalAvailable = $response.tsResponse.pagination.totalAvailable
-                    $response.tsResponse.revisions.revision
-                } until ($PageSize*$pageNumber -ge $totalAvailable)
-            } else { # Query Data Source
-                $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId) -Method Get -Headers (Get-TSRequestHeaderDict)
-                $response.tsResponse.datasource
-            }
+        if ($Revisions) { # Get Data Source Revisions
+            # Assert-TSRestApiVersion -AtLeast 2.3
+            $pageNumber = 0
+            do {
+                $pageNumber += 1
+                $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/revisions
+                $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+                $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+                $totalAvailable = $response.tsResponse.pagination.totalAvailable
+                $response.tsResponse.revisions.revision
+            } until ($PageSize*$pageNumber -ge $totalAvailable)
+        } elseif ($DatasourceId) { # Query Data Source
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId) -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response.tsResponse.datasource
         } else { # Query Data Sources
             $pageNumber = 0
             do {
@@ -1859,13 +1861,13 @@ function Update-TSDatasourceNow {
 function Get-TSView {
     [OutputType([PSCustomObject[]])]
     Param(
-        [Parameter()][string] $ViewId,
-        [Parameter()][string] $WorkbookId,
-        [Parameter()][switch] $IncludeUsageStatistics,
-        [Parameter()][string[]] $Filter,
-        [Parameter()][string[]] $Sort,
-        [Parameter()][string[]] $Fields,
-        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+        [Parameter(Mandatory,ParameterSetName='ViewById')][string] $ViewId,
+        [Parameter(Mandatory,ParameterSetName='ViewsInWorkbook')][string] $WorkbookId,
+        [Parameter(ParameterSetName='ViewsInWorkbook')][switch] $IncludeUsageStatistics,
+        [Parameter(ParameterSetName='Views')][string[]] $Filter,
+        [Parameter(ParameterSetName='Views')][string[]] $Sort,
+        [Parameter(ParameterSetName='Views')][string[]] $Fields,
+        [Parameter(ParameterSetName='Views')][ValidateRange(1,100)][int] $PageSize = 100
     )
     if ($ViewId) { # Get View
         Assert-TSRestApiVersion -AtLeast 3.0
@@ -2069,11 +2071,11 @@ function Show-TSViewRecommendation {
 function Get-TSCustomView {
     [OutputType([PSCustomObject[]])]
     Param(
-        [Parameter()][string] $CustomViewId,
-        [Parameter()][string[]] $Filter,
-        [Parameter()][string[]] $Sort,
-        [Parameter()][string[]] $Fields,
-        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+        [Parameter(Mandatory,ParameterSetName='CustomViewById')][string] $CustomViewId,
+        [Parameter(ParameterSetName='CustomViews')][string[]] $Filter,
+        [Parameter(ParameterSetName='CustomViews')][string[]] $Sort,
+        [Parameter(ParameterSetName='CustomViews')][string[]] $Fields,
+        [Parameter(ParameterSetName='CustomViews')][ValidateRange(1,100)][int] $PageSize = 100
     )
     Assert-TSRestApiVersion -AtLeast 3.18
     try {
@@ -2168,7 +2170,6 @@ function Export-TSCustomViewImage {
     if ($Resolution -eq "high") {
         $uriParam.Add('resolution', $Resolution)
     }
-    # $fileType = 'png'
     if ($MaxAge) {
         $uriParam.Add('maxAge', $MaxAge)
     }
@@ -2241,13 +2242,17 @@ function Remove-TSCustomView {
 function Get-TSFlow {
     [OutputType([PSCustomObject[]])]
     Param(
-        [Parameter()][string] $FlowId,
-        # [Parameter()][switch] $Revisions, #TODO
-        [Parameter()][switch] $OutputSteps,
-        [Parameter()][string[]] $Filter,
-        [Parameter()][string[]] $Sort,
-        [Parameter()][string[]] $Fields,
-        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+        [Parameter(Mandatory,ParameterSetName='FlowById')]
+        [Parameter(Mandatory,ParameterSetName='FlowRevisions')]
+        [string] $FlowId,
+        [Parameter(Mandatory,ParameterSetName='FlowRevisions')][switch] $Revisions, # TODO
+        [Parameter(ParameterSetName='FlowById')][switch] $OutputSteps,
+        [Parameter(ParameterSetName='Flows')][string[]] $Filter,
+        [Parameter(ParameterSetName='Flows')][string[]] $Sort,
+        [Parameter(ParameterSetName='Flows')][string[]] $Fields,
+        [Parameter(ParameterSetName='Flows')]
+        [Parameter(Mandatory,ParameterSetName='FlowRevisions')]
+        [ValidateRange(1,100)][int] $PageSize = 100
     )
     Assert-TSRestApiVersion -AtLeast 3.3
     try {
@@ -2330,7 +2335,7 @@ function Export-TSFlow {
     Param(
         [Parameter(Mandatory)][string] $FlowId,
         [Parameter()][string] $OutFile,
-        # [Parameter()][int] $Revision #TODO
+        [Parameter()][int] $Revision, # TODO
         [Parameter()][switch] $ShowProgress
     )
     Assert-TSRestApiVersion -AtLeast 3.3
@@ -2515,8 +2520,8 @@ function Remove-TSFlow {
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType([PSCustomObject])]
     Param(
-        [Parameter(Mandatory)][string] $FlowId
-        # [Parameter()][int] $Revision #TODO
+        [Parameter(Mandatory)][string] $FlowId,
+        [Parameter()][int] $Revision # TODO
     )
     Assert-TSRestApiVersion -AtLeast 3.3
     try {
@@ -2829,8 +2834,8 @@ function Move-TSUserFavorite {
 function Get-TSDatabase {
     [OutputType([PSCustomObject[]])]
     Param(
-        [Parameter()][string] $DatabaseId,
-        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+        [Parameter(Mandatory,ParameterSetName='DatabaseById')][string] $DatabaseId,
+        [Parameter(ParameterSetName='Databases')][ValidateRange(1,100)][int] $PageSize = 100
     )
     Assert-TSRestApiVersion -AtLeast 3.5
     try {
@@ -2856,8 +2861,8 @@ function Get-TSDatabase {
 function Get-TSTable {
     [OutputType([PSCustomObject[]])]
     Param(
-        [Parameter()][string] $TableId,
-        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+        [Parameter(Mandatory,ParameterSetName='TableById')][string] $TableId,
+        [Parameter(ParameterSetName='Tables')][ValidateRange(1,100)][int] $PageSize = 100
     )
     Assert-TSRestApiVersion -AtLeast 3.5
     try {
@@ -2884,8 +2889,8 @@ function Get-TSTableColumn {
     [OutputType([PSCustomObject[]])]
     Param(
         [Parameter(Mandatory)][string] $TableId,
-        [Parameter()][string] $ColumnId,
-        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+        [Parameter(Mandatory,ParameterSetName='ColumnById')][string] $ColumnId,
+        [Parameter(ParameterSetName='Columns')][ValidateRange(1,100)][int] $PageSize = 100
     )
     Assert-TSRestApiVersion -AtLeast 3.5
     try {
