@@ -456,6 +456,7 @@ function Add-TSProject {
         [Parameter(Mandatory)][string] $Name,
         [Parameter()][string] $Description,
         [Parameter()][ValidateSet('ManagedByOwner','LockedToProject','LockedToProjectWithoutNested')][string] $ContentPermissions,
+        [Parameter()][string] $OwnerId, # TODO test this
         [Parameter()][string] $ParentProjectId
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
@@ -471,6 +472,11 @@ function Add-TSProject {
     }
     if ($ParentProjectId) {
         $el_project.SetAttribute("parentProjectId", $ParentProjectId)
+    }
+    if ($OwnerId) {
+        Assert-TSRestApiVersion -AtLeast 3.21
+        $el_owner = $el_project.AppendChild($xml.CreateElement("owner"))
+        $el_owner.SetAttribute("id", $OwnerId)
     }
     try {
         if ($PSCmdlet.ShouldProcess($Name)) {
@@ -492,6 +498,7 @@ function Update-TSProject {
         [Parameter()][string] $Description,
         [Parameter()][ValidateSet('ManagedByOwner','LockedToProject','LockedToProjectWithoutNested')][string] $ContentPermissions,
         [Parameter()][string] $ParentProjectId,
+        [Parameter()][string] $OwnerId, # TODO test this
         [Parameter()][switch] $PublishSamples
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
@@ -509,6 +516,11 @@ function Update-TSProject {
     }
     if ($ParentProjectId) {
         $el_project.SetAttribute("parentProjectId", $ParentProjectId)
+    }
+    if ($OwnerId) {
+        Assert-TSRestApiVersion -AtLeast 3.21
+        $el_owner = $el_project.AppendChild($xml.CreateElement("owner"))
+        $el_owner.SetAttribute("id", $OwnerId)
     }
     $uri = Get-TSRequestUri -Endpoint Project -Param $ProjectId
     if ($PublishSamples) {
@@ -718,6 +730,7 @@ function Add-TSGroup {
         [Parameter()][ValidateSet('Creator','Explorer','ExplorerCanPublish','SiteAdministratorExplorer','SiteAdministratorCreator','Viewer','Unlicensed')][string] $MinimumSiteRole,
         [Parameter()][string] $DomainName,
         [Parameter()][ValidateSet('onLogin','onSync')][string] $GrantLicenseMode,
+        [Parameter()][switch] $EphemeralUsersEnabled,
         [Parameter()][switch] $BackgroundTask
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
@@ -736,6 +749,10 @@ function Add-TSGroup {
     } else { # Creating a local group
         if ($MinimumSiteRole) {
             $el_group.SetAttribute("minimumSiteRole", $MinimumSiteRole)
+        }
+        if ($EphemeralUsersEnabled) {
+            Assert-TSRestApiVersion -AtLeast 3.21
+            $el_group.SetAttribute("ephemeralUsersEnabled", "true")
         }
     }
     $uri = Get-TSRequestUri -Endpoint Group
@@ -761,6 +778,7 @@ function Update-TSGroup {
         [Parameter()][ValidateSet('Creator','Explorer','ExplorerCanPublish','SiteAdministratorExplorer','SiteAdministratorCreator','Viewer','Unlicensed')][string] $MinimumSiteRole,
         [Parameter()][string] $DomainName,
         [Parameter()][ValidateSet('onLogin','onSync')][string] $GrantLicenseMode,
+        [Parameter()][switch] $EphemeralUsersEnabled,
         [Parameter()][switch] $BackgroundTask
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
@@ -779,6 +797,10 @@ function Update-TSGroup {
     } else { # Updating a local group
         if ($MinimumSiteRole) {
             $el_group.SetAttribute("minimumSiteRole", $MinimumSiteRole)
+        }
+        if ($EphemeralUsersEnabled) {
+            Assert-TSRestApiVersion -AtLeast 3.21
+            $el_group.SetAttribute("ephemeralUsersEnabled", "true")
         }
     }
     $uri = Get-TSRequestUri -Endpoint Group -Param $GroupId
@@ -1216,6 +1238,7 @@ function Update-TSWorkbook {
     Param(
         [Parameter(Mandatory)][string] $WorkbookId,
         [Parameter()][string] $Name,
+        [Parameter()][string] $Description,
         [Parameter()][string] $NewProjectId,
         [Parameter()][string] $NewOwnerId,
         [Parameter()][switch] $ShowTabs,
@@ -1230,6 +1253,10 @@ function Update-TSWorkbook {
     $el_workbook = $tsRequest.AppendChild($xml.CreateElement("workbook"))
     if ($Name) {
         $el_workbook.SetAttribute("name", $Name)
+    }
+    if ($Description) {
+        Assert-TSRestApiVersion -AtLeast 3.21
+        $el_workbook.SetAttribute("description", $Description)
     }
     if ($ShowTabs) {
         $el_workbook.SetAttribute("showTabs", "true")
@@ -2504,6 +2531,7 @@ function Start-TSFlowNow {
         $el_step.SetAttribute("id", $OutputStepId)
     }
     if ($FlowParams) {
+        Assert-TSRestApiVersion -AtLeast 3.15
         $el_params = $el_flow.AppendChild($xml.CreateElement("flowParameterSpecs"))
         $FlowParams.GetEnumerator() | ForEach-Object {
             $el_param = $el_params.AppendChild($xml.CreateElement("flowParameterSpec"))
