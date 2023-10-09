@@ -988,31 +988,42 @@ function Send-TSFileUpload {
 function Get-TSWorkbook {
     [OutputType([PSCustomObject[]])]
     Param(
-        [Parameter()][string] $WorkbookId,
-        [Parameter()][switch] $Revisions,
-        [Parameter()][string[]] $Filter,
-        [Parameter()][string[]] $Sort,
-        [Parameter()][string[]] $Fields,
-        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+        [Parameter(Mandatory,ParameterSetName='WorkbookById')]
+        [Parameter(Mandatory,ParameterSetName='WorkbookRevisions')]
+        [string] $WorkbookId,
+        [Parameter(Mandatory,ParameterSetName='WorkbookByContentUrl')][string] $ContentUrl,
+        [Parameter(Mandatory,ParameterSetName='WorkbookRevisions')][switch] $Revisions,
+        [Parameter(ParameterSetName='Workbooks')][string[]] $Filter,
+        [Parameter(ParameterSetName='Workbooks')][string[]] $Sort,
+        [Parameter(ParameterSetName='Workbooks')][string[]] $Fields,
+        [Parameter(ParameterSetName='Workbooks')]
+        [Parameter(ParameterSetName='WorkbookRevisions')]
+        [ValidateRange(1,100)][int] $PageSize = 100
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
+    if ($ContentUrl) {
+        Assert-TSRestApiVersion -AtLeast 3.17
+    }
     try {
-        if ($WorkbookId) {
-            if ($Revisions) { # Get Workbook Revisions
-                # Assert-TSRestApiVersion -AtLeast 2.3
-                $pageNumber = 0
-                do {
-                    $pageNumber += 1
-                    $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/revisions
-                    $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-                    $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
-                    $totalAvailable = $response.tsResponse.pagination.totalAvailable
-                    $response.tsResponse.revisions.revision
-                } until ($PageSize*$pageNumber -ge $totalAvailable)
-            } else { # Get Workbook
-                $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId) -Method Get -Headers (Get-TSRequestHeaderDict)
-                $response.tsResponse.workbook
-            }
+        if ($Revisions) { # Get Workbook Revisions
+            # Assert-TSRestApiVersion -AtLeast 2.3
+            $pageNumber = 0
+            do {
+                $pageNumber += 1
+                $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/revisions
+                $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+                $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+                $totalAvailable = $response.tsResponse.pagination.totalAvailable
+                $response.tsResponse.revisions.revision
+            } until ($PageSize*$pageNumber -ge $totalAvailable)
+        } elseif ($WorkbookId) { # Get Workbook by Id
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId) -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response.tsResponse.workbook
+        } elseif ($ContentUrl) { # Get Workbook by ContentUrl
+            $uri = Get-TSRequestUri -Endpoint Workbook -Param $ContentUrl
+            $uri += "?key=contentUrl"
+            $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response.tsResponse.workbook
         } else { # Query Workbooks on Site
             $pageNumber = 0
             do {

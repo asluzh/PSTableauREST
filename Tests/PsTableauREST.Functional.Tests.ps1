@@ -358,7 +358,13 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $workbook = Get-TSWorkbook -Filter "projectName:eq:$samplesProjectName","name:eq:Superstore" | Select-Object -First 1
                     $script:sampleWorkbookId = $workbook.id
                     $script:sampleWorkbookName = $workbook.name
+                    $script:sampleWorkbookContentUrl = $workbook.contentUrl
                     $sampleWorkbookId | Should -BeOfType String
+                }
+                It "Get sample workbook by content URL from <ConfigFile.server>" {
+                    $workbook = Get-TSWorkbook -ContentUrl $sampleWorkbookContentUrl
+                    $workbook.id | Should -Be $script:sampleWorkbookId
+                    $workbook.name | Should -Be $script:sampleWorkbookName
                 }
                 It "Download sample workbook from <ConfigFile.server>" {
                     {Export-TSWorkbook -WorkbookId $sampleWorkbookId -OutFile "Tests/Output/$sampleWorkbookName.twbx"} | Should -Not -Throw
