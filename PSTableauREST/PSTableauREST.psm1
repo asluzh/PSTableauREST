@@ -2245,18 +2245,28 @@ function Get-TSFlow {
         [Parameter(Mandatory,ParameterSetName='FlowById')]
         [Parameter(Mandatory,ParameterSetName='FlowRevisions')]
         [string] $FlowId,
-        [Parameter(Mandatory,ParameterSetName='FlowRevisions')][switch] $Revisions, # TODO
+        [Parameter(Mandatory,ParameterSetName='FlowRevisions')][switch] $Revisions, # Note: flow revisions currently not supported via REST API
         [Parameter(ParameterSetName='FlowById')][switch] $OutputSteps,
         [Parameter(ParameterSetName='Flows')][string[]] $Filter,
         [Parameter(ParameterSetName='Flows')][string[]] $Sort,
         [Parameter(ParameterSetName='Flows')][string[]] $Fields,
         [Parameter(ParameterSetName='Flows')]
-        [Parameter(Mandatory,ParameterSetName='FlowRevisions')]
+        [Parameter(ParameterSetName='FlowRevisions')]
         [ValidateRange(1,100)][int] $PageSize = 100
     )
     Assert-TSRestApiVersion -AtLeast 3.3
     try {
-        if ($FlowId) {
+        if ($Revisions) { # Get Flow Revisions
+            $pageNumber = 0
+            do {
+                $pageNumber += 1
+                $uri = Get-TSRequestUri -Endpoint Flow -Param $FlowId/revisions
+                $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+                $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+                $totalAvailable = $response.tsResponse.pagination.totalAvailable
+                $response.tsResponse.revisions.revision
+            } until ($PageSize*$pageNumber -ge $totalAvailable)
+        } elseif ($FlowId) { # Get Flow
             $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param $FlowId) -Method Get -Headers (Get-TSRequestHeaderDict)
             if ($OutputSteps) { # Get Flow, return output steps
                 $response.tsResponse.flowOutputSteps.flowOutputStep
@@ -2335,7 +2345,7 @@ function Export-TSFlow {
     Param(
         [Parameter(Mandatory)][string] $FlowId,
         [Parameter()][string] $OutFile,
-        [Parameter()][int] $Revision, # TODO
+        [Parameter()][int] $Revision, # Note: flow revisions currently not supported via REST API
         [Parameter()][switch] $ShowProgress
     )
     Assert-TSRestApiVersion -AtLeast 3.3
@@ -2343,7 +2353,15 @@ function Export-TSFlow {
     if ($OutFile) {
         $OutFileParam.Add("OutFile", $OutFile)
     }
-    $uri = Get-TSRequestUri -Endpoint Flow -Param $FlowId/content
+    $uri = Get-TSRequestUri -Endpoint Flow -Param $FlowId
+    if ($Revision) {
+        $lastRevision = Get-TSFlow -FlowId $FlowId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
+        # Note that the current revision of a flow cannot be accessed by the /revisions endpoint; in this case we ignore the -Revision parameter
+        if ($Revision -lt $lastRevision) {
+            $uri += "/revisions/$Revision"
+        }
+    }
+    $uri += "/content"
     $prevProgressPreference = $global:ProgressPreference
     try {
         if ($ShowProgress) {
@@ -2521,12 +2539,18 @@ function Remove-TSFlow {
     [OutputType([PSCustomObject])]
     Param(
         [Parameter(Mandatory)][string] $FlowId,
-        [Parameter()][int] $Revision # TODO
+        [Parameter()][int] $Revision # Note: flow revisions currently not supported via REST API
     )
     Assert-TSRestApiVersion -AtLeast 3.3
     try {
-        if ($PSCmdlet.ShouldProcess($FlowId)) {
-            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param $FlowId) -Method Delete -Headers (Get-TSRequestHeaderDict)
+        if ($Revision) { # Remove Flow Revision
+            if ($PSCmdlet.ShouldProcess("$FlowId, revision $Revision")) {
+                Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $FlowId/revisions/$Revision) -Method Delete -Headers (Get-TSRequestHeaderDict)
+            }
+        } else { # Remove Flow
+            if ($PSCmdlet.ShouldProcess($FlowId)) {
+                Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param $FlowId) -Method Delete -Headers (Get-TSRequestHeaderDict)
+            }
         }
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop

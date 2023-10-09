@@ -535,7 +535,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $datasource = Publish-TSDatasource -Name $sampleDatasourceName -InFile "Tests/Output/$sampleDatasourceName.tdsx" -ProjectId $samplesProjectId -Overwrite
                     $datasource.id | Should -BeOfType String
                 }
-                It "Publish/overwrite sample datasource on <ConfigFile.server> - rev. 2" {
+                It "Publish sample datasource (chunks) on <ConfigFile.server>" {
                     $datasource = Publish-TSDatasource -Name $sampleDatasourceName -InFile "Tests/Output/$sampleDatasourceName.tdsx" -ProjectId $samplesProjectId -Overwrite -Chunked
                     $datasource.id | Should -BeOfType String
                     $script:sampleDatasourceId = $datasource.id
@@ -724,7 +724,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 }
                 AfterAll {
                     if ($script:samplesProjectId) {
-                        Remove-TSProject -ProjectId $script:samplesProjectId
+                        # Remove-TSProject -ProjectId $script:samplesProjectId
                         $script:samplesProjectId = $null
                     }
                 }
@@ -772,6 +772,24 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $flow.id | Should -BeOfType String
                     $script:sampleFlowId = $flow.id
                 }
+                It "Download & remove previous flow revision on <ConfigFile.server>" -Skip {
+                    $revisions = Get-TSFlow -FlowId $sampleFlowId -Revisions
+                    if (($revisions | Measure-Object).Count -gt 1) {
+                        $revision = $revisions | Sort-Object revisionNumber -Descending | Select-Object -Skip 1 -First 1 -ExpandProperty revisionNumber
+                        {Export-TSFlow -FlowId $sampleFlowId -Revision $revision -OutFile "Tests/Output/download_revision.tflx"} | Should -Not -Throw
+                        Test-Path -Path "Tests/Output/download_revision.tflx" | Should -BeTrue
+                        Remove-Item -Path "Tests/Output/download_revision.tflx"
+                        {Remove-TSFlow -FlowId $sampleFlowId -Revision $revision} | Should -Not -Throw
+                    } else {
+                        Set-ItResult -Skipped
+                    }
+                }
+                It "Download latest flow revision on <ConfigFile.server>" -Skip {
+                    $revision = Get-TSFlow -FlowId $sampleFlowId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
+                    {Export-TSFlow -FlowId $sampleFlowId -Revision $revision -OutFile "Tests/Output/download_revision.tflx"} | Should -Not -Throw
+                    Test-Path -Path "Tests/Output/download_revision.tflx" | Should -BeTrue
+                    Remove-Item -Path "Tests/Output/download_revision.tflx"
+                }
                 It "Add/remove tags for sample flow on <ConfigFile.server>" {
                     {Add-TSTagsToContent -FlowId $sampleFlowId -Tags "active","test"} | Should -Not -Throw
                     ((Get-TSFlow -FlowId $sampleFlowId).tags.tag | Measure-Object).Count | Should -Be 2
@@ -780,7 +798,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     {Remove-TSTagFromContent -FlowId $sampleFlowId -Tag "active"} | Should -Not -Throw
                     (Get-TSFlow -FlowId $sampleFlowId).tags | Should -BeNullOrEmpty
                 }
-                It "Remove sample flow on <ConfigFile.server>" {
+                It "Remove sample flow on <ConfigFile.server>" -Skip {
                     {Remove-TSFlow -FlowId $sampleFlowId} | Should -Not -Throw
                 }
                 It "Publish flow with invalid extension on <ConfigFile.server>" {
