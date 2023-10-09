@@ -393,21 +393,21 @@ function Remove-TSSite {
         [Parameter()][switch] $BackgroundTask
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
-    try {
-        if ($PSCmdlet.ShouldProcess($SiteId)) {
-            if ($SiteId -eq $script:TSSiteId) {
-                $uri = Get-TSRequestUri -Endpoint Site -Param $SiteId
-                if ($BackgroundTask) {
-                    Assert-TSRestApiVersion -AtLeast 3.18
-                    $uri += "?asJob=true"
-                }
+    $uri = Get-TSRequestUri -Endpoint Site -Param $SiteId
+    if ($BackgroundTask) {
+        Assert-TSRestApiVersion -AtLeast 3.18
+        $uri += "?asJob=true"
+    }
+    if ($SiteId -eq $script:TSSiteId) {
+        try {
+            if ($PSCmdlet.ShouldProcess($SiteId)) {
                 Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
-            } else {
-                Write-Error "You can only remove the site for which you are currently authenticated."
             }
+        } catch {
+            Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
         }
-    } catch {
-        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    } else {
+        Write-Error "You can only remove the site for which you are currently authenticated."
     }
 }
 
@@ -474,7 +474,7 @@ function Add-TSProject {
     }
     try {
         if ($PSCmdlet.ShouldProcess($Name)) {
-            $uri = Get-TSRequestUri -Endpoint Project # -Param $ProjectId
+            $uri = Get-TSRequestUri -Endpoint Project
             $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
             return $response.tsResponse.project
         }
@@ -510,12 +510,12 @@ function Update-TSProject {
     if ($ParentProjectId) {
         $el_project.SetAttribute("parentProjectId", $ParentProjectId)
     }
+    $uri = Get-TSRequestUri -Endpoint Project -Param $ProjectId
+    if ($PublishSamples) {
+        $uri += "?publishSamples=true"
+    }
     try {
         if ($PSCmdlet.ShouldProcess($ProjectId)) {
-            $uri = Get-TSRequestUri -Endpoint Project -Param $ProjectId
-            if ($PublishSamples) {
-                $uri += "?publishSamples=true"
-            }
             $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
             return $response.tsResponse.project
         }
@@ -660,12 +660,12 @@ function Remove-TSUser {
         [Parameter()][string] $MapAssetsToUserId
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
+    $uri = Get-TSRequestUri -Endpoint User -Param $UserId
+    if ($MapAssetsToUserId) {
+        $uri += "?mapAssetsTo=$MapAssetsToUserId"
+    }
     try {
         if ($PSCmdlet.ShouldProcess($UserId)) {
-            $uri = Get-TSRequestUri -Endpoint User -Param $UserId
-            if ($MapAssetsToUserId) {
-                $uri += "?mapAssetsTo=$MapAssetsToUserId"
-            }
             Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
         }
     } catch {
@@ -738,12 +738,12 @@ function Add-TSGroup {
             $el_group.SetAttribute("minimumSiteRole", $MinimumSiteRole)
         }
     }
+    $uri = Get-TSRequestUri -Endpoint Group
+    if ($BackgroundTask) {
+        $uri += "?asJob=true"
+    }
     try {
         if ($PSCmdlet.ShouldProcess($Name)) {
-            $uri = Get-TSRequestUri -Endpoint Group
-            if ($BackgroundTask) {
-                $uri += "?asJob=true"
-            }
             $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
             return $response.tsResponse.group
         }
@@ -768,7 +768,7 @@ function Update-TSGroup {
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_group = $tsRequest.AppendChild($xml.CreateElement("group"))
     $el_group.SetAttribute("name", $Name)
-    if ($DomainName) { # Importing a group from Active Directory
+    if ($DomainName) { # Updating an Active Directory group
         $el_import = $el_group.AppendChild($xml.CreateElement("import"))
         $el_import.SetAttribute("source", "ActiveDirectory")
         $el_import.SetAttribute("domainName", $DomainName)
@@ -776,17 +776,17 @@ function Update-TSGroup {
             $el_import.SetAttribute("grantLicenseMode", $GrantLicenseMode)
             $el_import.SetAttribute("siteRole", $MinimumSiteRole)
         }
-    } else { # Creating a local group
+    } else { # Updating a local group
         if ($MinimumSiteRole) {
             $el_group.SetAttribute("minimumSiteRole", $MinimumSiteRole)
         }
     }
+    $uri = Get-TSRequestUri -Endpoint Group -Param $GroupId
+    if ($BackgroundTask) {
+        $uri += "?asJob=true"
+    }
     try {
-        if ($PSCmdlet.ShouldProcess($UserId)) {
-            $uri = Get-TSRequestUri -Endpoint Group -Param $GroupId
-            if ($BackgroundTask) {
-                $uri += "?asJob=true"
-            }
+        if ($PSCmdlet.ShouldProcess($GroupId)) {
             $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
             return $response.tsResponse.group
         }
@@ -1256,9 +1256,9 @@ function Update-TSWorkbook {
             $el_dataaccel.SetAttribute("accelerateNow", "true")
         }
     }
+    $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId
     try {
         if ($PSCmdlet.ShouldProcess($WorkbookId)) {
-            $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId
             $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
             return $response.tsResponse.workbook
         }
@@ -1303,9 +1303,9 @@ function Update-TSWorkbookConnection {
     if ($QueryTagging) {
         $el_connection.SetAttribute("queryTaggingEnabled", "true")
     }
+    $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/connections/$ConnectionId
     try {
         if ($PSCmdlet.ShouldProcess($ConnectionId)) {
-            $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/connections/$ConnectionId
             $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
             return $response.tsResponse.connection
         }
@@ -1412,9 +1412,9 @@ function Update-TSWorkbookNow {
     Assert-TSRestApiVersion -AtLeast 2.8
     $xml = New-Object System.Xml.XmlDocument
     $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/refresh
     try {
         if ($PSCmdlet.ShouldProcess($WorkbookId)) {
-            $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/refresh
             $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
             return $response.tsResponse.job
         }
@@ -1708,9 +1708,9 @@ function Update-TSDatasource {
         $el_askdata = $el_datasource.AppendChild($xml.CreateElement("askData"))
         $el_askdata.SetAttribute("enablement", "true")
     }
+    $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId
     try {
         if ($PSCmdlet.ShouldProcess($DatasourceId)) {
-            $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId
             $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
             return $response.tsResponse.datasource
         }
@@ -1755,9 +1755,9 @@ function Update-TSDatasourceConnection {
     if ($QueryTagging) {
         $el_connection.SetAttribute("queryTaggingEnabled", "true")
     }
+    $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/connections/$ConnectionId
     try {
         if ($PSCmdlet.ShouldProcess($ConnectionId)) {
-            $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/connections/$ConnectionId
             $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
             return $response.tsResponse.connection
         }
@@ -1799,9 +1799,9 @@ function Update-TSDatasourceNow {
     Assert-TSRestApiVersion -AtLeast 2.8
     $xml = New-Object System.Xml.XmlDocument
     $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/refresh
     try {
         if ($PSCmdlet.ShouldProcess($DatasourceId)) {
-            $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/refresh
             $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
             return $response.tsResponse.job
         }
@@ -1822,9 +1822,11 @@ function Get-TSView {
         [Parameter()][string[]] $Fields,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
+    if ($ViewId) { # Get View
+        Assert-TSRestApiVersion -AtLeast 3.0
+    }
     try {
         if ($ViewId) { # Get View
-            Assert-TSRestApiVersion -AtLeast 3.0
             $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint View -Param $ViewId) -Method Get -Headers (Get-TSRequestHeaderDict)
             $response.tsResponse.view
         } elseif ($WorkbookId) { # Query Views for Workbook
@@ -1977,8 +1979,8 @@ function Get-TSViewRecommendation {
     [OutputType([PSCustomObject[]])]
     Param()
     Assert-TSRestApiVersion -AtLeast 3.7
+    $uri = Get-TSRequestUri -Endpoint Recommendation -Param "?type=view"
     try {
-        $uri = Get-TSRequestUri -Endpoint Recommendation -Param "?type=view"
         $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
         $response.tsResponse.recommendations.recommendation
     } catch {
@@ -2091,8 +2093,8 @@ function Set-TSCustomViewAsUserDefault {
         $el_user = $el_users.AppendChild($xml.CreateElement("user"))
         $el_user.SetAttribute("id", $id)
     }
+    $uri = Get-TSRequestUri -Endpoint CustomView -Param "default/users"
     try {
-        $uri = Get-TSRequestUri -Endpoint CustomView -Param "default/users"
         $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
         $response.tsResponse.customViewAsUserDefaultResults.customViewAsUserDefaultViewResult
     } catch {
@@ -2453,9 +2455,9 @@ function Update-TSFlowConnection {
     if ($EmbedPassword) {
         $el_connection.SetAttribute("embedPassword", "true")
     }
+    $uri = Get-TSRequestUri -Endpoint Flow -Param $FlowId/connections/$ConnectionId
     try {
         if ($PSCmdlet.ShouldProcess($ConnectionId)) {
-            $uri = Get-TSRequestUri -Endpoint Flow -Param $FlowId/connections/$ConnectionId
             $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
             return $response.tsResponse.connection
         }
@@ -2509,9 +2511,9 @@ function Start-TSFlowNow {
             $el_param.SetAttribute("overrideValue", $_.Value)
         }
     }
+    $uri = Get-TSRequestUri -Endpoint Flow -Param $FlowId/run
     try {
         if ($PSCmdlet.ShouldProcess($FlowId)) {
-            $uri = Get-TSRequestUri -Endpoint Flow -Param $FlowId/run
             $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
             return $response.tsResponse.job
         }
@@ -2591,8 +2593,8 @@ function Get-TSUserFavorite {
         [Parameter(Mandatory)][string] $UserId,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
+    Assert-TSRestApiVersion -AtLeast 2.5
     try {
-        Assert-TSRestApiVersion -AtLeast 2.5
         $pageNumber = 0
         do {
             $pageNumber += 1
@@ -2622,63 +2624,69 @@ function Add-TSUserFavorite {
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_favorite = $tsRequest.AppendChild($xml.CreateElement("favorite"))
+    if ($WorkbookId) {
+        # Assert-TSRestApiVersion -AtLeast 2.0
+        $el_favorite.AppendChild($xml.CreateElement("workbook")).SetAttribute("id", $WorkbookId)
+        if ($Label) {
+            $el_favorite.SetAttribute("label", $Label)
+        } else {
+            $el_favorite.SetAttribute("label", $WorkbookId)
+        }
+    } elseif ($DatasourceId) {
+        # Assert-TSRestApiVersion -AtLeast 2.3
+        $el_favorite.AppendChild($xml.CreateElement("datasource")).SetAttribute("id", $DatasourceId)
+        if ($Label) {
+            $el_favorite.SetAttribute("label", $Label)
+        } else {
+            $el_favorite.SetAttribute("label", $DatasourceId)
+        }
+    } elseif ($ViewId) {
+        # Assert-TSRestApiVersion -AtLeast 2.0
+        $el_favorite.AppendChild($xml.CreateElement("view")).SetAttribute("id", $ViewId)
+        if ($Label) {
+            $el_favorite.SetAttribute("label", $Label)
+        } else {
+            $el_favorite.SetAttribute("label", $ViewId)
+        }
+    } elseif ($ProjectId) {
+        Assert-TSRestApiVersion -AtLeast 3.1
+        $el_favorite.AppendChild($xml.CreateElement("project")).SetAttribute("id", $ProjectId)
+        if ($Label) {
+            $el_favorite.SetAttribute("label", $Label)
+        } else {
+            $el_favorite.SetAttribute("label", $ProjectId)
+        }
+    } elseif ($FlowId) {
+        Assert-TSRestApiVersion -AtLeast 3.3
+        $el_favorite.AppendChild($xml.CreateElement("flow")).SetAttribute("id", $FlowId)
+        if ($Label) {
+            $el_favorite.SetAttribute("label", $Label)
+        } else {
+            $el_favorite.SetAttribute("label", $FlowId)
+        }
+    }
     try {
         if ($WorkbookId) {
-            # Assert-TSRestApiVersion -AtLeast 2.0
-            $el_favorite.AppendChild($xml.CreateElement("workbook")).SetAttribute("id", $WorkbookId)
-            if ($Label) {
-                $el_favorite.SetAttribute("label", $Label)
-            } else {
-                $el_favorite.SetAttribute("label", $WorkbookId)
-            }
             if ($PSCmdlet.ShouldProcess("user:$UserId, workbook:$WorkbookId")) {
                 $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Favorite -Param $UserId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
                 return $response.tsResponse.favorites.favorite
             }
         } elseif ($DatasourceId) {
-            # Assert-TSRestApiVersion -AtLeast 2.3
-            $el_favorite.AppendChild($xml.CreateElement("datasource")).SetAttribute("id", $DatasourceId)
-            if ($Label) {
-                $el_favorite.SetAttribute("label", $Label)
-            } else {
-                $el_favorite.SetAttribute("label", $DatasourceId)
-            }
             if ($PSCmdlet.ShouldProcess("user:$UserId, datasource:$DatasourceId")) {
                 $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Favorite -Param $UserId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
                 return $response.tsResponse.favorites.favorite
             }
         } elseif ($ViewId) {
-            # Assert-TSRestApiVersion -AtLeast 2.0
-            $el_favorite.AppendChild($xml.CreateElement("view")).SetAttribute("id", $ViewId)
-            if ($Label) {
-                $el_favorite.SetAttribute("label", $Label)
-            } else {
-                $el_favorite.SetAttribute("label", $ViewId)
-            }
             if ($PSCmdlet.ShouldProcess("user:$UserId, view:$ViewId")) {
                 $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Favorite -Param $UserId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
                 return $response.tsResponse.favorites.favorite
             }
         } elseif ($ProjectId) {
-            Assert-TSRestApiVersion -AtLeast 3.1
-            $el_favorite.AppendChild($xml.CreateElement("project")).SetAttribute("id", $ProjectId)
-            if ($Label) {
-                $el_favorite.SetAttribute("label", $Label)
-            } else {
-                $el_favorite.SetAttribute("label", $ProjectId)
-            }
             if ($PSCmdlet.ShouldProcess("user:$UserId, project:$ProjectId")) {
                 $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Favorite -Param $UserId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
                 return $response.tsResponse.favorites.favorite
             }
         } elseif ($FlowId) {
-            Assert-TSRestApiVersion -AtLeast 3.3
-            $el_favorite.AppendChild($xml.CreateElement("flow")).SetAttribute("id", $FlowId)
-            if ($Label) {
-                $el_favorite.SetAttribute("label", $Label)
-            } else {
-                $el_favorite.SetAttribute("label", $FlowId)
-            }
             if ($PSCmdlet.ShouldProcess("user:$UserId, flow:$FlowId")) {
                 $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Favorite -Param $UserId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
                 return $response.tsResponse.favorites.favorite
@@ -2700,34 +2708,40 @@ function Remove-TSUserFavorite {
         [Parameter(Mandatory,ParameterSetName='Project')][string] $ProjectId,
         [Parameter(Mandatory,ParameterSetName='Flow')][string] $FlowId
     )
+    if ($WorkbookId) {
+        # Assert-TSRestApiVersion -AtLeast 2.0
+        $uri = Get-TSRequestUri -Endpoint Favorite -Param $UserId/workbooks/$WorkbookId
+    } elseif ($DatasourceId) {
+        # Assert-TSRestApiVersion -AtLeast 2.3
+        $uri = Get-TSRequestUri -Endpoint Favorite -Param $UserId/datasources/$DatasourceId
+    } elseif ($ViewId) {
+        # Assert-TSRestApiVersion -AtLeast 2.0
+        $uri = Get-TSRequestUri -Endpoint Favorite -Param $UserId/views/$ViewId
+    } elseif ($ProjectId) {
+        Assert-TSRestApiVersion -AtLeast 3.1
+        $uri = Get-TSRequestUri -Endpoint Favorite -Param $UserId/projects/$ProjectId
+    } elseif ($FlowId) {
+        Assert-TSRestApiVersion -AtLeast 3.3
+        $uri = Get-TSRequestUri -Endpoint Favorite -Param $UserId/flows/$FlowId
+    }
     try {
         if ($WorkbookId) {
-            # Assert-TSRestApiVersion -AtLeast 2.0
-            $uri = Get-TSRequestUri -Endpoint Favorite -Param $UserId/workbooks/$WorkbookId
             if ($PSCmdlet.ShouldProcess("user:$UserId, workbook:$WorkbookId")) {
                 Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
             }
         } elseif ($DatasourceId) {
-            # Assert-TSRestApiVersion -AtLeast 2.3
-            $uri = Get-TSRequestUri -Endpoint Favorite -Param $UserId/datasources/$DatasourceId
             if ($PSCmdlet.ShouldProcess("user:$UserId, datasource:$DatasourceId")) {
                 Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
             }
         } elseif ($ViewId) {
-            # Assert-TSRestApiVersion -AtLeast 2.0
-            $uri = Get-TSRequestUri -Endpoint Favorite -Param $UserId/views/$ViewId
             if ($PSCmdlet.ShouldProcess("user:$UserId, view:$ViewId")) {
                 Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
             }
         } elseif ($ProjectId) {
-            Assert-TSRestApiVersion -AtLeast 3.1
-            $uri = Get-TSRequestUri -Endpoint Favorite -Param $UserId/projects/$ProjectId
             if ($PSCmdlet.ShouldProcess("user:$UserId, project:$ProjectId")) {
                 Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
             }
         } elseif ($FlowId) {
-            Assert-TSRestApiVersion -AtLeast 3.3
-            $uri = Get-TSRequestUri -Endpoint Favorite -Param $UserId/flows/$FlowId
             if ($PSCmdlet.ShouldProcess("user:$UserId, flow:$FlowId")) {
                 Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
             }

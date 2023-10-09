@@ -700,6 +700,10 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             }
             It "Get custom views on <ConfigFile.server>" -Skip {
             }
+            It "Update custom view on <ConfigFile.server>" -Skip {
+            }
+            It "Remove custom view on <ConfigFile.server>" -Skip {
+            }
         }
         Context "Flow operations" -Tag Flow {
             Context "Get, publish, download sample flow on <ConfigFile.server>" {
