@@ -709,15 +709,53 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     {Remove-TSTagFromContent -DatasourceId $sampleDatasourceId -Tag "active"} | Should -Not -Throw
                     (Get-TSDatasource -DatasourceId $sampleDatasourceId).tags | Should -BeNullOrEmpty
                 }
-                It "Query/remove/add datasource permissions on <ConfigFile.server>" {
+                It "Query/remove/add/set datasource permissions on <ConfigFile.server>" {
                     $permissions = Get-TSContentPermission -DatasourceId $sampleDatasourceId
                     $permissions.datasource.id | Should -Be $sampleDatasourceId
                     $permissions.datasource.name | Should -Be $sampleDatasourceName
+                    $savedPermissionTable = $permissions | ConvertTo-TSPermissionTable
+                    # remove all permissions for all grantees
+                    {Remove-TSContentPermission -DatasourceId $sampleDatasourceId -All} | Should -Not -Throw
+                    $permissions = Get-TSContentPermission -DatasourceId $sampleDatasourceId
+                    $permissions.granteeCapabilities | Should -BeNullOrEmpty
+                    # add all possible permissions (random Allow/Deny) for the current user
+                    $possibleCap = 'ChangePermissions','Connect','Delete','ExportXml','Read','Write','SaveAs'
+                    $allPermissionTable = @()
+                    $capabilitiesHashtable = @{}
+                    foreach ($cap in $possibleCap) {
+                        $capabilitiesHashtable.Add($cap, (Get-Random -InputObject 'Allow','Deny'))
+                    }
+                    $allPermissionTable += @{granteeType="User";granteeId=(Get-TSCurrentUserId);capabilities=$capabilitiesHashtable}
+                    $permissions = Add-TSContentPermission -DatasourceId $sampleDatasourceId -PermissionTable $allPermissionTable
+                    $permissions.datasource.id | Should -Be $sampleDatasourceId
+                    $permissions.datasource.name | Should -Be $sampleDatasourceName
+                    $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
+                    ($permissions.granteeCapabilities.capabilities.capability | Measure-Object).Count | Should -Be $possibleCap.Length
+                    # set all possible permissions to Allow for the current user
+                    $allPermissionTable = @()
+                    $capabilitiesHashtable = @{}
+                    foreach ($cap in $possibleCap) {
+                        $capabilitiesHashtable.Add($cap, "Allow")
+                    }
+                    $allPermissionTable += @{granteeType="User";granteeId=(Get-TSCurrentUserId);capabilities=$capabilitiesHashtable}
+                    $permissions = Set-TSContentPermission -DatasourceId $sampleDatasourceId -PermissionTable $allPermissionTable
+                    $permissions.datasource.id | Should -Be $sampleDatasourceId
+                    $permissions.datasource.name | Should -Be $sampleDatasourceName
+                    $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
+                    ($permissions.granteeCapabilities.capabilities.capability | Measure-Object).Count | Should -Be $possibleCap.Length
+                    # remove all permissions for the current user
+                    {Remove-TSContentPermission -DatasourceId $sampleDatasourceId -GranteeType User -GranteeId (Get-TSCurrentUserId)} | Should -Not -Throw
+                    $permissions = Get-TSContentPermission -DatasourceId $sampleDatasourceId
+                    $permissions.granteeCapabilities | Should -BeNullOrEmpty
+                    # add back initial permissions configuration
+                    $permissions = Add-TSContentPermission -DatasourceId $sampleDatasourceId -PermissionTable $savedPermissionTable
+                    ($permissions.granteeCapabilities | Measure-Object).Count | Should -Be $savedPermissionTable.Length
+                    # remove again each permission/capability one-by-one
                     $permissions.granteeCapabilities | ForEach-Object {
                         if ($_.group) {
                             $granteeType = 'Group'
                             $granteeId = $_.group.id
-                        } else {
+                        } elseif ($_.user) {
                             $granteeType = 'User'
                             $granteeId = $_.user.id
                         }
@@ -729,16 +767,6 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     }
                     $permissions = Get-TSContentPermission -DatasourceId $sampleDatasourceId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
-                    $permissionArray = @()
-                    $capabilitiesHashtable = @{}
-                    foreach ($cap in 'ChangePermissions','Connect','Delete','ExportXml','Filter','Read','Write','SaveAs') {
-                        $capabilitiesHashtable.Add($cap, (Get-Random -InputObject 'Allow','Deny'))
-                    }
-                    $permissionArray += @{type="User";id=(Get-TSCurrentUserId);capabilities=$capabilitiesHashtable}
-                    $permissions = Add-TSContentPermission -DatasourceId $sampleDatasourceId -Permissions $permissionArray
-                    $permissions.datasource.id | Should -Be $sampleDatasourceId
-                    $permissions.datasource.name | Should -Be $sampleDatasourceName
-                    $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
                 }
                 It "Publish datasource with connections on <ConfigFile.server>" -Skip {
                     Publish-TSDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/Datasource.txt" -ProjectId $samplesProjectId
