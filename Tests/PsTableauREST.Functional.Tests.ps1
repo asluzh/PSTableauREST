@@ -476,15 +476,53 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     {Remove-TSTagFromContent -WorkbookId $sampleWorkbookId -Tag "active"} | Should -Not -Throw
                     (Get-TSWorkbook -WorkbookId $sampleWorkbookId).tags | Should -BeNullOrEmpty
                 }
-                It "Query/remove/add workbook permissions on <ConfigFile.server>" {
+                It "Query/remove/add/set workbook permissions on <ConfigFile.server>" {
                     $permissions = Get-TSContentPermission -WorkbookId $sampleWorkbookId
                     $permissions.workbook.id | Should -Be $sampleWorkbookId
                     $permissions.workbook.name | Should -Be $sampleWorkbookName
+                    $savedPermissionTable = $permissions | ConvertTo-TSPermissionTable
+                    # remove all permissions for all grantees
+                    {Remove-TSContentPermission -WorkbookId $sampleWorkbookId -All} | Should -Not -Throw
+                    $permissions = Get-TSContentPermission -WorkbookId $sampleWorkbookId
+                    $permissions.granteeCapabilities | Should -BeNullOrEmpty
+                    # add all possible permissions (random Allow/Deny) for the current user
+                    $possibleCap = 'AddComment','ChangeHierarchy','ChangePermissions','CreateRefreshMetrics','Delete','ExportData','ExportImage','ExportXml','Filter','Read','RunExplainData','ShareView','ViewComments','ViewUnderlyingData','WebAuthoring','Write'
+                    $allPermissionTable = @()
+                    $capabilitiesHashtable = @{}
+                    foreach ($cap in $possibleCap) {
+                        $capabilitiesHashtable.Add($cap, (Get-Random -InputObject 'Allow','Deny'))
+                    }
+                    $allPermissionTable += @{granteeType="User";granteeId=(Get-TSCurrentUserId);capabilities=$capabilitiesHashtable}
+                    $permissions = Add-TSContentPermission -WorkbookId $sampleWorkbookId -PermissionTable $allPermissionTable
+                    $permissions.workbook.id | Should -Be $sampleWorkbookId
+                    $permissions.workbook.name | Should -Be $sampleWorkbookName
+                    $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
+                    ($permissions.granteeCapabilities.capabilities.capability | Measure-Object).Count | Should -Be $possibleCap.Length
+                    # set all possible permissions to Allow for the current user
+                    $allPermissionTable = @()
+                    $capabilitiesHashtable = @{}
+                    foreach ($cap in $possibleCap) {
+                        $capabilitiesHashtable.Add($cap, "Allow")
+                    }
+                    $allPermissionTable += @{granteeType="User";granteeId=(Get-TSCurrentUserId);capabilities=$capabilitiesHashtable}
+                    $permissions = Set-TSContentPermission -WorkbookId $sampleWorkbookId -PermissionTable $allPermissionTable
+                    $permissions.workbook.id | Should -Be $sampleWorkbookId
+                    $permissions.workbook.name | Should -Be $sampleWorkbookName
+                    $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
+                    ($permissions.granteeCapabilities.capabilities.capability | Measure-Object).Count | Should -Be $possibleCap.Length
+                    # remove all permissions for the current user
+                    {Remove-TSContentPermission -WorkbookId $sampleWorkbookId -GranteeType User -GranteeId (Get-TSCurrentUserId)} | Should -Not -Throw
+                    $permissions = Get-TSContentPermission -WorkbookId $sampleWorkbookId
+                    $permissions.granteeCapabilities | Should -BeNullOrEmpty
+                    # add back initial permissions configuration
+                    $permissions = Add-TSContentPermission -WorkbookId $sampleWorkbookId -PermissionTable $savedPermissionTable
+                    ($permissions.granteeCapabilities | Measure-Object).Count | Should -Be $savedPermissionTable.Length
+                    # remove again each permission/capability one-by-one
                     $permissions.granteeCapabilities | ForEach-Object {
                         if ($_.group) {
                             $granteeType = 'Group'
                             $granteeId = $_.group.id
-                        } else {
+                        } elseif ($_.user) {
                             $granteeType = 'User'
                             $granteeId = $_.user.id
                         }
@@ -496,16 +534,6 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     }
                     $permissions = Get-TSContentPermission -WorkbookId $sampleWorkbookId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
-                    $permissionArray = @()
-                    $capabilitiesHashtable = @{}
-                    foreach ($cap in 'AddComment','ChangeHierarchy','ChangePermissions','CreateRefreshMetrics','Delete','ExportData','ExportImage','ExportXml','Filter','Read','RunExplainData','ShareView','ViewComments','ViewUnderlyingData','WebAuthoring','Write') {
-                        $capabilitiesHashtable.Add($cap, (Get-Random -InputObject 'Allow','Deny'))
-                    }
-                    $permissionArray += @{type="User";id=(Get-TSCurrentUserId);capabilities=$capabilitiesHashtable}
-                    $permissions = Add-TSContentPermission -WorkbookId $sampleWorkbookId -Permissions $permissionArray
-                    $permissions.workbook.id | Should -Be $sampleWorkbookId
-                    $permissions.workbook.name | Should -Be $sampleWorkbookName
-                    $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
                 }
                 It "Publish workbook with invalid extension on <ConfigFile.server>" {
                     {Publish-TSWorkbook -Name "Workbook" -InFile "Tests/Assets/Misc/Workbook.txt" -ProjectId $samplesProjectId} | Should -Throw
@@ -929,7 +957,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     {Remove-TSTagFromContent -FlowId $sampleFlowId -Tag "active"} | Should -Not -Throw
                     (Get-TSFlow -FlowId $sampleFlowId).tags | Should -BeNullOrEmpty
                 }
-                It "Query/remove/add flow permissions on <ConfigFile.server>" {
+                It "Query/remove/add/set flow permissions on <ConfigFile.server>" {
                     $permissions = Get-TSContentPermission -FlowId $sampleFlowId
                     $permissions.flow.id | Should -Be $sampleFlowId
                     $permissions.flow.name | Should -Be $sampleFlowName
