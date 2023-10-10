@@ -2641,7 +2641,7 @@ function Add-TSContentPermission {
         [Parameter(Mandatory,ParameterSetName='View')][string] $ViewId,
         [Parameter(Mandatory,ParameterSetName='Project')][string] $ProjectId,
         [Parameter(Mandatory,ParameterSetName='Flow')][string] $FlowId,
-        [Parameter(Mandatory)][hashtable[]] $Permissions
+        [Parameter(Mandatory)][hashtable[]] $PermissionTable
     )
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -2672,18 +2672,20 @@ function Add-TSContentPermission {
         $el_pm.AppendChild($xml.CreateElement("flow")).SetAttribute("id", $FlowId)
         $shouldProcessItem = "flow:$FlowId"
     }
-    $shouldProcessItem += ", " + $GranteeType +":" + $GranteeId + ", $CapabilityName" + ":" + $CapabilityMode
     $uri += "/permissions"
-    foreach ($permission in $Permissions) {
+    $permissionsCount = 0
+    foreach ($permission in $PermissionTable) {
         $el_gc = $el_pm.AppendChild($xml.CreateElement("granteeCapabilities"))
-        $el_gc.AppendChild($xml.CreateElement($permission["type"].ToLower())).SetAttribute("id", $permission["id"])
+        $el_gc.AppendChild($xml.CreateElement($permission["granteeType"].ToLower())).SetAttribute("id", $permission["granteeId"])
         $el_caps = $el_gc.AppendChild($xml.CreateElement("capabilities"))
+        $permissionsCount += $permission["capabilities"].Count
         $permission["capabilities"].GetEnumerator() | ForEach-Object {
             $el_cap = $el_caps.AppendChild($xml.CreateElement("capability"))
             $el_cap.SetAttribute("name", $_.Key)
             $el_cap.SetAttribute("mode", $_.Value)
         }
     }
+    $shouldProcessItem += ", grantees:{0}, permissions:{1}" -f $PermissionTable.Length,$permissionsCount
     try {
         if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
             $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
@@ -2694,7 +2696,7 @@ function Add-TSContentPermission {
     }
 }
 
-function Remove-TSContentPermission {
+function Set-TSContentPermission {
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType([PSCustomObject])]
     Param(
@@ -2703,43 +2705,227 @@ function Remove-TSContentPermission {
         [Parameter(Mandatory,ParameterSetName='View')][string] $ViewId,
         [Parameter(Mandatory,ParameterSetName='Project')][string] $ProjectId,
         [Parameter(Mandatory,ParameterSetName='Flow')][string] $FlowId,
-        [Parameter(Mandatory)][ValidateSet('User','Group')][string] $GranteeType,
-        [Parameter(Mandatory)][string] $GranteeId,
-        [Parameter(Mandatory)][ValidateSet('AddComment','ChangeHierarchy','ChangePermissions','Connect','Delete','Execute',
-            'ExportData','ExportImage','ExportXml','Filter','ProjectLeader','Read','ShareView','ViewComments','ViewUnderlyingData',
-            'WebAuthoring','Write','RunExplainData','CreateRefreshMetrics','SaveAs')][string] $CapabilityName,
-        [Parameter(Mandatory)][ValidateSet('Allow','Deny')][string] $CapabilityMode
+        [Parameter(Mandatory)][hashtable[]] $PermissionTable
     )
+    $MainParam = @{}
     if ($WorkbookId) {
         # Assert-TSRestApiVersion -AtLeast 2.0
-        $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId
         $shouldProcessItem = "workbook:$WorkbookId"
+        $MainParam.Add("WorkbookId", $WorkbookId)
     } elseif ($DatasourceId) {
         # Assert-TSRestApiVersion -AtLeast 2.0
-        $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId
         $shouldProcessItem = "datasource:$DatasourceId"
+        $MainParam.Add("DatasourceId", $DatasourceId)
     } elseif ($ViewId) {
         Assert-TSRestApiVersion -AtLeast 3.2
-        $uri = Get-TSRequestUri -Endpoint View -Param $ViewId
         $shouldProcessItem = "view:$ViewId"
+        $MainParam.Add("ViewId", $ViewId)
     } elseif ($ProjectId) {
         # Assert-TSRestApiVersion -AtLeast 2.0
-        $uri = Get-TSRequestUri -Endpoint Project -Param $ProjectId
         $shouldProcessItem = "project:$ProjectId"
+        $MainParam.Add("ProjectId", $ProjectId)
     } elseif ($FlowId) {
         Assert-TSRestApiVersion -AtLeast 3.3
-        $uri = Get-TSRequestUri -Endpoint Flow -Param $FlowId
         $shouldProcessItem = "flow:$FlowId"
+        $MainParam.Add("FlowId", $FlowId)
     }
-    $shouldProcessItem += ", " + $GranteeType +":" + $GranteeId + ", $CapabilityName" + ":" + $CapabilityMode
-    $uri += "/permissions/" + $GranteeType.ToLower() + "s/$GranteeId/$CapabilityName/$CapabilityMode"
+    $permissionsCount = 0
+    $permissionOverrides = @()
+    $currentPermissionTable = Get-TSContentPermission @MainParam | ConvertTo-TSPermissionTable
+    foreach ($permission in $PermissionTable) {
+        $permissionsCount += $permission["capabilities"].Count
+        $currentPermissionTable | Where-Object -FilterScript {($_.granteeType -eq $permission["granteeType"]) -and ($_.granteeId -eq $permission["granteeId"])} | ForEach-Object {
+            $currentCapabilities = $_.capabilities
+            $currentCapabilities.GetEnumerator() | ForEach-Object {
+                $capabilityName = $_.Key
+                $capabilityMode = $_.Value
+                if ($permission["capabilities"].ContainsKey($capabilityName) -and $capabilityMode -ne $permission["capabilities"][$capabilityName]) {
+                    $permissionOverrides += @{granteeType=$permission["granteeType"];granteeId=$permission["granteeId"];capabilityName=$capabilityName;capabilityMode=$capabilityMode}
+                }
+            }
+        }
+    }
+    $shouldProcessItem += ", grantees:{0}, permissions:{1}, overrides:{2}" -f $PermissionTable.Length,$permissionsCount,$permissionOverrides.Length
     try {
         if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-            Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
+            $permissionOverrides | ForEach-Object { # remove all incompatible permissions (overrides)
+                Remove-TSContentPermission @MainParam -GranteeType $_.granteeType -GranteeId $_.granteeId -CapabilityName $_.capabilityName -CapabilityMode $_.capabilityMode
+            }
+            Add-TSContentPermission @MainParam -PermissionTable $PermissionTable
         }
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
+}
+
+function Remove-TSContentPermission {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory,ParameterSetName='WorkbookAll')]
+        [Parameter(Mandatory,ParameterSetName='WorkbookAllGrantee')]
+        [Parameter(Mandatory,ParameterSetName='WorkbookOne')]
+        [string] $WorkbookId,
+        [Parameter(Mandatory,ParameterSetName='DatasourceAll')]
+        [Parameter(Mandatory,ParameterSetName='DatasourceAllGrantee')]
+        [Parameter(Mandatory,ParameterSetName='DatasourceOne')]
+        [string] $DatasourceId,
+        [Parameter(Mandatory,ParameterSetName='ViewAll')]
+        [Parameter(Mandatory,ParameterSetName='ViewAllGrantee')]
+        [Parameter(Mandatory,ParameterSetName='ViewOne')]
+        [string] $ViewId,
+        [Parameter(Mandatory,ParameterSetName='ProjectAll')]
+        [Parameter(Mandatory,ParameterSetName='ProjectAllGrantee')]
+        [Parameter(Mandatory,ParameterSetName='ProjectOne')]
+        [string] $ProjectId,
+        [Parameter(Mandatory,ParameterSetName='FlowAll')]
+        [Parameter(Mandatory,ParameterSetName='FlowAllGrantee')]
+        [Parameter(Mandatory,ParameterSetName='FlowOne')]
+        [string] $FlowId,
+        [Parameter(Mandatory,ParameterSetName='WorkbookAllGrantee')]
+        [Parameter(Mandatory,ParameterSetName='WorkbookOne')]
+        [Parameter(Mandatory,ParameterSetName='DatasourceAllGrantee')]
+        [Parameter(Mandatory,ParameterSetName='DatasourceOne')]
+        [Parameter(Mandatory,ParameterSetName='ViewAllGrantee')]
+        [Parameter(Mandatory,ParameterSetName='ViewOne')]
+        [Parameter(Mandatory,ParameterSetName='ProjectAllGrantee')]
+        [Parameter(Mandatory,ParameterSetName='ProjectOne')]
+        [Parameter(Mandatory,ParameterSetName='FlowAllGrantee')]
+        [Parameter(Mandatory,ParameterSetName='FlowOne')]
+        [ValidateSet('User','Group')][string] $GranteeType,
+        [Parameter(Mandatory,ParameterSetName='WorkbookAllGrantee')]
+        [Parameter(Mandatory,ParameterSetName='WorkbookOne')]
+        [Parameter(Mandatory,ParameterSetName='DatasourceAllGrantee')]
+        [Parameter(Mandatory,ParameterSetName='DatasourceOne')]
+        [Parameter(Mandatory,ParameterSetName='ViewAllGrantee')]
+        [Parameter(Mandatory,ParameterSetName='ViewOne')]
+        [Parameter(Mandatory,ParameterSetName='ProjectAllGrantee')]
+        [Parameter(Mandatory,ParameterSetName='ProjectOne')]
+        [Parameter(Mandatory,ParameterSetName='FlowAllGrantee')]
+        [Parameter(Mandatory,ParameterSetName='FlowOne')]
+        [string] $GranteeId,
+        [Parameter(Mandatory,ParameterSetName='WorkbookOne')]
+        [Parameter(Mandatory,ParameterSetName='DatasourceOne')]
+        [Parameter(Mandatory,ParameterSetName='ViewOne')]
+        [Parameter(Mandatory,ParameterSetName='ProjectOne')]
+        [Parameter(Mandatory,ParameterSetName='FlowOne')]
+        [ValidateSet('AddComment','ChangeHierarchy','ChangePermissions','Connect','Delete','Execute',
+            'ExportData','ExportImage','ExportXml','Filter','ProjectLeader','Read','ShareView','ViewComments','ViewUnderlyingData',
+            'WebAuthoring','Write','RunExplainData','CreateRefreshMetrics','SaveAs')][string] $CapabilityName,
+        [Parameter(Mandatory,ParameterSetName='WorkbookOne')]
+        [Parameter(Mandatory,ParameterSetName='DatasourceOne')]
+        [Parameter(Mandatory,ParameterSetName='ViewOne')]
+        [Parameter(Mandatory,ParameterSetName='ProjectOne')]
+        [Parameter(Mandatory,ParameterSetName='FlowOne')]
+        [ValidateSet('Allow','Deny')][string] $CapabilityMode,
+        [Parameter(Mandatory,ParameterSetName='WorkbookAll')]
+        [Parameter(Mandatory,ParameterSetName='DatasourceAll')]
+        [Parameter(Mandatory,ParameterSetName='ViewAll')]
+        [Parameter(Mandatory,ParameterSetName='ProjectAll')]
+        [Parameter(Mandatory,ParameterSetName='FlowAll')]
+        [switch] $All # explicit switch parameter to remove all permissions
+    )
+    $MainParam = @{}
+    if ($WorkbookId) {
+        # Assert-TSRestApiVersion -AtLeast 2.0
+        $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId
+        $shouldProcessItem = "workbook:$WorkbookId"
+        $MainParam.Add("WorkbookId", $WorkbookId)
+    } elseif ($DatasourceId) {
+        # Assert-TSRestApiVersion -AtLeast 2.0
+        $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId
+        $shouldProcessItem = "datasource:$DatasourceId"
+        $MainParam.Add("DatasourceId", $DatasourceId)
+    } elseif ($ViewId) {
+        Assert-TSRestApiVersion -AtLeast 3.2
+        $uri = Get-TSRequestUri -Endpoint View -Param $ViewId
+        $shouldProcessItem = "view:$ViewId"
+        $MainParam.Add("ViewId", $ViewId)
+    } elseif ($ProjectId) {
+        # Assert-TSRestApiVersion -AtLeast 2.0
+        $uri = Get-TSRequestUri -Endpoint Project -Param $ProjectId
+        $shouldProcessItem = "project:$ProjectId"
+        $MainParam.Add("ProjectId", $ProjectId)
+    } elseif ($FlowId) {
+        Assert-TSRestApiVersion -AtLeast 3.3
+        $uri = Get-TSRequestUri -Endpoint Flow -Param $FlowId
+        $shouldProcessItem = "flow:$FlowId"
+        $MainParam.Add("FlowId", $FlowId)
+    }
+    $uri += "/permissions/"
+    try {
+        if ($CapabilityName -and $CapabilityMode) { # Remove one permission/capability
+            $shouldProcessItem += ", " + $GranteeType +":" + $GranteeId + ", $CapabilityName" + ":" + $CapabilityMode
+            $uri += $GranteeType.ToLower() + "s/$GranteeId/$CapabilityName/$CapabilityMode"
+            if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
+                Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
+            }
+        } elseif ($GranteeType -and $GranteeId) { # Remove all permissions for one grantee
+            $shouldProcessItem += ", all permissions for " + $GranteeType +":" + $GranteeId
+            if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
+                $permissions = Get-TSContentPermission @MainParam
+                $permissions.granteeCapabilities | ForEach-Object {
+                    if (($GranteeType -eq 'Group' -and $_.group -and $_.group.id -eq $GranteeId) -or ($GranteeType -eq 'User' -and $_.user -and $_.user.id -eq $GranteeId)) {
+                        $_.capabilities.capability | ForEach-Object {
+                            $uriAdd = $GranteeType.ToLower() + "s/$GranteeId/" + $_.name + "/" + $_.mode
+                            Invoke-RestMethod -Uri "$uri$uriAdd" -Method Delete -Headers (Get-TSRequestHeaderDict)
+                        }
+                    }
+                }
+            }
+        } elseif ($All) { # Remove all permissions for all grantees
+            $shouldProcessItem += ", ALL PERMISSIONS"
+            if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
+                $permissions = Get-TSContentPermission @MainParam
+                $permissions.granteeCapabilities | ForEach-Object {
+                    if ($_.group) {
+                        $grtType = 'group'
+                        $grtId = $_.group.id
+                    } elseif ($_.user) {
+                        $grtType = 'user'
+                        $grtId = $_.user.id
+                    }
+                    $_.capabilities.capability | ForEach-Object {
+                        $uriAdd = $grtType + "s/$grtId/" + $_.name + "/" + $_.mode
+                        Invoke-RestMethod -Uri "$uri$uriAdd" -Method Delete -Headers (Get-TSRequestHeaderDict)
+                    }
+                }
+            }
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function ConvertTo-TSPermissionTable {
+    [OutputType([hashtable[]])]
+    Param(
+        [Parameter(Mandatory,Position=0,ValueFromPipeline)][System.Xml.XmlElement] $Permissions
+    )
+    $permissionTable = @()
+    if ($Permissions.granteeCapabilities) {
+        $Permissions.granteeCapabilities | ForEach-Object {
+            if ($_.group -and $_.group.id) {
+                $granteeType = 'group'
+                $granteeId = $_.group.id
+            } elseif ($_.user -and $_.user.id) {
+                $granteeType = 'user'
+                $granteeId = $_.user.id
+            } else {
+                Write-Error -Message "Invalid grantee in the input object" -Exception -Category InvalidArgument
+            }
+            $capabilitiesHashtable = @{}
+            $_.capabilities.capability | ForEach-Object {
+                if ($_.name -and $_.mode) {
+                    $capabilitiesHashtable.Add($_.name, $_.mode)
+                } else {
+                    Write-Error -Message "Invalid permission capability in the input object" -Exception -Category InvalidArgument
+                }
+            }
+            $permissionTable += @{granteeType=$granteeType;granteeId=$granteeId;capabilities=$capabilitiesHashtable}
+        }
+    }
+    return $permissionTable
 }
 
 ### Tags methods
@@ -3254,11 +3440,14 @@ Export-ModuleMember -Function Start-TSFlowNow
 
 ### Permissions methods
 Export-ModuleMember -Function Get-TSDefaultPermission
+Export-ModuleMember -Function Set-TSDefaultPermission
 Export-ModuleMember -Function Add-TSDefaultPermission
 Export-ModuleMember -Function Remove-TSDefaultPermission
 Export-ModuleMember -Function Get-TSContentPermission
+Export-ModuleMember -Function Set-TSContentPermission
 Export-ModuleMember -Function Add-TSContentPermission
 Export-ModuleMember -Function Remove-TSContentPermission
+Export-ModuleMember -Function ConvertTo-TSPermissionTable
 # Query Default Permissions
 # Query Workbook Permissions
 # Query View Permissions
