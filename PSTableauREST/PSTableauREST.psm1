@@ -2597,6 +2597,151 @@ function Start-TSFlowNow {
     }
 }
 
+### Permissions methods
+function Get-TSContentPermission {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter(Mandatory,ParameterSetName='Workbook')][string] $WorkbookId,
+        [Parameter(Mandatory,ParameterSetName='Datasource')][string] $DatasourceId,
+        [Parameter(Mandatory,ParameterSetName='View')][string] $ViewId,
+        [Parameter(Mandatory,ParameterSetName='Project')][string] $ProjectId,
+        [Parameter(Mandatory,ParameterSetName='Flow')][string] $FlowId
+    )
+    if ($WorkbookId) {
+        # Assert-TSRestApiVersion -AtLeast 2.0
+        $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId
+    } elseif ($DatasourceId) {
+        # Assert-TSRestApiVersion -AtLeast 2.0
+        $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId
+    } elseif ($ViewId) {
+        Assert-TSRestApiVersion -AtLeast 3.2
+        $uri = Get-TSRequestUri -Endpoint View -Param $ViewId
+    } elseif ($ProjectId) {
+        # Assert-TSRestApiVersion -AtLeast 2.0
+        $uri = Get-TSRequestUri -Endpoint Project -Param $ProjectId
+    } elseif ($FlowId) {
+        Assert-TSRestApiVersion -AtLeast 3.3
+        $uri = Get-TSRequestUri -Endpoint Flow -Param $FlowId
+    }
+    $uri += "/permissions"
+    try {
+        $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+        $response.tsResponse.permissions
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Add-TSContentPermission {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory,ParameterSetName='Workbook')][string] $WorkbookId,
+        [Parameter(Mandatory,ParameterSetName='Datasource')][string] $DatasourceId,
+        [Parameter(Mandatory,ParameterSetName='View')][string] $ViewId,
+        [Parameter(Mandatory,ParameterSetName='Project')][string] $ProjectId,
+        [Parameter(Mandatory,ParameterSetName='Flow')][string] $FlowId,
+        [Parameter(Mandatory)][hashtable[]] $Permissions
+    )
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_pm = $tsRequest.AppendChild($xml.CreateElement("permissions"))
+    if ($WorkbookId) {
+        # Assert-TSRestApiVersion -AtLeast 2.0
+        $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId
+        $el_pm.AppendChild($xml.CreateElement("workbook")).SetAttribute("id", $WorkbookId)
+        $shouldProcessItem = "workbook:$WorkbookId"
+    } elseif ($DatasourceId) {
+        # Assert-TSRestApiVersion -AtLeast 2.0
+        $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId
+        $el_pm.AppendChild($xml.CreateElement("datasource")).SetAttribute("id", $DatasourceId)
+        $shouldProcessItem = "datasource:$DatasourceId"
+    } elseif ($ViewId) {
+        Assert-TSRestApiVersion -AtLeast 3.2
+        $uri = Get-TSRequestUri -Endpoint View -Param $ViewId
+        $el_pm.AppendChild($xml.CreateElement("view")).SetAttribute("id", $ViewId)
+        $shouldProcessItem = "view:$ViewId"
+    } elseif ($ProjectId) {
+        # Assert-TSRestApiVersion -AtLeast 2.0
+        $uri = Get-TSRequestUri -Endpoint Project -Param $ProjectId
+        # $el_pm.AppendChild($xml.CreateElement("project")).SetAttribute("id", $ProjectId)
+        $shouldProcessItem = "project:$ProjectId"
+    } elseif ($FlowId) {
+        Assert-TSRestApiVersion -AtLeast 3.3
+        $uri = Get-TSRequestUri -Endpoint Flow -Param $FlowId
+        $el_pm.AppendChild($xml.CreateElement("flow")).SetAttribute("id", $FlowId)
+        $shouldProcessItem = "flow:$FlowId"
+    }
+    $shouldProcessItem += ", " + $GranteeType +":" + $GranteeId + ", $CapabilityName" + ":" + $CapabilityMode
+    $uri += "/permissions"
+    foreach ($permission in $Permissions) {
+        $el_gc = $el_pm.AppendChild($xml.CreateElement("granteeCapabilities"))
+        $el_gc.AppendChild($xml.CreateElement($permission["type"].ToLower())).SetAttribute("id", $permission["id"])
+        $el_caps = $el_gc.AppendChild($xml.CreateElement("capabilities"))
+        $permission["capabilities"].GetEnumerator() | ForEach-Object {
+            $el_cap = $el_caps.AppendChild($xml.CreateElement("capability"))
+            $el_cap.SetAttribute("name", $_.Key)
+            $el_cap.SetAttribute("mode", $_.Value)
+        }
+    }
+    try {
+        if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
+            $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            return $response.tsResponse.permissions
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Remove-TSContentPermission {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory,ParameterSetName='Workbook')][string] $WorkbookId,
+        [Parameter(Mandatory,ParameterSetName='Datasource')][string] $DatasourceId,
+        [Parameter(Mandatory,ParameterSetName='View')][string] $ViewId,
+        [Parameter(Mandatory,ParameterSetName='Project')][string] $ProjectId,
+        [Parameter(Mandatory,ParameterSetName='Flow')][string] $FlowId,
+        [Parameter(Mandatory)][ValidateSet('User','Group')][string] $GranteeType,
+        [Parameter(Mandatory)][string] $GranteeId,
+        [Parameter(Mandatory)][ValidateSet('AddComment','ChangeHierarchy','ChangePermissions','Connect','Delete','Execute',
+            'ExportData','ExportImage','ExportXml','Filter','ProjectLeader','Read','ShareView','ViewComments','ViewUnderlyingData',
+            'WebAuthoring','Write','RunExplainData','CreateRefreshMetrics','SaveAs')][string] $CapabilityName,
+        [Parameter(Mandatory)][ValidateSet('Allow','Deny')][string] $CapabilityMode
+    )
+    if ($WorkbookId) {
+        # Assert-TSRestApiVersion -AtLeast 2.0
+        $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId
+        $shouldProcessItem = "workbook:$WorkbookId"
+    } elseif ($DatasourceId) {
+        # Assert-TSRestApiVersion -AtLeast 2.0
+        $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId
+        $shouldProcessItem = "datasource:$DatasourceId"
+    } elseif ($ViewId) {
+        Assert-TSRestApiVersion -AtLeast 3.2
+        $uri = Get-TSRequestUri -Endpoint View -Param $ViewId
+        $shouldProcessItem = "view:$ViewId"
+    } elseif ($ProjectId) {
+        # Assert-TSRestApiVersion -AtLeast 2.0
+        $uri = Get-TSRequestUri -Endpoint Project -Param $ProjectId
+        $shouldProcessItem = "project:$ProjectId"
+    } elseif ($FlowId) {
+        Assert-TSRestApiVersion -AtLeast 3.3
+        $uri = Get-TSRequestUri -Endpoint Flow -Param $FlowId
+        $shouldProcessItem = "flow:$FlowId"
+    }
+    $shouldProcessItem += ", " + $GranteeType +":" + $GranteeId + ", $CapabilityName" + ":" + $CapabilityMode
+    $uri += "/permissions/" + $GranteeType.ToLower() + "s/$GranteeId/$CapabilityName/$CapabilityMode"
+    try {
+        if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
+            Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
 ### Tags methods
 function Add-TSTagsToContent {
     [CmdletBinding(SupportsShouldProcess)]
@@ -3108,6 +3253,12 @@ Export-ModuleMember -Function Start-TSFlowNow
 # Cancel Flow Run
 
 ### Permissions methods
+Export-ModuleMember -Function Get-TSDefaultPermission
+Export-ModuleMember -Function Add-TSDefaultPermission
+Export-ModuleMember -Function Remove-TSDefaultPermission
+Export-ModuleMember -Function Get-TSContentPermission
+Export-ModuleMember -Function Add-TSContentPermission
+Export-ModuleMember -Function Remove-TSContentPermission
 # Query Default Permissions
 # Query Workbook Permissions
 # Query View Permissions
