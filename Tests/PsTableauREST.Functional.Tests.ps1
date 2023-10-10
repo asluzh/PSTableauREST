@@ -933,11 +933,49 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $permissions = Get-TSContentPermission -FlowId $sampleFlowId
                     $permissions.flow.id | Should -Be $sampleFlowId
                     $permissions.flow.name | Should -Be $sampleFlowName
+                    $savedPermissionTable = $permissions | ConvertTo-TSPermissionTable
+                    # remove all permissions for all grantees
+                    {Remove-TSContentPermission -FlowId $sampleFlowId -All} | Should -Not -Throw
+                    $permissions = Get-TSContentPermission -FlowId $sampleFlowId
+                    $permissions.granteeCapabilities | Should -BeNullOrEmpty
+                    # add all possible permissions (random Allow/Deny) for the current user
+                    $possibleCap = 'ChangeHierarchy','ChangePermissions','Delete','Execute','ExportXml','Read','Write'
+                    $allPermissionTable = @()
+                    $capabilitiesHashtable = @{}
+                    foreach ($cap in $possibleCap) {
+                        $capabilitiesHashtable.Add($cap, (Get-Random -InputObject 'Allow','Deny'))
+                    }
+                    $allPermissionTable += @{granteeType="User";granteeId=(Get-TSCurrentUserId);capabilities=$capabilitiesHashtable}
+                    $permissions = Add-TSContentPermission -FlowId $sampleFlowId -PermissionTable $allPermissionTable
+                    $permissions.flow.id | Should -Be $sampleFlowId
+                    $permissions.flow.name | Should -Be $sampleFlowName
+                    $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
+                    ($permissions.granteeCapabilities.capabilities.capability | Measure-Object).Count | Should -Be $possibleCap.Length
+                    # set all possible permissions to Allow for the current user
+                    $allPermissionTable = @()
+                    $capabilitiesHashtable = @{}
+                    foreach ($cap in $possibleCap) {
+                        $capabilitiesHashtable.Add($cap, "Allow")
+                    }
+                    $allPermissionTable += @{granteeType="User";granteeId=(Get-TSCurrentUserId);capabilities=$capabilitiesHashtable}
+                    $permissions = Set-TSContentPermission -FlowId $sampleFlowId -PermissionTable $allPermissionTable
+                    $permissions.flow.id | Should -Be $sampleFlowId
+                    $permissions.flow.name | Should -Be $sampleFlowName
+                    $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
+                    ($permissions.granteeCapabilities.capabilities.capability | Measure-Object).Count | Should -Be $possibleCap.Length
+                    # remove all permissions for the current user
+                    {Remove-TSContentPermission -FlowId $sampleFlowId -GranteeType User -GranteeId (Get-TSCurrentUserId)} | Should -Not -Throw
+                    $permissions = Get-TSContentPermission -FlowId $sampleFlowId
+                    $permissions.granteeCapabilities | Should -BeNullOrEmpty
+                    # add back initial permissions configuration
+                    $permissions = Add-TSContentPermission -FlowId $sampleFlowId -PermissionTable $savedPermissionTable
+                    ($permissions.granteeCapabilities | Measure-Object).Count | Should -Be $savedPermissionTable.Length
+                    # remove again each permission/capability one-by-one
                     $permissions.granteeCapabilities | ForEach-Object {
                         if ($_.group) {
                             $granteeType = 'Group'
                             $granteeId = $_.group.id
-                        } else {
+                        } elseif ($_.user) {
                             $granteeType = 'User'
                             $granteeId = $_.user.id
                         }
@@ -949,16 +987,6 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     }
                     $permissions = Get-TSContentPermission -FlowId $sampleFlowId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
-                    $permissionArray = @()
-                    $capabilitiesHashtable = @{}
-                    foreach ($cap in 'ChangeHierarchy','ChangePermissions','Delete','Execute','ExportXml','Read','Write') {
-                        $capabilitiesHashtable.Add($cap, (Get-Random -InputObject 'Allow','Deny'))
-                    }
-                    $permissionArray += @{type="User";id=(Get-TSCurrentUserId);capabilities=$capabilitiesHashtable}
-                    $permissions = Add-TSContentPermission -FlowId $sampleFlowId -Permissions $permissionArray
-                    $permissions.flow.id | Should -Be $sampleFlowId
-                    $permissions.flow.name | Should -Be $sampleFlowName
-                    $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
                 }
                 It "Remove sample flow on <ConfigFile.server>" -Skip {
                     {Remove-TSFlow -FlowId $sampleFlowId} | Should -Not -Throw
