@@ -202,9 +202,38 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 # Note: testing with a different OwnerId doesn't work with Dev Sandbox on Tableau Cloud
                 $project.id | Should -BeOfType String
                 $script:testProjectId = $project.id
-                $project = Update-TSProject -ProjectId $script:testProjectId -Name $projectNameSamples -PublishSamples -OwnerId (Get-TSCurrentUserId)
+                $project = Update-TSProject -ProjectId $testProjectId -Name $projectNameSamples -PublishSamples -OwnerId (Get-TSCurrentUserId)
                 $project.id | Should -BeOfType String
                 Remove-TSUser -UserId $user.id
+            }
+            It "Query/remove/add project permissions on <ConfigFile.server>" {
+                $permissions = Get-TSContentPermission -ProjectId $testProjectId
+                $permissions.project.id | Should -Be $testProjectId
+                $permissions.granteeCapabilities | ForEach-Object {
+                    if ($_.group) {
+                        $granteeType = 'Group'
+                        $granteeId = $_.group.id
+                    } else {
+                        $granteeType = 'User'
+                        $granteeId = $_.user.id
+                    }
+                    $_.capabilities.capability | ForEach-Object {
+                        $capName = $_.name
+                        $capMode = $_.mode
+                        {Remove-TSContentPermission -ProjectId $testProjectId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode} | Should -Not -Throw
+                    }
+                }
+                $permissions = Get-TSContentPermission -ProjectId $testProjectId
+                $permissions.granteeCapabilities | Should -BeNullOrEmpty
+                $permissionArray = @()
+                $capabilitiesHashtable = @{}
+                foreach ($cap in 'ProjectLeader','Read','Write') {
+                    $capabilitiesHashtable.Add($cap, (Get-Random -InputObject 'Allow','Deny'))
+                }
+                $permissionArray += @{type="User";id=(Get-TSCurrentUserId);capabilities=$capabilitiesHashtable}
+                $permissions = Add-TSContentPermission -ProjectId $testProjectId -Permissions $permissionArray
+                $permissions.project.id | Should -Be $testProjectId
+                $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
             }
         }
         Context "User operations" -Tag User {
@@ -447,6 +476,37 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     {Remove-TSTagFromContent -WorkbookId $sampleWorkbookId -Tag "active"} | Should -Not -Throw
                     (Get-TSWorkbook -WorkbookId $sampleWorkbookId).tags | Should -BeNullOrEmpty
                 }
+                It "Query/remove/add workbook permissions on <ConfigFile.server>" {
+                    $permissions = Get-TSContentPermission -WorkbookId $sampleWorkbookId
+                    $permissions.workbook.id | Should -Be $sampleWorkbookId
+                    $permissions.workbook.name | Should -Be $sampleWorkbookName
+                    $permissions.granteeCapabilities | ForEach-Object {
+                        if ($_.group) {
+                            $granteeType = 'Group'
+                            $granteeId = $_.group.id
+                        } else {
+                            $granteeType = 'User'
+                            $granteeId = $_.user.id
+                        }
+                        $_.capabilities.capability | ForEach-Object {
+                            $capName = $_.name
+                            $capMode = $_.mode
+                            {Remove-TSContentPermission -WorkbookId $sampleWorkbookId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode} | Should -Not -Throw
+                        }
+                    }
+                    $permissions = Get-TSContentPermission -WorkbookId $sampleWorkbookId
+                    $permissions.granteeCapabilities | Should -BeNullOrEmpty
+                    $permissionArray = @()
+                    $capabilitiesHashtable = @{}
+                    foreach ($cap in 'AddComment','ChangeHierarchy','ChangePermissions','CreateRefreshMetrics','Delete','ExportData','ExportImage','ExportXml','Filter','Read','RunExplainData','ShareView','ViewComments','ViewUnderlyingData','WebAuthoring','Write') {
+                        $capabilitiesHashtable.Add($cap, (Get-Random -InputObject 'Allow','Deny'))
+                    }
+                    $permissionArray += @{type="User";id=(Get-TSCurrentUserId);capabilities=$capabilitiesHashtable}
+                    $permissions = Add-TSContentPermission -WorkbookId $sampleWorkbookId -Permissions $permissionArray
+                    $permissions.workbook.id | Should -Be $sampleWorkbookId
+                    $permissions.workbook.name | Should -Be $sampleWorkbookName
+                    $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
+                }
                 It "Publish workbook with invalid extension on <ConfigFile.server>" {
                     {Publish-TSWorkbook -Name "Workbook" -InFile "Tests/Assets/Misc/Workbook.txt" -ProjectId $samplesProjectId} | Should -Throw
                 }
@@ -590,6 +650,37 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     {Remove-TSTagFromContent -DatasourceId $sampleDatasourceId -Tag "active"} | Should -Not -Throw
                     (Get-TSDatasource -DatasourceId $sampleDatasourceId).tags | Should -BeNullOrEmpty
                 }
+                It "Query/remove/add datasource permissions on <ConfigFile.server>" {
+                    $permissions = Get-TSContentPermission -DatasourceId $sampleDatasourceId
+                    $permissions.datasource.id | Should -Be $sampleDatasourceId
+                    $permissions.datasource.name | Should -Be $sampleDatasourceName
+                    $permissions.granteeCapabilities | ForEach-Object {
+                        if ($_.group) {
+                            $granteeType = 'Group'
+                            $granteeId = $_.group.id
+                        } else {
+                            $granteeType = 'User'
+                            $granteeId = $_.user.id
+                        }
+                        $_.capabilities.capability | ForEach-Object {
+                            $capName = $_.name
+                            $capMode = $_.mode
+                            {Remove-TSContentPermission -DatasourceId $sampleDatasourceId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode} | Should -Not -Throw
+                        }
+                    }
+                    $permissions = Get-TSContentPermission -DatasourceId $sampleDatasourceId
+                    $permissions.granteeCapabilities | Should -BeNullOrEmpty
+                    $permissionArray = @()
+                    $capabilitiesHashtable = @{}
+                    foreach ($cap in 'ChangePermissions','Connect','Delete','ExportXml','Filter','Read','Write','SaveAs') {
+                        $capabilitiesHashtable.Add($cap, (Get-Random -InputObject 'Allow','Deny'))
+                    }
+                    $permissionArray += @{type="User";id=(Get-TSCurrentUserId);capabilities=$capabilitiesHashtable}
+                    $permissions = Add-TSContentPermission -DatasourceId $sampleDatasourceId -Permissions $permissionArray
+                    $permissions.datasource.id | Should -Be $sampleDatasourceId
+                    $permissions.datasource.name | Should -Be $sampleDatasourceName
+                    $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
+                }
                 It "Publish datasource with connections on <ConfigFile.server>" -Skip {
                     Publish-TSDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/Datasource.txt" -ProjectId $samplesProjectId
                 }
@@ -712,6 +803,37 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     {Remove-TSTagFromContent -ViewId $sampleViewId -Tag "active"} | Should -Not -Throw
                     (Get-TSView -ViewId $sampleViewId).tags | Should -BeNullOrEmpty
                 }
+                It "Query/remove/add view permissions on <ConfigFile.server>" {
+                    $permissions = Get-TSContentPermission -ViewId $sampleViewId
+                    $permissions.view.id | Should -Be $sampleViewId
+                    $permissions.view.name | Should -Be $sampleViewName
+                    $permissions.granteeCapabilities | ForEach-Object {
+                        if ($_.group) {
+                            $granteeType = 'Group'
+                            $granteeId = $_.group.id
+                        } else {
+                            $granteeType = 'User'
+                            $granteeId = $_.user.id
+                        }
+                        $_.capabilities.capability | ForEach-Object {
+                            $capName = $_.name
+                            $capMode = $_.mode
+                            {Remove-TSContentPermission -ViewId $sampleViewId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode} | Should -Not -Throw
+                        }
+                    }
+                    $permissions = Get-TSContentPermission -ViewId $sampleViewId
+                    $permissions.granteeCapabilities | Should -BeNullOrEmpty
+                    $permissionArray = @()
+                    $capabilitiesHashtable = @{}
+                    foreach ($cap in 'AddComment','ChangePermissions','Delete','ExportData','ExportImage','ExportXml','Filter','Read','ShareView','ViewComments','ViewUnderlyingData','WebAuthoring','Write') {
+                        $capabilitiesHashtable.Add($cap, (Get-Random -InputObject 'Allow','Deny'))
+                    }
+                    $permissionArray += @{type="User";id=(Get-TSCurrentUserId);capabilities=$capabilitiesHashtable}
+                    $permissions = Add-TSContentPermission -ViewId $sampleViewId -Permissions $permissionArray
+                    $permissions.view.id | Should -Be $sampleViewId
+                    $permissions.view.name | Should -Be $sampleViewName
+                    $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
+                }
                 It "Get/hide/unhide view recommendations on <ConfigFile.server>" -Skip {
                 }
             }
@@ -806,6 +928,37 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     ((Get-TSFlow -FlowId $sampleFlowId).tags.tag | Measure-Object).Count | Should -Be 1
                     {Remove-TSTagFromContent -FlowId $sampleFlowId -Tag "active"} | Should -Not -Throw
                     (Get-TSFlow -FlowId $sampleFlowId).tags | Should -BeNullOrEmpty
+                }
+                It "Query/remove/add flow permissions on <ConfigFile.server>" {
+                    $permissions = Get-TSContentPermission -FlowId $sampleFlowId
+                    $permissions.flow.id | Should -Be $sampleFlowId
+                    $permissions.flow.name | Should -Be $sampleFlowName
+                    $permissions.granteeCapabilities | ForEach-Object {
+                        if ($_.group) {
+                            $granteeType = 'Group'
+                            $granteeId = $_.group.id
+                        } else {
+                            $granteeType = 'User'
+                            $granteeId = $_.user.id
+                        }
+                        $_.capabilities.capability | ForEach-Object {
+                            $capName = $_.name
+                            $capMode = $_.mode
+                            {Remove-TSContentPermission -FlowId $sampleFlowId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode} | Should -Not -Throw
+                        }
+                    }
+                    $permissions = Get-TSContentPermission -FlowId $sampleFlowId
+                    $permissions.granteeCapabilities | Should -BeNullOrEmpty
+                    $permissionArray = @()
+                    $capabilitiesHashtable = @{}
+                    foreach ($cap in 'ChangeHierarchy','ChangePermissions','Delete','Execute','ExportXml','Read','Write') {
+                        $capabilitiesHashtable.Add($cap, (Get-Random -InputObject 'Allow','Deny'))
+                    }
+                    $permissionArray += @{type="User";id=(Get-TSCurrentUserId);capabilities=$capabilitiesHashtable}
+                    $permissions = Add-TSContentPermission -FlowId $sampleFlowId -Permissions $permissionArray
+                    $permissions.flow.id | Should -Be $sampleFlowId
+                    $permissions.flow.name | Should -Be $sampleFlowName
+                    $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
                 }
                 It "Remove sample flow on <ConfigFile.server>" -Skip {
                     {Remove-TSFlow -FlowId $sampleFlowId} | Should -Not -Throw
