@@ -206,14 +206,54 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 $project.id | Should -BeOfType String
                 Remove-TSUser -UserId $user.id
             }
-            It "Query/remove/add project permissions on <ConfigFile.server>" {
+            It "Query/remove/add/set project permissions on <ConfigFile.server>" {
                 $permissions = Get-TSContentPermission -ProjectId $testProjectId
                 $permissions.project.id | Should -Be $testProjectId
+                $savedPermissionTable = $permissions | ConvertTo-TSPermissionTable
+                # remove all permissions for all grantees
+                {Remove-TSContentPermission -ProjectId $testProjectId -All} | Should -Not -Throw
+                $permissions = Get-TSContentPermission -ProjectId $testProjectId
+                $permissions.granteeCapabilities | Should -BeNullOrEmpty
+                # add all possible permissions (random Allow/Deny) for the current user
+                $possibleCap = 'ProjectLeader','Read','Write' #
+                $allPermissionTable = @()
+                $capabilitiesHashtable = @{}
+                foreach ($cap in $possibleCap) {
+                    if ($cap -eq 'ProjectLeader') {
+                        $capabilitiesHashtable.Add($cap, "Allow") # Deny is not supported
+                    } else {
+                        $capabilitiesHashtable.Add($cap, (Get-Random -InputObject 'Allow','Deny'))
+                    }
+                }
+                $allPermissionTable += @{granteeType="User";granteeId=(Get-TSCurrentUserId);capabilities=$capabilitiesHashtable}
+                $permissions = Add-TSContentPermission -ProjectId $testProjectId -PermissionTable $allPermissionTable
+                $permissions.project.id | Should -Be $testProjectId
+                $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
+                ($permissions.granteeCapabilities.capabilities.capability | Measure-Object).Count | Should -Be $possibleCap.Length
+                # set all possible permissions to Allow for the current user
+                $allPermissionTable = @()
+                $capabilitiesHashtable = @{}
+                foreach ($cap in $possibleCap) {
+                    $capabilitiesHashtable.Add($cap, "Allow")
+                }
+                $allPermissionTable += @{granteeType="User";granteeId=(Get-TSCurrentUserId);capabilities=$capabilitiesHashtable}
+                $permissions = Set-TSContentPermission -ProjectId $testProjectId -PermissionTable $allPermissionTable
+                $permissions.project.id | Should -Be $testProjectId
+                $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
+                ($permissions.granteeCapabilities.capabilities.capability | Measure-Object).Count | Should -Be $possibleCap.Length
+                # remove all permissions for the current user
+                {Remove-TSContentPermission -ProjectId $testProjectId -GranteeType User -GranteeId (Get-TSCurrentUserId)} | Should -Not -Throw
+                $permissions = Get-TSContentPermission -ProjectId $testProjectId
+                $permissions.granteeCapabilities | Should -BeNullOrEmpty
+                # add back initial permissions configuration
+                $permissions = Add-TSContentPermission -ProjectId $testProjectId -PermissionTable $savedPermissionTable
+                ($permissions.granteeCapabilities | Measure-Object).Count | Should -Be $savedPermissionTable.Length
+                # remove again each permission/capability one-by-one
                 $permissions.granteeCapabilities | ForEach-Object {
                     if ($_.group) {
                         $granteeType = 'Group'
                         $granteeId = $_.group.id
-                    } else {
+                    } elseif ($_.user) {
                         $granteeType = 'User'
                         $granteeId = $_.user.id
                     }
@@ -225,15 +265,6 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 }
                 $permissions = Get-TSContentPermission -ProjectId $testProjectId
                 $permissions.granteeCapabilities | Should -BeNullOrEmpty
-                $permissionArray = @()
-                $capabilitiesHashtable = @{}
-                foreach ($cap in 'ProjectLeader','Read','Write') {
-                    $capabilitiesHashtable.Add($cap, (Get-Random -InputObject 'Allow','Deny'))
-                }
-                $permissionArray += @{type="User";id=(Get-TSCurrentUserId);capabilities=$capabilitiesHashtable}
-                $permissions = Add-TSContentPermission -ProjectId $testProjectId -Permissions $permissionArray
-                $permissions.project.id | Should -Be $testProjectId
-                $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
             }
         }
         Context "User operations" -Tag User {
