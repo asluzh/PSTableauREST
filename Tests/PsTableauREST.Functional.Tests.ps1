@@ -270,6 +270,11 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                 }
             }
+            It "Get default project on <ConfigFile.server>" {
+                $project = Get-TSDefaultProject
+                $project.id | Should -BeOfType String
+                $project.name | Should -Be "Default"
+            }
         }
         Context "User operations" -Tag User {
             It "Add new user on <ConfigFile.server>" {

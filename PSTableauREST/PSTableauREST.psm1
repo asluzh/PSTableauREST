@@ -559,6 +559,12 @@ function Remove-TSProject {
     }
 }
 
+function Get-TSDefaultProject {
+    [OutputType([PSCustomObject[]])]
+    Param()
+    Get-TSProject -Filter "name:eq:Default","topLevelProject:eq:true"
+}
+
 ### Users and Groups methods
 function Get-TSUser {
     [OutputType([PSCustomObject[]])]
@@ -1671,7 +1677,6 @@ function Publish-TSDatasource {
             $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName -ShowProgress:$ShowProgress
             $uri += "&uploadSessionId=$uploadSessionId"
             $response = Invoke-RestMethod -Uri $uri -Body $multipartContent -Method Post -Headers (Get-TSRequestHeaderDict)
-            # write-error (new-object System.IO.StreamReader($multipartContent.ReadAsStream())).ReadToEnd()
         } else {
             $fileStream = New-Object System.IO.FileStream($InFile, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read)
             $fileContent = New-Object System.Net.Http.StreamContent($fileStream)
@@ -2233,6 +2238,25 @@ function Remove-TSCustomView {
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
+}
+
+function Get-TSViewUrl {
+    [OutputType([string])]
+    Param(
+        [Parameter(Mandatory,ParameterSetName='ViewId')][string] $ViewId,
+        [Parameter(Mandatory,ParameterSetName='ContentUrl')][string] $ContentUrl
+    )
+    if ($ViewId) {
+        $view = Get-TSView -ViewId $ViewId
+        $ContentUrl = $view.contentUrl
+    }
+    $currentSite = Get-TSSite -Current
+    $viewUrl = $script:TSServerUrl + "/#/"
+    if ($currentSite.contentUrl) { # non-default site
+        $viewUrl += "site/" + $currentSite.contentUrl
+    }
+    $viewUrl += "/views/" + $ContentUrl.Replace("/sheets/","/")
+    return $viewUrl
 }
 
 ### Flows methods
@@ -3329,6 +3353,7 @@ Export-ModuleMember -Function Get-TSProject
 Export-ModuleMember -Function Add-TSProject
 Export-ModuleMember -Function Update-TSProject
 Export-ModuleMember -Function Remove-TSProject
+Export-ModuleMember -Function Get-TSDefaultProject
 
 ### Users and Groups methods
 Export-ModuleMember -Function Get-TSUser
@@ -3388,6 +3413,7 @@ Export-ModuleMember -Function Set-TSCustomViewAsUserDefault
 Export-ModuleMember -Function Export-TSCustomViewImage
 Export-ModuleMember -Function Update-TSCustomView
 Export-ModuleMember -Function Remove-TSCustomView
+Export-ModuleMember -Function Get-TSViewUrl
 
 ### Flow methods
 Export-ModuleMember -Function Get-TSFlow
