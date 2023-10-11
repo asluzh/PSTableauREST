@@ -1141,7 +1141,7 @@ function Publish-TSWorkbook {
         [Parameter(Mandatory)][string] $Name,
         [Parameter()][string] $FileName,
         [Parameter()][string] $FileType,
-        # [Parameter()][string] $Description,
+        [Parameter()][string] $Description,
         [Parameter()][string] $ProjectId,
         [Parameter()][switch] $ShowTabs,
         [Parameter()][hashtable] $HideViews,
@@ -1193,12 +1193,11 @@ function Publish-TSWorkbook {
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_workbook = $tsRequest.AppendChild($xml.CreateElement("workbook"))
     $el_workbook.SetAttribute("name", $Name)
-    # if ($Description) {
-    #     $el_workbook.SetAttribute("description", $Description)
-    # }
-    if ($ShowTabs) {
-        $el_workbook.SetAttribute("showTabs", "true")
+    if ($Description) {
+        Assert-TSRestApiVersion -AtLeast 3.21
+        $el_workbook.SetAttribute("description", $Description)
     }
+    $el_workbook.SetAttribute("showTabs", $ShowTabs)
     if ($ThumbnailsUserId) {
         $el_workbook.SetAttribute("thumbnailsUserId", $ThumbnailsUserId)
     }
@@ -1276,9 +1275,7 @@ function Update-TSWorkbook {
         Assert-TSRestApiVersion -AtLeast 3.21
         $el_workbook.SetAttribute("description", $Description)
     }
-    if ($ShowTabs) {
-        $el_workbook.SetAttribute("showTabs", "true")
-    }
+    $el_workbook.SetAttribute("showTabs", $ShowTabs)
     if ($RecentlyViewed) {
         $el_workbook.SetAttribute("recentlyViewed", "true")
     }
