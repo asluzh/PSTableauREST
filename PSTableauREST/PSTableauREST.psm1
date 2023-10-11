@@ -2646,17 +2646,17 @@ function Add-TSContentPermission {
     if ($WorkbookId) {
         # Assert-TSRestApiVersion -AtLeast 2.0
         $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId
-        $el_pm.AppendChild($xml.CreateElement("workbook")).SetAttribute("id", $WorkbookId)
+        # $el_pm.AppendChild($xml.CreateElement("workbook")).SetAttribute("id", $WorkbookId)
         $shouldProcessItem = "workbook:$WorkbookId"
     } elseif ($DatasourceId) {
         # Assert-TSRestApiVersion -AtLeast 2.0
         $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId
-        $el_pm.AppendChild($xml.CreateElement("datasource")).SetAttribute("id", $DatasourceId)
+        # $el_pm.AppendChild($xml.CreateElement("datasource")).SetAttribute("id", $DatasourceId)
         $shouldProcessItem = "datasource:$DatasourceId"
     } elseif ($ViewId) {
         Assert-TSRestApiVersion -AtLeast 3.2
         $uri = Get-TSRequestUri -Endpoint View -Param $ViewId
-        $el_pm.AppendChild($xml.CreateElement("view")).SetAttribute("id", $ViewId)
+        # $el_pm.AppendChild($xml.CreateElement("view")).SetAttribute("id", $ViewId)
         $shouldProcessItem = "view:$ViewId"
     } elseif ($ProjectId) {
         # Assert-TSRestApiVersion -AtLeast 2.0
@@ -2666,7 +2666,7 @@ function Add-TSContentPermission {
     } elseif ($FlowId) {
         Assert-TSRestApiVersion -AtLeast 3.3
         $uri = Get-TSRequestUri -Endpoint Flow -Param $FlowId
-        $el_pm.AppendChild($xml.CreateElement("flow")).SetAttribute("id", $FlowId)
+        # $el_pm.AppendChild($xml.CreateElement("flow")).SetAttribute("id", $FlowId)
         $shouldProcessItem = "flow:$FlowId"
     }
     $uri += "/permissions"
@@ -2861,11 +2861,13 @@ function Remove-TSContentPermission {
             $shouldProcessItem += ", all permissions for " + $GranteeType +":" + $GranteeId
             if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
                 $permissions = Get-TSContentPermission @MainParam
-                $permissions.granteeCapabilities | ForEach-Object {
-                    if (($GranteeType -eq 'Group' -and $_.group -and $_.group.id -eq $GranteeId) -or ($GranteeType -eq 'User' -and $_.user -and $_.user.id -eq $GranteeId)) {
-                        $_.capabilities.capability | ForEach-Object {
-                            $uriAdd = $GranteeType.ToLower() + "s/$GranteeId/" + $_.name + "/" + $_.mode
-                            Invoke-RestMethod -Uri "$uri$uriAdd" -Method Delete -Headers (Get-TSRequestHeaderDict)
+                if ($permissions.granteeCapabilities) {
+                    $permissions.granteeCapabilities | ForEach-Object {
+                        if (($GranteeType -eq 'Group' -and $_.group -and $_.group.id -eq $GranteeId) -or ($GranteeType -eq 'User' -and $_.user -and $_.user.id -eq $GranteeId)) {
+                            $_.capabilities.capability | ForEach-Object {
+                                $uriAdd = $GranteeType.ToLower() + "s/$GranteeId/" + $_.name + "/" + $_.mode
+                                Invoke-RestMethod -Uri "$uri$uriAdd" -Method Delete -Headers (Get-TSRequestHeaderDict)
+                            }
                         }
                     }
                 }
@@ -2874,17 +2876,19 @@ function Remove-TSContentPermission {
             $shouldProcessItem += ", ALL PERMISSIONS"
             if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
                 $permissions = Get-TSContentPermission @MainParam
-                $permissions.granteeCapabilities | ForEach-Object {
-                    if ($_.group) {
-                        $grtType = 'group'
-                        $grtId = $_.group.id
-                    } elseif ($_.user) {
-                        $grtType = 'user'
-                        $grtId = $_.user.id
-                    }
-                    $_.capabilities.capability | ForEach-Object {
-                        $uriAdd = $grtType + "s/$grtId/" + $_.name + "/" + $_.mode
-                        Invoke-RestMethod -Uri "$uri$uriAdd" -Method Delete -Headers (Get-TSRequestHeaderDict)
+                if ($permissions.granteeCapabilities) {
+                    $permissions.granteeCapabilities | ForEach-Object {
+                        if ($_.group) {
+                            $grtType = 'group'
+                            $grtId = $_.group.id
+                        } elseif ($_.user) {
+                            $grtType = 'user'
+                            $grtId = $_.user.id
+                        }
+                        $_.capabilities.capability | ForEach-Object {
+                            $uriAdd = $grtType + "s/$grtId/" + $_.name + "/" + $_.mode
+                            Invoke-RestMethod -Uri "$uri$uriAdd" -Method Delete -Headers (Get-TSRequestHeaderDict)
+                        }
                     }
                 }
             }
