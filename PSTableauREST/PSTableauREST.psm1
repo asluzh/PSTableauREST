@@ -3039,6 +3039,7 @@ function Add-TSUserFavorite {
         } else {
             $el_favorite.SetAttribute("label", $WorkbookId)
         }
+        $shouldProcessItem = "user:$UserId, workbook:$WorkbookId"
     } elseif ($DatasourceId) {
         # Assert-TSRestApiVersion -AtLeast 2.3
         $el_favorite.AppendChild($xml.CreateElement("datasource")).SetAttribute("id", $DatasourceId)
@@ -3047,6 +3048,7 @@ function Add-TSUserFavorite {
         } else {
             $el_favorite.SetAttribute("label", $DatasourceId)
         }
+        $shouldProcessItem = "user:$UserId, datasource:$DatasourceId"
     } elseif ($ViewId) {
         # Assert-TSRestApiVersion -AtLeast 2.0
         $el_favorite.AppendChild($xml.CreateElement("view")).SetAttribute("id", $ViewId)
@@ -3055,6 +3057,7 @@ function Add-TSUserFavorite {
         } else {
             $el_favorite.SetAttribute("label", $ViewId)
         }
+        $shouldProcessItem = "user:$UserId, view:$ViewId"
     } elseif ($ProjectId) {
         Assert-TSRestApiVersion -AtLeast 3.1
         $el_favorite.AppendChild($xml.CreateElement("project")).SetAttribute("id", $ProjectId)
@@ -3063,6 +3066,7 @@ function Add-TSUserFavorite {
         } else {
             $el_favorite.SetAttribute("label", $ProjectId)
         }
+        $shouldProcessItem = "user:$UserId, project:$ProjectId"
     } elseif ($FlowId) {
         Assert-TSRestApiVersion -AtLeast 3.3
         $el_favorite.AppendChild($xml.CreateElement("flow")).SetAttribute("id", $FlowId)
@@ -3071,33 +3075,12 @@ function Add-TSUserFavorite {
         } else {
             $el_favorite.SetAttribute("label", $FlowId)
         }
+        $shouldProcessItem = "user:$UserId, flow:$FlowId"
     }
     try {
-        if ($WorkbookId) {
-            if ($PSCmdlet.ShouldProcess("user:$UserId, workbook:$WorkbookId")) {
-                $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Favorite -Param $UserId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
-                return $response.tsResponse.favorites.favorite
-            }
-        } elseif ($DatasourceId) {
-            if ($PSCmdlet.ShouldProcess("user:$UserId, datasource:$DatasourceId")) {
-                $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Favorite -Param $UserId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
-                return $response.tsResponse.favorites.favorite
-            }
-        } elseif ($ViewId) {
-            if ($PSCmdlet.ShouldProcess("user:$UserId, view:$ViewId")) {
-                $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Favorite -Param $UserId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
-                return $response.tsResponse.favorites.favorite
-            }
-        } elseif ($ProjectId) {
-            if ($PSCmdlet.ShouldProcess("user:$UserId, project:$ProjectId")) {
-                $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Favorite -Param $UserId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
-                return $response.tsResponse.favorites.favorite
-            }
-        } elseif ($FlowId) {
-            if ($PSCmdlet.ShouldProcess("user:$UserId, flow:$FlowId")) {
-                $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Favorite -Param $UserId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
-                return $response.tsResponse.favorites.favorite
-            }
+        if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Favorite -Param $UserId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            return $response.tsResponse.favorites.favorite
         }
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
@@ -3118,40 +3101,27 @@ function Remove-TSUserFavorite {
     if ($WorkbookId) {
         # Assert-TSRestApiVersion -AtLeast 2.0
         $uri = Get-TSRequestUri -Endpoint Favorite -Param $UserId/workbooks/$WorkbookId
+        $shouldProcessItem = "user:$UserId, workbook:$WorkbookId"
     } elseif ($DatasourceId) {
         # Assert-TSRestApiVersion -AtLeast 2.3
         $uri = Get-TSRequestUri -Endpoint Favorite -Param $UserId/datasources/$DatasourceId
+        $shouldProcessItem = "user:$UserId, datasource:$DatasourceId"
     } elseif ($ViewId) {
         # Assert-TSRestApiVersion -AtLeast 2.0
         $uri = Get-TSRequestUri -Endpoint Favorite -Param $UserId/views/$ViewId
+        $shouldProcessItem = "user:$UserId, view:$ViewId"
     } elseif ($ProjectId) {
         Assert-TSRestApiVersion -AtLeast 3.1
         $uri = Get-TSRequestUri -Endpoint Favorite -Param $UserId/projects/$ProjectId
+        $shouldProcessItem = "user:$UserId, project:$ProjectId"
     } elseif ($FlowId) {
         Assert-TSRestApiVersion -AtLeast 3.3
         $uri = Get-TSRequestUri -Endpoint Favorite -Param $UserId/flows/$FlowId
+        $shouldProcessItem = "user:$UserId, flow:$FlowId"
     }
     try {
-        if ($WorkbookId) {
-            if ($PSCmdlet.ShouldProcess("user:$UserId, workbook:$WorkbookId")) {
-                Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
-            }
-        } elseif ($DatasourceId) {
-            if ($PSCmdlet.ShouldProcess("user:$UserId, datasource:$DatasourceId")) {
-                Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
-            }
-        } elseif ($ViewId) {
-            if ($PSCmdlet.ShouldProcess("user:$UserId, view:$ViewId")) {
-                Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
-            }
-        } elseif ($ProjectId) {
-            if ($PSCmdlet.ShouldProcess("user:$UserId, project:$ProjectId")) {
-                Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
-            }
-        } elseif ($FlowId) {
-            if ($PSCmdlet.ShouldProcess("user:$UserId, flow:$FlowId")) {
-                Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
-            }
+        if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
+            Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
         }
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
