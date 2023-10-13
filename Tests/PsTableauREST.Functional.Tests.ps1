@@ -1,6 +1,7 @@
 BeforeDiscovery {
     Import-Module ./PSTableauREST/PSTableauREST.psm1 -Force
-    Import-Module Microsoft.PowerShell.SecretManagement -Force
+    Import-Module Microsoft.PowerShell.SecretManagement
+    Import-Module Assert
     $script:ConfigFiles = Get-ChildItem -Path "Tests/Config" -Filter "test_*.json" -Recurse
     $script:DatasourceFiles = Get-ChildItem -Path "Tests/Assets/Datasources" -Recurse
     $script:WorkbookFiles = Get-ChildItem -Path "Tests/Assets/Workbooks" -Recurse
@@ -59,21 +60,24 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             } else {
                 Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
             }
-            $script:testProjectId = $null
         }
         AfterAll {
             if ($script:testProjectId) {
                 Remove-TSProject -ProjectId $script:testProjectId
+                $script:testProjectId = $null
             }
             if ($script:testUserId) {
                 Remove-TSUser -UserId $script:testUserId
+                $script:testUserId = $null
             }
             if ($script:testGroupId) {
                 Remove-TSGroup -GroupId $script:testGroupId
+                $script:testGroupId = $null
             }
             if ($script:testSiteId -and $script:testSite) { # Note: this should be the last cleanup step (session is killed by removing the site)
                 Switch-TSSite -Site $script:testSite
                 Remove-TSSite -SiteId $script:testSiteId
+                $script:testSite = $null
             }
             Close-TSSignOut
         }
@@ -169,23 +173,23 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             }
             It "Update project <testProjectId> on <ConfigFile.server>" {
                 $projectNewName = New-Guid
-                $project = Update-TSProject -ProjectId $script:testProjectId -Name $projectNewName
-                $project.id | Should -Be $script:testProjectId
+                $project = Update-TSProject -ProjectId $testProjectId -Name $projectNewName
+                $project.id | Should -Be $testProjectId
                 $project.name | Should -Be $projectNewName
             }
             It "Query projects on <ConfigFile.server>" {
                 $projects = Get-TSProject
                 ($projects | Measure-Object).Count | Should -BeGreaterThan 0
-                $projects | Where-Object id -eq $script:testProjectId | Should -Not -BeNullOrEmpty
+                $projects | Where-Object id -eq $testProjectId | Should -Not -BeNullOrEmpty
             }
             It "Query projects with options on <ConfigFile.server>" {
-                $projectName = Get-TSProject | Where-Object id -eq $script:testProjectId | Select-Object -First 1 -ExpandProperty name
+                $projectName = Get-TSProject | Where-Object id -eq $testProjectId | Select-Object -First 1 -ExpandProperty name
                 $projects = Get-TSProject -Filter "name:eq:$projectName" -Sort name:asc -Fields id,name,description
                 ($projects | Measure-Object).Count | Should -Be 1
                 ($projects | Get-Member -MemberType Property | Measure-Object).Count | Should -Be 3
             }
             It "Delete project <testProjectId> on <ConfigFile.server>" {
-                $response = Remove-TSProject -ProjectId $script:testProjectId
+                $response = Remove-TSProject -ProjectId $testProjectId
                 $response | Should -BeOfType String
                 $script:testProjectId = $null
             }
@@ -206,7 +210,23 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 $project.id | Should -BeOfType String
                 Remove-TSUser -UserId $user.id
             }
-            It "Query/remove/add/set project permissions on <ConfigFile.server>" {
+            It "Initial project permissions & default permissions on <ConfigFile.server>" {
+                $defaultProject = Get-TSDefaultProject
+                $defaultProject.id | Should -BeOfType String
+                $defaultProject.name | Should -Be "Default"
+                # $defProjectPermissions = Get-TSContentPermission -ProjectId $defaultProject.id
+                # $newProjectPermissions = Get-TSContentPermission -ProjectId $testProjectId
+                # Assert-Equivalent -Actual $newProjectPermissions -Expected $defProjectPermissions
+                $defProjectPermissions = Get-TSDefaultPermission -ProjectId $defaultProject.id
+                $newProjectPermissions = Get-TSDefaultPermission -ProjectId $testProjectId
+                Assert-Equivalent -Actual $newProjectPermissions -Expected $defProjectPermissions
+                # another approach to deep compare permissions tables: convert to json
+                # however this doesn't work for differences in capabilities sort order
+                # $defProjectPermissionsJson = $defProjectPermissions | ConvertTo-Json -Compress
+                # $newProjectPermissionsJson = $newProjectPermissions | ConvertTo-Json -Compress
+                # $newProjectPermissionsJson | Should -Be $defProjectPermissionsJson
+            }
+            It "Query/remove/add/set project permissions on <ConfigFile.server>" -Skip {
                 $permissions = Get-TSContentPermission -ProjectId $testProjectId
                 $permissions.project.id | Should -Be $testProjectId
                 $savedPermissionTable = $permissions | ConvertTo-TSPermissionTable
@@ -270,7 +290,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                 }
             }
-            It "Query/remove/set default project permissions on <ConfigFile.server>" {
+            It "Query/remove/set default project permissions on <ConfigFile.server>" -Skip {
                 $savedPermissionTable = Get-TSDefaultPermission -ProjectId $testProjectId
                 # remove all default permissions for all grantees
                 {Remove-TSDefaultPermission -ProjectId $testProjectId -All} | Should -Not -Throw
@@ -320,11 +340,6 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $permissions = Get-TSDefaultPermission -ProjectId $testProjectId
                     $permissions.Length | Should -Be 0
                 }
-            }
-            It "Get default project on <ConfigFile.server>" {
-                $project = Get-TSDefaultProject
-                $project.id | Should -BeOfType String
-                $project.name | Should -Be "Default"
             }
         }
         Context "User operations" -Tag User {

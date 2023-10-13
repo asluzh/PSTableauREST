@@ -3005,13 +3005,13 @@ function Set-TSDefaultPermission {
     $outputPermissionTable = @()
     foreach ($contentType in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
         $shouldProcessItem = "project:$ProjectId"
-        $permissions = $PermissionTable | Where-Object contentType -eq $contentType
-        if ($permissions.Length -gt 0) {
+        $contentTypePermissions = $PermissionTable | Where-Object contentType -eq $contentType
+        if ($contentTypePermissions.Length -gt 0) {
             $xml = New-Object System.Xml.XmlDocument
             $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
             $el_pm = $tsRequest.AppendChild($xml.CreateElement("permissions"))
             $permissionsCount = 0
-            foreach ($permission in $permissions) {
+            foreach ($permission in $contentTypePermissions) {
                 $el_gc = $el_pm.AppendChild($xml.CreateElement("granteeCapabilities"))
                 $el_gc.AppendChild($xml.CreateElement($permission.granteeType.ToLower())).SetAttribute("id", $permission.granteeId)
                 $el_caps = $el_gc.AppendChild($xml.CreateElement("capabilities"))
@@ -3022,7 +3022,7 @@ function Set-TSDefaultPermission {
                     $el_cap.SetAttribute("mode", $_.Value)
                 }
             }
-            $shouldProcessItem += ", {0}:{1}/{2}" -f $contentType,$permissions.Length,$permissionsCount
+            $shouldProcessItem += ", {0}:{1}/{2}" -f $contentType,$contentTypePermissions.Length,$permissionsCount
             try {
                 if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
                     $response = Invoke-RestMethod -Uri $uri$contentType -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
@@ -3140,9 +3140,9 @@ function Remove-TSDefaultPermission { # TODO specific contentType not as switch 
             if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
                 $allDefaultPermissions = Get-TSDefaultPermission -ProjectId $ProjectId
                 foreach ($contentType in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
-                    $permissions = $allDefaultPermissions | Where-Object contentType -eq $contentType
-                    if ($permissions.Length -gt 0) {
-                        foreach ($permission in $permissions) {
+                    $contentTypePermissions = $allDefaultPermissions | Where-Object contentType -eq $contentType
+                    if ($contentTypePermissions.Length -gt 0) {
+                        foreach ($permission in $contentTypePermissions) {
                             $permission.capabilities.GetEnumerator() | ForEach-Object {
                                 $uriAdd = "{0}/{1}s/{2}/{3}/{4}" -f $contentType,$permission.granteeType.ToLower(),$permission.granteeId,$_.Key,$_.Value
                                 $null = Invoke-RestMethod -Uri "$uri$uriAdd" -Method Delete -Headers (Get-TSRequestHeaderDict)
