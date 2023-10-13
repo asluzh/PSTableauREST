@@ -270,6 +270,57 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                 }
             }
+            It "Query/remove/set default project permissions on <ConfigFile.server>" {
+                $savedPermissionTable = Get-TSDefaultPermission -ProjectId $testProjectId
+                # remove all default permissions for all grantees
+                {Remove-TSDefaultPermission -ProjectId $testProjectId -All} | Should -Not -Throw
+                $permissions = Get-TSDefaultPermission -ProjectId $testProjectId
+                $permissions.Length | Should -Be 0
+                # add all possible permissions (random Allow/Deny) for the current user
+                # $possibleCap = 'ProjectLeader','Read','Write' #
+                # $allPermissionTable = @()
+                # $capabilitiesHashtable = @{}
+                # foreach ($cap in $possibleCap) {
+                #     if ($cap -eq 'ProjectLeader') {
+                #         $capabilitiesHashtable.Add($cap, "Allow") # Deny is not supported
+                #     } else {
+                #         $capabilitiesHashtable.Add($cap, (Get-Random -InputObject 'Allow','Deny'))
+                #     }
+                # }
+                # $allPermissionTable += @{granteeType="User";granteeId=(Get-TSCurrentUserId);capabilities=$capabilitiesHashtable}
+                # $permissions = Add-TSContentPermission -ProjectId $testProjectId -PermissionTable $allPermissionTable
+                # $permissions.project.id | Should -Be $testProjectId
+                # $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
+                # ($permissions.granteeCapabilities.capabilities.capability | Measure-Object).Count | Should -Be $possibleCap.Length
+                # restore initial permissions configuration
+                if ($savedPermissionTable.Length -gt 0) {
+                    $permissions = Set-TSDefaultPermission -ProjectId $testProjectId -PermissionTable $savedPermissionTable
+                    $permissions.Length | Should -Be $savedPermissionTable.Length
+                    # remove all default permissions for one grantee for the first content type
+                    $ContentTypeParam = @{}
+                    $ContentTypeParam.Add($permissions[0].contentType,$true)
+                    {Remove-TSDefaultPermission -ProjectId $testProjectId -GranteeType $permissions[0].granteeType -GranteeId $permissions[0].granteeId @ContentTypeParam} | Should -Not -Throw
+                    $permissions = Get-TSDefaultPermission -ProjectId $testProjectId
+                    $permissions.Length | Should -BeLessThan $savedPermissionTable.Length
+                }
+                # restore initial permissions configuration
+                if ($savedPermissionTable.Length -gt 0) {
+                    $permissions = Set-TSDefaultPermission -ProjectId $testProjectId -PermissionTable $savedPermissionTable
+                    $permissions.Length | Should -Be $savedPermissionTable.Length
+                    # remove again each permission/capability one-by-one
+                    foreach ($permission in $permissions) {
+                        $ContentTypeParam = @{}
+                        $ContentTypeParam.Add($permission.contentType,$true)
+                        if ($permission.capabilities -and $permission.capabilities.Count -gt 0) {
+                            $permission.capabilities.GetEnumerator() | ForEach-Object {
+                                {Remove-TSDefaultPermission -ProjectId $testProjectId -GranteeType $permission.granteeType -GranteeId $permission.granteeId -CapabilityName $_.Key -CapabilityMode $_.Value @ContentTypeParam} | Should -Not -Throw
+                            }
+                        }
+                    }
+                    $permissions = Get-TSDefaultPermission -ProjectId $testProjectId
+                    $permissions.Length | Should -Be 0
+                }
+            }
             It "Get default project on <ConfigFile.server>" {
                 $project = Get-TSDefaultProject
                 $project.id | Should -BeOfType String

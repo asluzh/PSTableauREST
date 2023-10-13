@@ -2619,7 +2619,7 @@ function Start-TSFlowNow {
 }
 
 ### Permissions methods
-function Get-TSContentPermission {
+function Get-TSContentPermission { # TODO convert output to hashtable[], add contentType
     [OutputType([PSCustomObject[]])]
     Param(
         [Parameter(Mandatory,ParameterSetName='Workbook')][string] $WorkbookId,
@@ -2653,7 +2653,7 @@ function Get-TSContentPermission {
     }
 }
 
-function Add-TSContentPermission {
+function Add-TSContentPermission { # TODO convert output to hashtable[], add contentType
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType([PSCustomObject])]
     Param(
@@ -2697,10 +2697,10 @@ function Add-TSContentPermission {
     $permissionsCount = 0
     foreach ($permission in $PermissionTable) {
         $el_gc = $el_pm.AppendChild($xml.CreateElement("granteeCapabilities"))
-        $el_gc.AppendChild($xml.CreateElement($permission["granteeType"].ToLower())).SetAttribute("id", $permission["granteeId"])
+        $el_gc.AppendChild($xml.CreateElement($permission.granteeType.ToLower())).SetAttribute("id", $permission.granteeId)
         $el_caps = $el_gc.AppendChild($xml.CreateElement("capabilities"))
-        $permissionsCount += $permission["capabilities"].Count
-        $permission["capabilities"].GetEnumerator() | ForEach-Object {
+        $permissionsCount += $permission.capabilities.Count
+        $permission.capabilities.GetEnumerator() | ForEach-Object {
             $el_cap = $el_caps.AppendChild($xml.CreateElement("capability"))
             $el_cap.SetAttribute("name", $_.Key)
             $el_cap.SetAttribute("mode", $_.Value)
@@ -2717,7 +2717,7 @@ function Add-TSContentPermission {
     }
 }
 
-function Set-TSContentPermission {
+function Set-TSContentPermission { # TODO add support for permission templates
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType([PSCustomObject])]
     Param(
@@ -2754,14 +2754,14 @@ function Set-TSContentPermission {
     $permissionOverrides = @()
     $currentPermissionTable = Get-TSContentPermission @MainParam | ConvertTo-TSPermissionTable
     foreach ($permission in $PermissionTable) {
-        $permissionsCount += $permission["capabilities"].Count
-        $currentPermissionTable | Where-Object -FilterScript {($_.granteeType -eq $permission["granteeType"]) -and ($_.granteeId -eq $permission["granteeId"])} | ForEach-Object {
+        $permissionsCount += $permission.capabilities.Count
+        $currentPermissionTable | Where-Object -FilterScript {($_.granteeType -eq $permission.granteeType) -and ($_.granteeId -eq $permission.granteeId)} | ForEach-Object {
             $currentCapabilities = $_.capabilities
             $currentCapabilities.GetEnumerator() | ForEach-Object {
                 $capabilityName = $_.Key
                 $capabilityMode = $_.Value
-                if ($permission["capabilities"].ContainsKey($capabilityName) -and $capabilityMode -ne $permission["capabilities"][$capabilityName]) {
-                    $permissionOverrides += @{granteeType=$permission["granteeType"];granteeId=$permission["granteeId"];capabilityName=$capabilityName;capabilityMode=$capabilityMode}
+                if ($permission.capabilities.ContainsKey($capabilityName) -and $capabilityMode -ne $permission.capabilities[$capabilityName]) {
+                    $permissionOverrides += @{granteeType=$permission.granteeType;granteeId=$permission.granteeId;capabilityName=$capabilityName;capabilityMode=$capabilityMode}
                 }
             }
         }
@@ -2781,7 +2781,7 @@ function Set-TSContentPermission {
 
 function Remove-TSContentPermission {
     [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
+    [OutputType()]
     Param(
         [Parameter(Mandatory,ParameterSetName='WorkbookAll')]
         [Parameter(Mandatory,ParameterSetName='WorkbookAllGrantee')]
@@ -2876,21 +2876,21 @@ function Remove-TSContentPermission {
     $uri += "/permissions/"
     try {
         if ($CapabilityName -and $CapabilityMode) { # Remove one permission/capability
-            $shouldProcessItem += ", " + $GranteeType +":" + $GranteeId + ", $CapabilityName" + ":" + $CapabilityMode
-            $uri += $GranteeType.ToLower() + "s/$GranteeId/$CapabilityName/$CapabilityMode"
+            $shouldProcessItem += ", {0}:{1}, {2}:{3}" -f $GranteeType,$GranteeId,$CapabilityName,$CapabilityMode
+            $uriAdd = "{0}s/{1}/{2}/{3}" -f $GranteeType.ToLower(),$GranteeId,$CapabilityName,$CapabilityMode
             if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-                Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
+                $null = Invoke-RestMethod -Uri "$uri$uriAdd" -Method Delete -Headers (Get-TSRequestHeaderDict)
             }
         } elseif ($GranteeType -and $GranteeId) { # Remove all permissions for one grantee
-            $shouldProcessItem += ", all permissions for " + $GranteeType +":" + $GranteeId
+            $shouldProcessItem += ", all permissions for {0}:{1}" -f $GranteeType,$GranteeId
             if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
                 $permissions = Get-TSContentPermission @MainParam
                 if ($permissions.granteeCapabilities) {
                     $permissions.granteeCapabilities | ForEach-Object {
                         if (($GranteeType -eq 'Group' -and $_.group -and $_.group.id -eq $GranteeId) -or ($GranteeType -eq 'User' -and $_.user -and $_.user.id -eq $GranteeId)) {
                             $_.capabilities.capability | ForEach-Object {
-                                $uriAdd = $GranteeType.ToLower() + "s/$GranteeId/" + $_.name + "/" + $_.mode
-                                Invoke-RestMethod -Uri "$uri$uriAdd" -Method Delete -Headers (Get-TSRequestHeaderDict)
+                                $uriAdd = "{0}s/{1}/{2}/{3}" -f $GranteeType.ToLower(),$GranteeId,$_.name,$_.mode
+                                $null = Invoke-RestMethod -Uri "$uri$uriAdd" -Method Delete -Headers (Get-TSRequestHeaderDict)
                             }
                         }
                     }
@@ -2910,8 +2910,8 @@ function Remove-TSContentPermission {
                             $grtId = $_.user.id
                         }
                         $_.capabilities.capability | ForEach-Object {
-                            $uriAdd = $grtType + "s/$grtId/" + $_.name + "/" + $_.mode
-                            Invoke-RestMethod -Uri "$uri$uriAdd" -Method Delete -Headers (Get-TSRequestHeaderDict)
+                            $uriAdd = "{0}s/{1}/{2}/{3}" -f $grtType,$grtId,$_.name,$_.mode
+                            $null = Invoke-RestMethod -Uri "$uri$uriAdd" -Method Delete -Headers (Get-TSRequestHeaderDict)
                         }
                     }
                 }
@@ -2951,6 +2951,210 @@ function ConvertTo-TSPermissionTable {
         }
     }
     return $permissionTable
+}
+
+function Get-TSDefaultPermission { # TODO add support to get only for specific contentType
+    # TODO check if dp for virtual connections are supported
+    [OutputType([hashtable[]])]
+    Param(
+        [Parameter(Mandatory)][string] $ProjectId
+    )
+    # Assert-TSRestApiVersion -AtLeast 2.1
+    $permissionTable = @()
+    $uri = Get-TSRequestUri -Endpoint Project -Param "$ProjectId/default-permissions/"
+    try {
+        foreach ($contentType in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
+            $response = Invoke-RestMethod -Uri $uri$contentType -Method Get -Headers (Get-TSRequestHeaderDict)
+            if ($response.tsResponse.permissions.granteeCapabilities) {
+                $response.tsResponse.permissions.granteeCapabilities | ForEach-Object {
+                    if ($_.group -and $_.group.id) {
+                        $granteeType = 'group'
+                        $granteeId = $_.group.id
+                    } elseif ($_.user -and $_.user.id) {
+                        $granteeType = 'user'
+                        $granteeId = $_.user.id
+                    } else {
+                        Write-Error -Message "Invalid grantee in the response object" -Exception -Category InvalidArgument
+                    }
+                    $capabilitiesHashtable = @{}
+                    $_.capabilities.capability | ForEach-Object {
+                        if ($_.name -and $_.mode) {
+                            $capabilitiesHashtable.Add($_.name, $_.mode)
+                        } else {
+                            Write-Error -Message "Invalid permission capability in the input object" -Exception -Category InvalidArgument
+                        }
+                    }
+                    $permissionTable += @{contentType=$contentType;granteeType=$granteeType;granteeId=$granteeId;capabilities=$capabilitiesHashtable}
+                }
+            }
+        }
+        return $permissionTable
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Set-TSDefaultPermission {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $ProjectId,
+        [Parameter(Mandatory)][hashtable[]] $PermissionTable
+    )
+    $uri = Get-TSRequestUri -Endpoint Project -Param "$ProjectId/default-permissions/"
+    $outputPermissionTable = @()
+    foreach ($contentType in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
+        $shouldProcessItem = "project:$ProjectId"
+        $permissions = $PermissionTable | Where-Object contentType -eq $contentType
+        if ($permissions.Length -gt 0) {
+            $xml = New-Object System.Xml.XmlDocument
+            $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+            $el_pm = $tsRequest.AppendChild($xml.CreateElement("permissions"))
+            $permissionsCount = 0
+            foreach ($permission in $permissions) {
+                $el_gc = $el_pm.AppendChild($xml.CreateElement("granteeCapabilities"))
+                $el_gc.AppendChild($xml.CreateElement($permission.granteeType.ToLower())).SetAttribute("id", $permission.granteeId)
+                $el_caps = $el_gc.AppendChild($xml.CreateElement("capabilities"))
+                $permissionsCount += $permission.capabilities.Count
+                $permission.capabilities.GetEnumerator() | ForEach-Object {
+                    $el_cap = $el_caps.AppendChild($xml.CreateElement("capability"))
+                    $el_cap.SetAttribute("name", $_.Key)
+                    $el_cap.SetAttribute("mode", $_.Value)
+                }
+            }
+            $shouldProcessItem += ", {0}:{1}/{2}" -f $contentType,$permissions.Length,$permissionsCount
+            try {
+                if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
+                    $response = Invoke-RestMethod -Uri $uri$contentType -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+                    if ($response.tsResponse.permissions.granteeCapabilities) {
+                        $response.tsResponse.permissions.granteeCapabilities | ForEach-Object {
+                            if ($_.group -and $_.group.id) {
+                                $granteeType = 'group'
+                                $granteeId = $_.group.id
+                            } elseif ($_.user -and $_.user.id) {
+                                $granteeType = 'user'
+                                $granteeId = $_.user.id
+                            } else {
+                                Write-Error -Message "Invalid grantee in the response object" -Exception -Category InvalidArgument
+                            }
+                            $capabilitiesHashtable = @{}
+                            $_.capabilities.capability | ForEach-Object {
+                                if ($_.name -and $_.mode) {
+                                    $capabilitiesHashtable.Add($_.name, $_.mode)
+                                } else {
+                                    Write-Error -Message "Invalid permission capability in the input object" -Exception -Category InvalidArgument
+                                }
+                            }
+                            $outputPermissionTable += @{contentType=$contentType;granteeType=$granteeType;granteeId=$granteeId;capabilities=$capabilitiesHashtable}
+                        }
+                    }
+                }
+            } catch {
+                Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+            }
+        }
+    }
+    return $outputPermissionTable
+}
+
+function Remove-TSDefaultPermission { # TODO specific contentType not as switch but as single param (either for one or allgrantee)
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType()]
+    Param(
+        [Parameter(Mandatory)][string] $ProjectId,
+        [Parameter(Mandatory,ParameterSetName='AllGrantee')]
+        [Parameter(Mandatory,ParameterSetName='OneCapability')]
+        [ValidateSet('User','Group')][string] $GranteeType,
+        [Parameter(Mandatory,ParameterSetName='AllGrantee')]
+        [Parameter(Mandatory,ParameterSetName='OneCapability')]
+        [string] $GranteeId,
+        [Parameter(Mandatory,ParameterSetName='OneCapability')]
+        [ValidateSet('AddComment','ChangeHierarchy','ChangePermissions','Connect','Delete','Execute',
+            'ExportData','ExportImage','ExportXml','Filter','ProjectLeader','Read','ShareView','ViewComments','ViewUnderlyingData',
+            'WebAuthoring','Write','RunExplainData','CreateRefreshMetrics','SaveAs')][string] $CapabilityName,
+        [Parameter(Mandatory,ParameterSetName='OneCapability')]
+        [ValidateSet('Allow','Deny')][string] $CapabilityMode,
+        [Parameter(ParameterSetName='AllGrantee')]
+        [Parameter(ParameterSetName='OneCapability')]
+        [switch] $Workbooks, # remove default permissions for workbooks
+        [Parameter(ParameterSetName='AllGrantee')]
+        [Parameter(ParameterSetName='OneCapability')]
+        [switch] $Datasources, # remove default permissions for datasources
+        [Parameter(ParameterSetName='AllGrantee')]
+        [Parameter(ParameterSetName='OneCapability')]
+        [switch] $Flows, # remove default permissions for flows
+        [Parameter(ParameterSetName='AllGrantee')]
+        [Parameter(ParameterSetName='OneCapability')]
+        [switch] $Dataroles, # remove default permissions for dataroles
+        [Parameter(ParameterSetName='AllGrantee')]
+        [Parameter(ParameterSetName='OneCapability')]
+        [switch] $Lenses, # remove default permissions for lenses
+        [Parameter(ParameterSetName='AllGrantee')]
+        [Parameter(ParameterSetName='OneCapability')]
+        [switch] $Metrics, # remove default permissions for metrics
+        [Parameter(ParameterSetName='AllGrantee')]
+        [Parameter(ParameterSetName='OneCapability')]
+        [switch] $Databases, # remove default permissions for databases
+        [Parameter(ParameterSetName='AllGrantee')]
+        [Parameter(ParameterSetName='OneCapability')]
+        [switch] $Tables, # remove default permissions for tables
+        [Parameter(Mandatory,ParameterSetName='All')]
+        [switch] $All # explicit switch parameter to remove all default permissions
+    )
+    $uri = Get-TSRequestUri -Endpoint Project -Param "$ProjectId/default-permissions/"
+    $shouldProcessItem = "project:$ProjectId"
+    try {
+        if ($CapabilityName -and $CapabilityMode) { # Remove one default permission/capability
+            $shouldProcessItem += ", default permission for {0}:{1}, {2}:{3}" -f $GranteeType,$GranteeId,$CapabilityName,$CapabilityMode
+            foreach ($contentType in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
+                if ((Get-Variable -Name $contentType -ValueOnly) -eq $true) {
+                    $uriAdd = "{0}/{1}s/{2}/{3}/{4}" -f $contentType,$GranteeType.ToLower(),$GranteeId,$CapabilityName,$CapabilityMode
+                    if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
+                        $null = Invoke-RestMethod -Uri "$uri$uriAdd" -Method Delete -Headers (Get-TSRequestHeaderDict)
+                    }
+                }
+            }
+        } elseif ($GranteeType -and $GranteeId) { # Remove all permissions for one grantee
+            $shouldProcessItem += ", all default permissions for {0}:{1}" -f $GranteeTyp,$GranteeId
+            if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
+                $allDefaultPermissions = Get-TSDefaultPermission -ProjectId $ProjectId
+                foreach ($contentType in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
+                    if ((Get-Variable -Name $contentType -ValueOnly) -eq $true) {
+                        $permissions = $allDefaultPermissions | Where-Object -FilterScript {
+                            ($_.contentType -eq $contentType) -and
+                            ($_.granteeType -eq $GranteeType) -and
+                            ($_.granteeId -eq $GranteeId)}
+                        if ($permissions.Length -gt 0) {
+                            foreach ($permission in $permissions) {
+                                $permission.capabilities.GetEnumerator() | ForEach-Object {
+                                    $uriAdd = "{0}/{1}s/{2}/{3}/{4}" -f $contentType,$GranteeType.ToLower(),$GranteeId,$_.Key,$_.Value
+                                    $null = Invoke-RestMethod -Uri "$uri$uriAdd" -Method Delete -Headers (Get-TSRequestHeaderDict)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } elseif ($All) { # Remove all default permissions for all grantees
+            $shouldProcessItem += ", ALL DEFAULT PERMISSIONS"
+            if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
+                $allDefaultPermissions = Get-TSDefaultPermission -ProjectId $ProjectId
+                foreach ($contentType in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
+                    $permissions = $allDefaultPermissions | Where-Object contentType -eq $contentType
+                    if ($permissions.Length -gt 0) {
+                        foreach ($permission in $permissions) {
+                            $permission.capabilities.GetEnumerator() | ForEach-Object {
+                                $uriAdd = "{0}/{1}s/{2}/{3}/{4}" -f $contentType,$permission.granteeType.ToLower(),$permission.granteeId,$_.Key,$_.Value
+                                $null = Invoke-RestMethod -Uri "$uri$uriAdd" -Method Delete -Headers (Get-TSRequestHeaderDict)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
 }
 
 ### Tags methods
@@ -3436,33 +3640,14 @@ Export-ModuleMember -Function Start-TSFlowNow
 # Cancel Flow Run
 
 ### Permissions methods
-Export-ModuleMember -Function Get-TSDefaultPermission
-Export-ModuleMember -Function Set-TSDefaultPermission
-Export-ModuleMember -Function Add-TSDefaultPermission
-Export-ModuleMember -Function Remove-TSDefaultPermission
 Export-ModuleMember -Function Get-TSContentPermission
 Export-ModuleMember -Function Set-TSContentPermission
 Export-ModuleMember -Function Add-TSContentPermission
 Export-ModuleMember -Function Remove-TSContentPermission
 Export-ModuleMember -Function ConvertTo-TSPermissionTable
-# Query Default Permissions
-# Query Workbook Permissions
-# Query View Permissions
-# Query Data Source Permissions
-# Query Project Permissions
-# Query Flow Permissions
-# Add Default Permissions
-# Add Workbook Permissions
-# Add View Permissions
-# Add Data Source Permissions
-# Add Project Permissions
-# Add Flow Permissions
-# Delete Default Permission
-# Delete Workbook Permission
-# Delete View Permission
-# Delete Data Source Permission
-# Delete Project Permission
-# Delete Flow Permission
+Export-ModuleMember -Function Get-TSDefaultPermission
+Export-ModuleMember -Function Set-TSDefaultPermission
+Export-ModuleMember -Function Remove-TSDefaultPermission
 # List Ask Data Lens Permissions
 # Add Ask Data Lens Permissions
 # Delete Ask Data Lens Permission
