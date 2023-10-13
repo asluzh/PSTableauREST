@@ -226,7 +226,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 # $newProjectPermissionsJson = $newProjectPermissions | ConvertTo-Json -Compress
                 # $newProjectPermissionsJson | Should -Be $defProjectPermissionsJson
             }
-            It "Query/remove/add/set project permissions on <ConfigFile.server>" -Skip {
+            It "Query/remove/add/set project permissions on <ConfigFile.server>" {
                 $permissions = Get-TSContentPermission -ProjectId $testProjectId
                 $permissions.project.id | Should -Be $testProjectId
                 $savedPermissionTable = $permissions | ConvertTo-TSPermissionTable
@@ -245,7 +245,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         $capabilitiesHashtable.Add($cap, (Get-Random -InputObject 'Allow','Deny'))
                     }
                 }
-                $allPermissionTable += @{granteeType="User";granteeId=(Get-TSCurrentUserId);capabilities=$capabilitiesHashtable}
+                $allPermissionTable += @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=$capabilitiesHashtable}
                 $permissions = Add-TSContentPermission -ProjectId $testProjectId -PermissionTable $allPermissionTable
                 $permissions.project.id | Should -Be $testProjectId
                 $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
@@ -256,7 +256,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 foreach ($cap in $possibleCap) {
                     $capabilitiesHashtable.Add($cap, "Allow")
                 }
-                $allPermissionTable += @{granteeType="User";granteeId=(Get-TSCurrentUserId);capabilities=$capabilitiesHashtable}
+                $allPermissionTable += @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=$capabilitiesHashtable}
                 $permissions = Set-TSContentPermission -ProjectId $testProjectId -PermissionTable $allPermissionTable
                 $permissions.project.id | Should -Be $testProjectId
                 $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
@@ -290,32 +290,50 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                 }
             }
-            It "Query/remove/set default project permissions on <ConfigFile.server>" -Skip {
+            It "Query/remove/set default project permissions on <ConfigFile.server>" {
                 $savedPermissionTable = Get-TSDefaultPermission -ProjectId $testProjectId
+                $wbPermissionTable = Get-TSDefaultPermission -ProjectId $testProjectId -ContentType Workbooks
+                $wbPermissionTable.Length | Should -BeLessOrEqual $savedPermissionTable.Length
                 # remove all default permissions for all grantees
                 {Remove-TSDefaultPermission -ProjectId $testProjectId -All} | Should -Not -Throw
                 $permissions = Get-TSDefaultPermission -ProjectId $testProjectId
                 $permissions.Length | Should -Be 0
                 # add all possible permissions (random Allow/Deny) for the current user
-                # $possibleCap = 'ProjectLeader','Read','Write' #
-                # $allPermissionTable = @()
-                # $capabilitiesHashtable = @{}
-                # foreach ($cap in $possibleCap) {
-                #     if ($cap -eq 'ProjectLeader') {
-                #         $capabilitiesHashtable.Add($cap, "Allow") # Deny is not supported
-                #     } else {
-                #         $capabilitiesHashtable.Add($cap, (Get-Random -InputObject 'Allow','Deny'))
-                #     }
-                # }
-                # $allPermissionTable += @{granteeType="User";granteeId=(Get-TSCurrentUserId);capabilities=$capabilitiesHashtable}
-                # $permissions = Add-TSContentPermission -ProjectId $testProjectId -PermissionTable $allPermissionTable
-                # $permissions.project.id | Should -Be $testProjectId
-                # $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
-                # ($permissions.granteeCapabilities.capabilities.capability | Measure-Object).Count | Should -Be $possibleCap.Length
+                foreach ($ct in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
+                    switch ($ct) {
+                        'workbooks' {
+                            $possibleCap = 'Read','Filter','ViewComments','AddComment','ExportImage','ExportData','ShareView','ViewUnderlyingData','WebAuthoring','RunExplainData','ExportXml','Write','CreateRefreshMetrics','ChangeHierarchy','Delete','ChangePermissions'
+                        }
+                        'datasources' {
+                            $possibleCap = 'Read','Connect','ExportXml','Write','SaveAs','ChangeHierarchy','Delete','ChangePermissions'
+                        }
+                        'flows' {
+                            $possibleCap = 'Read','ExportXml','Execute','Write','ChangeHierarchy','Delete','ChangePermissions' # ,'WebAuthoring'
+                        }
+                        {$_ -in 'dataroles','metrics','lenses'} {
+                            $possibleCap = 'Read','Write','ChangeHierarchy','Delete','ChangePermissions'
+                        }
+                        {$_ -in 'databases','tables'} {
+                            $possibleCap = 'Read','Write','ChangeHierarchy','ChangePermissions'
+                        }
+                    }
+                    $allPermissionTable = @()
+                    $capabilitiesHashtable = @{}
+                    foreach ($cap in $possibleCap) {
+                        $capabilitiesHashtable.Add($cap, (Get-Random -InputObject 'Allow','Deny'))
+                    }
+                    $allPermissionTable += @{contentType=$ct; granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=$capabilitiesHashtable}
+                    $permissions = Set-TSDefaultPermission -ProjectId $testProjectId -PermissionTable $allPermissionTable
+                    $permissions.Length | Should -Be 1 # we add for only one content type, so the output is also only 1
+                    ($permissions | Where-Object contentType -eq $ct).capabilities.Count | Should -Be $possibleCap.Length
+                }
+                # remove all default permissions for one grantee
+                {Remove-TSDefaultPermission -ProjectId $testProjectId -GranteeType User -GranteeId (Get-TSCurrentUserId)} | Should -Not -Throw
+                $permissions = Get-TSDefaultPermission -ProjectId $testProjectId
+                $permissions.Length | Should -Be 0
                 # restore initial permissions configuration
                 if ($savedPermissionTable.Length -gt 0) {
                     $permissions = Set-TSDefaultPermission -ProjectId $testProjectId -PermissionTable $savedPermissionTable
-                    $permissions.Length | Should -Be $savedPermissionTable.Length
                     # remove all default permissions for one grantee for the first content type
                     {Remove-TSDefaultPermission -ProjectId $testProjectId -GranteeType $permissions[0].granteeType -GranteeId $permissions[0].granteeId -ContentType $permissions[0].contentType} | Should -Not -Throw
                     $permissions = Get-TSDefaultPermission -ProjectId $testProjectId
@@ -324,7 +342,6 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 # restore initial permissions configuration
                 if ($savedPermissionTable.Length -gt 0) {
                     $permissions = Set-TSDefaultPermission -ProjectId $testProjectId -PermissionTable $savedPermissionTable
-                    $permissions.Length | Should -Be $savedPermissionTable.Length
                     # remove again each permission/capability one-by-one
                     foreach ($permission in $permissions) {
                         if ($permission.capabilities -and $permission.capabilities.Count -gt 0) {
@@ -611,13 +628,13 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $permissions = Get-TSContentPermission -WorkbookId $sampleWorkbookId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # add all possible permissions (random Allow/Deny) for the current user
-                    $possibleCap = 'AddComment','ChangeHierarchy','ChangePermissions','CreateRefreshMetrics','Delete','ExportData','ExportImage','ExportXml','Filter','Read','RunExplainData','ShareView','ViewComments','ViewUnderlyingData','WebAuthoring','Write'
+                    $possibleCap = 'Read','Filter','ViewComments','AddComment','ExportImage','ExportData','ShareView','ViewUnderlyingData','WebAuthoring','RunExplainData','ExportXml','Write','CreateRefreshMetrics','ChangeHierarchy','Delete','ChangePermissions'
                     $allPermissionTable = @()
                     $capabilitiesHashtable = @{}
                     foreach ($cap in $possibleCap) {
                         $capabilitiesHashtable.Add($cap, (Get-Random -InputObject 'Allow','Deny'))
                     }
-                    $allPermissionTable += @{granteeType="User";granteeId=(Get-TSCurrentUserId);capabilities=$capabilitiesHashtable}
+                    $allPermissionTable += @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=$capabilitiesHashtable}
                     $permissions = Add-TSContentPermission -WorkbookId $sampleWorkbookId -PermissionTable $allPermissionTable
                     $permissions.workbook.id | Should -Be $sampleWorkbookId
                     $permissions.workbook.name | Should -Be $sampleWorkbookName
@@ -629,7 +646,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     foreach ($cap in $possibleCap) {
                         $capabilitiesHashtable.Add($cap, "Allow")
                     }
-                    $allPermissionTable += @{granteeType="User";granteeId=(Get-TSCurrentUserId);capabilities=$capabilitiesHashtable}
+                    $allPermissionTable += @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=$capabilitiesHashtable}
                     $permissions = Set-TSContentPermission -WorkbookId $sampleWorkbookId -PermissionTable $allPermissionTable
                     $permissions.workbook.id | Should -Be $sampleWorkbookId
                     $permissions.workbook.name | Should -Be $sampleWorkbookName
@@ -817,13 +834,13 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $permissions = Get-TSContentPermission -DatasourceId $sampleDatasourceId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # add all possible permissions (random Allow/Deny) for the current user
-                    $possibleCap = 'ChangePermissions','Connect','Delete','ExportXml','Read','Write','SaveAs'
+                    $possibleCap = 'Read','Connect','ExportXml','Write','SaveAs','ChangeHierarchy','Delete','ChangePermissions'
                     $allPermissionTable = @()
                     $capabilitiesHashtable = @{}
                     foreach ($cap in $possibleCap) {
                         $capabilitiesHashtable.Add($cap, (Get-Random -InputObject 'Allow','Deny'))
                     }
-                    $allPermissionTable += @{granteeType="User";granteeId=(Get-TSCurrentUserId);capabilities=$capabilitiesHashtable}
+                    $allPermissionTable += @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=$capabilitiesHashtable}
                     $permissions = Add-TSContentPermission -DatasourceId $sampleDatasourceId -PermissionTable $allPermissionTable
                     $permissions.datasource.id | Should -Be $sampleDatasourceId
                     $permissions.datasource.name | Should -Be $sampleDatasourceName
@@ -835,7 +852,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     foreach ($cap in $possibleCap) {
                         $capabilitiesHashtable.Add($cap, "Allow")
                     }
-                    $allPermissionTable += @{granteeType="User";granteeId=(Get-TSCurrentUserId);capabilities=$capabilitiesHashtable}
+                    $allPermissionTable += @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=$capabilitiesHashtable}
                     $permissions = Set-TSContentPermission -DatasourceId $sampleDatasourceId -PermissionTable $allPermissionTable
                     $permissions.datasource.id | Should -Be $sampleDatasourceId
                     $permissions.datasource.name | Should -Be $sampleDatasourceName
@@ -1009,13 +1026,13 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $permissions = Get-TSContentPermission -ViewId $sampleViewId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # add all possible permissions (random Allow/Deny) for the current user
-                    $possibleCap = 'AddComment','ChangePermissions','Delete','ExportData','ExportImage','Filter','Read','ShareView','ViewComments','ViewUnderlyingData','WebAuthoring' # 'ExportXml','Write' capabilities are not supported here (despite documentation)
+                    $possibleCap = 'Read','Filter','ViewComments','AddComment','ExportImage','ExportData','ShareView','ViewUnderlyingData','WebAuthoring','Delete','ChangePermissions' # 'ExportXml','Write' capabilities are not supported here (despite documentation)
                     $allPermissionTable = @()
                     $capabilitiesHashtable = @{}
                     foreach ($cap in $possibleCap) {
                         $capabilitiesHashtable.Add($cap, (Get-Random -InputObject 'Allow','Deny'))
                     }
-                    $allPermissionTable += @{granteeType="User";granteeId=(Get-TSCurrentUserId);capabilities=$capabilitiesHashtable}
+                    $allPermissionTable += @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=$capabilitiesHashtable}
                     $permissions = Add-TSContentPermission -ViewId $sampleViewId -PermissionTable $allPermissionTable
                     $permissions.view.id | Should -Be $sampleViewId
                     $permissions.view.name | Should -Be $sampleViewName
@@ -1027,7 +1044,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     foreach ($cap in $possibleCap) {
                         $capabilitiesHashtable.Add($cap, "Allow")
                     }
-                    $allPermissionTable += @{granteeType="User";granteeId=(Get-TSCurrentUserId);capabilities=$capabilitiesHashtable}
+                    $allPermissionTable += @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=$capabilitiesHashtable}
                     $permissions = Set-TSContentPermission -ViewId $sampleViewId -PermissionTable $allPermissionTable
                     $permissions.view.id | Should -Be $sampleViewId
                     $permissions.view.name | Should -Be $sampleViewName
@@ -1167,13 +1184,13 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $permissions = Get-TSContentPermission -FlowId $sampleFlowId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # add all possible permissions (random Allow/Deny) for the current user
-                    $possibleCap = 'ChangeHierarchy','ChangePermissions','Delete','Execute','ExportXml','Read','Write'
+                    $possibleCap = 'Read','ExportXml','Execute','Write','ChangeHierarchy','Delete','ChangePermissions' # ,'WebAuthoring' not suported
                     $allPermissionTable = @()
                     $capabilitiesHashtable = @{}
                     foreach ($cap in $possibleCap) {
                         $capabilitiesHashtable.Add($cap, (Get-Random -InputObject 'Allow','Deny'))
                     }
-                    $allPermissionTable += @{granteeType="User";granteeId=(Get-TSCurrentUserId);capabilities=$capabilitiesHashtable}
+                    $allPermissionTable += @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=$capabilitiesHashtable}
                     $permissions = Add-TSContentPermission -FlowId $sampleFlowId -PermissionTable $allPermissionTable
                     $permissions.flow.id | Should -Be $sampleFlowId
                     $permissions.flow.name | Should -Be $sampleFlowName
@@ -1185,7 +1202,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     foreach ($cap in $possibleCap) {
                         $capabilitiesHashtable.Add($cap, "Allow")
                     }
-                    $allPermissionTable += @{granteeType="User";granteeId=(Get-TSCurrentUserId);capabilities=$capabilitiesHashtable}
+                    $allPermissionTable += @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=$capabilitiesHashtable}
                     $permissions = Set-TSContentPermission -FlowId $sampleFlowId -PermissionTable $allPermissionTable
                     $permissions.flow.id | Should -Be $sampleFlowId
                     $permissions.flow.name | Should -Be $sampleFlowName

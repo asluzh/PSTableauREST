@@ -31,20 +31,20 @@ function Get-TSRequestUri {
         [Parameter()][string] $Param
     )
     $Uri = "$script:TSServerUrl/api/$script:TSRestApiVersion/"
-    switch($Endpoint) {
-        "Auth" { $Uri += "auth/$Param" }
-        "GraphQL" {
+    switch ($Endpoint) {
+        'Auth' { $Uri += "auth/$Param" }
+        'GraphQL' {
             $Uri = "$script:TSServerUrl/api/metadata/graphql"
         }
-        "Site" {
+        'Site' {
             $Uri += "sites"
             if ($Param) { $Uri += "/$Param" }
         }
-        "FileUpload" {
+        'FileUpload' {
             $Uri += "sites/$script:TSSiteId/fileUploads"
             if ($Param) { $Uri += "/$Param" }
         }
-        "OrderFavorites" {
+        'OrderFavorites' {
             $Uri += "sites/$script:TSSiteId/orderFavorites"
             if ($Param) { $Uri += "/$Param" }
         }
@@ -2953,38 +2953,40 @@ function ConvertTo-TSPermissionTable {
     return $permissionTable
 }
 
-function Get-TSDefaultPermission { # TODO add support to get only for specific contentType
-    # TODO check if dp for virtual connections are supported
+function Get-TSDefaultPermission {
     [OutputType([hashtable[]])]
     Param(
-        [Parameter(Mandatory)][string] $ProjectId
+        [Parameter(Mandatory)][string] $ProjectId,
+        [Parameter()][ValidateSet('Workbooks','Datasources','Flows','Dataroles','Lenses','Metrics','Databases','Tables')][string] $ContentType
     )
     # Assert-TSRestApiVersion -AtLeast 2.1
     $permissionTable = @()
     $uri = Get-TSRequestUri -Endpoint Project -Param "$ProjectId/default-permissions/"
     try {
-        foreach ($contentType in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
-            $response = Invoke-RestMethod -Uri $uri$contentType -Method Get -Headers (Get-TSRequestHeaderDict)
-            if ($response.tsResponse.permissions.granteeCapabilities) {
-                $response.tsResponse.permissions.granteeCapabilities | ForEach-Object {
-                    if ($_.group -and $_.group.id) {
-                        $granteeType = 'group'
-                        $granteeId = $_.group.id
-                    } elseif ($_.user -and $_.user.id) {
-                        $granteeType = 'user'
-                        $granteeId = $_.user.id
-                    } else {
-                        Write-Error -Message "Invalid grantee in the response object" -Exception -Category InvalidArgument
-                    }
-                    $capabilitiesHashtable = @{}
-                    $_.capabilities.capability | ForEach-Object {
-                        if ($_.name -and $_.mode) {
-                            $capabilitiesHashtable.Add($_.name, $_.mode)
+        foreach ($ct in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') { #,'virtualconnections' not supported yet
+            if ((-Not ($ContentType)) -or $ContentType -eq $ct) {
+                $response = Invoke-RestMethod -Uri $uri$ct -Method Get -Headers (Get-TSRequestHeaderDict)
+                if ($response.tsResponse.permissions.granteeCapabilities) {
+                    $response.tsResponse.permissions.granteeCapabilities | ForEach-Object {
+                        if ($_.group -and $_.group.id) {
+                            $granteeType = 'group'
+                            $granteeId = $_.group.id
+                        } elseif ($_.user -and $_.user.id) {
+                            $granteeType = 'user'
+                            $granteeId = $_.user.id
                         } else {
-                            Write-Error -Message "Invalid permission capability in the input object" -Exception -Category InvalidArgument
+                            Write-Error -Message "Invalid grantee in the response object" -Exception -Category InvalidArgument
                         }
+                        $capabilitiesHashtable = @{}
+                        $_.capabilities.capability | ForEach-Object {
+                            if ($_.name -and $_.mode) {
+                                $capabilitiesHashtable.Add($_.name, $_.mode)
+                            } else {
+                                Write-Error -Message "Invalid permission capability in the input object" -Exception -Category InvalidArgument
+                            }
+                        }
+                        $permissionTable += @{contentType=$ct;granteeType=$granteeType;granteeId=$granteeId;capabilities=$capabilitiesHashtable}
                     }
-                    $permissionTable += @{contentType=$contentType;granteeType=$granteeType;granteeId=$granteeId;capabilities=$capabilitiesHashtable}
                 }
             }
         }
@@ -3003,9 +3005,9 @@ function Set-TSDefaultPermission {
     )
     $uri = Get-TSRequestUri -Endpoint Project -Param "$ProjectId/default-permissions/"
     $outputPermissionTable = @()
-    foreach ($contentType in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
+    foreach ($ct in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
         $shouldProcessItem = "project:$ProjectId"
-        $contentTypePermissions = $PermissionTable | Where-Object contentType -eq $contentType
+        $contentTypePermissions = $PermissionTable | Where-Object contentType -eq $ct
         if ($contentTypePermissions.Length -gt 0) {
             $xml = New-Object System.Xml.XmlDocument
             $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -3022,10 +3024,10 @@ function Set-TSDefaultPermission {
                     $el_cap.SetAttribute("mode", $_.Value)
                 }
             }
-            $shouldProcessItem += ", {0}:{1}/{2}" -f $contentType,$contentTypePermissions.Length,$permissionsCount
+            $shouldProcessItem += ", {0}:{1}/{2}" -f $ct,$contentTypePermissions.Length,$permissionsCount
             try {
                 if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-                    $response = Invoke-RestMethod -Uri $uri$contentType -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+                    $response = Invoke-RestMethod -Uri $uri$ct -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
                     if ($response.tsResponse.permissions.granteeCapabilities) {
                         $response.tsResponse.permissions.granteeCapabilities | ForEach-Object {
                             if ($_.group -and $_.group.id) {
@@ -3045,7 +3047,7 @@ function Set-TSDefaultPermission {
                                     Write-Error -Message "Invalid permission capability in the input object" -Exception -Category InvalidArgument
                                 }
                             }
-                            $outputPermissionTable += @{contentType=$contentType;granteeType=$granteeType;granteeId=$granteeId;capabilities=$capabilitiesHashtable}
+                            $outputPermissionTable += @{contentType=$ct;granteeType=$granteeType;granteeId=$granteeId;capabilities=$capabilitiesHashtable}
                         }
                     }
                 }
@@ -3078,7 +3080,7 @@ function Remove-TSDefaultPermission {
         [ValidateSet('Allow','Deny')][string] $CapabilityMode,
         [Parameter(Mandatory,ParameterSetName='OneGranteeForContentType')]
         [Parameter(Mandatory,ParameterSetName='OneCapability')]
-        [ValidateSet('Workbooks','Datasources','Flows','Dataroles','Lenses','Metrics','Databases','Tables')][string] $ContentType, # only one content type can be removed
+        [ValidateSet('Workbooks','Datasources','Flows','Dataroles','Lenses','Metrics','Databases','Tables')][string] $ContentType,
         [Parameter(Mandatory,ParameterSetName='AllPermissions')]
         [switch] $All # explicit switch parameter to remove all default permissions
     )
