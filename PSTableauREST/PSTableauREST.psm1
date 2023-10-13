@@ -3057,15 +3057,17 @@ function Set-TSDefaultPermission {
     return $outputPermissionTable
 }
 
-function Remove-TSDefaultPermission { # TODO specific contentType not as switch but as single param (either for one or allgrantee)
+function Remove-TSDefaultPermission {
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType()]
     Param(
         [Parameter(Mandatory)][string] $ProjectId,
-        [Parameter(Mandatory,ParameterSetName='AllGrantee')]
+        [Parameter(Mandatory,ParameterSetName='OneGrantee')]
+        [Parameter(Mandatory,ParameterSetName='OneGranteeForContentType')]
         [Parameter(Mandatory,ParameterSetName='OneCapability')]
         [ValidateSet('User','Group')][string] $GranteeType,
-        [Parameter(Mandatory,ParameterSetName='AllGrantee')]
+        [Parameter(Mandatory,ParameterSetName='OneGrantee')]
+        [Parameter(Mandatory,ParameterSetName='OneGranteeForContentType')]
         [Parameter(Mandatory,ParameterSetName='OneCapability')]
         [string] $GranteeId,
         [Parameter(Mandatory,ParameterSetName='OneCapability')]
@@ -3074,31 +3076,10 @@ function Remove-TSDefaultPermission { # TODO specific contentType not as switch 
             'WebAuthoring','Write','RunExplainData','CreateRefreshMetrics','SaveAs')][string] $CapabilityName,
         [Parameter(Mandatory,ParameterSetName='OneCapability')]
         [ValidateSet('Allow','Deny')][string] $CapabilityMode,
-        [Parameter(ParameterSetName='AllGrantee')]
-        [Parameter(ParameterSetName='OneCapability')]
-        [switch] $Workbooks, # remove default permissions for workbooks
-        [Parameter(ParameterSetName='AllGrantee')]
-        [Parameter(ParameterSetName='OneCapability')]
-        [switch] $Datasources, # remove default permissions for datasources
-        [Parameter(ParameterSetName='AllGrantee')]
-        [Parameter(ParameterSetName='OneCapability')]
-        [switch] $Flows, # remove default permissions for flows
-        [Parameter(ParameterSetName='AllGrantee')]
-        [Parameter(ParameterSetName='OneCapability')]
-        [switch] $Dataroles, # remove default permissions for dataroles
-        [Parameter(ParameterSetName='AllGrantee')]
-        [Parameter(ParameterSetName='OneCapability')]
-        [switch] $Lenses, # remove default permissions for lenses
-        [Parameter(ParameterSetName='AllGrantee')]
-        [Parameter(ParameterSetName='OneCapability')]
-        [switch] $Metrics, # remove default permissions for metrics
-        [Parameter(ParameterSetName='AllGrantee')]
-        [Parameter(ParameterSetName='OneCapability')]
-        [switch] $Databases, # remove default permissions for databases
-        [Parameter(ParameterSetName='AllGrantee')]
-        [Parameter(ParameterSetName='OneCapability')]
-        [switch] $Tables, # remove default permissions for tables
-        [Parameter(Mandatory,ParameterSetName='All')]
+        [Parameter(Mandatory,ParameterSetName='OneGranteeForContentType')]
+        [Parameter(Mandatory,ParameterSetName='OneCapability')]
+        [ValidateSet('Workbooks','Datasources','Flows','Dataroles','Lenses','Metrics','Databases','Tables')][string] $ContentType, # only one content type can be removed
+        [Parameter(Mandatory,ParameterSetName='AllPermissions')]
         [switch] $All # explicit switch parameter to remove all default permissions
     )
     $uri = Get-TSRequestUri -Endpoint Project -Param "$ProjectId/default-permissions/"
@@ -3106,28 +3087,24 @@ function Remove-TSDefaultPermission { # TODO specific contentType not as switch 
     try {
         if ($CapabilityName -and $CapabilityMode) { # Remove one default permission/capability
             $shouldProcessItem += ", default permission for {0}:{1}, {2}:{3}" -f $GranteeType,$GranteeId,$CapabilityName,$CapabilityMode
-            foreach ($contentType in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
-                if ((Get-Variable -Name $contentType -ValueOnly) -eq $true) {
-                    $uriAdd = "{0}/{1}s/{2}/{3}/{4}" -f $contentType,$GranteeType.ToLower(),$GranteeId,$CapabilityName,$CapabilityMode
-                    if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-                        $null = Invoke-RestMethod -Uri "$uri$uriAdd" -Method Delete -Headers (Get-TSRequestHeaderDict)
-                    }
-                }
+            $uriAdd = "{0}/{1}s/{2}/{3}/{4}" -f $ContentType,$GranteeType.ToLower(),$GranteeId,$CapabilityName,$CapabilityMode
+            if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
+                $null = Invoke-RestMethod -Uri "$uri$uriAdd" -Method Delete -Headers (Get-TSRequestHeaderDict)
             }
         } elseif ($GranteeType -and $GranteeId) { # Remove all permissions for one grantee
             $shouldProcessItem += ", all default permissions for {0}:{1}" -f $GranteeTyp,$GranteeId
             if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
                 $allDefaultPermissions = Get-TSDefaultPermission -ProjectId $ProjectId
-                foreach ($contentType in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
-                    if ((Get-Variable -Name $contentType -ValueOnly) -eq $true) {
+                foreach ($ct in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
+                    if ((-Not ($ContentType)) -or $ContentType -eq $ct) {
                         $permissions = $allDefaultPermissions | Where-Object -FilterScript {
-                            ($_.contentType -eq $contentType) -and
+                            ($_.contentType -eq $ct) -and
                             ($_.granteeType -eq $GranteeType) -and
                             ($_.granteeId -eq $GranteeId)}
                         if ($permissions.Length -gt 0) {
                             foreach ($permission in $permissions) {
                                 $permission.capabilities.GetEnumerator() | ForEach-Object {
-                                    $uriAdd = "{0}/{1}s/{2}/{3}/{4}" -f $contentType,$GranteeType.ToLower(),$GranteeId,$_.Key,$_.Value
+                                    $uriAdd = "{0}/{1}s/{2}/{3}/{4}" -f $ct,$GranteeType.ToLower(),$GranteeId,$_.Key,$_.Value
                                     $null = Invoke-RestMethod -Uri "$uri$uriAdd" -Method Delete -Headers (Get-TSRequestHeaderDict)
                                 }
                             }
@@ -3139,12 +3116,12 @@ function Remove-TSDefaultPermission { # TODO specific contentType not as switch 
             $shouldProcessItem += ", ALL DEFAULT PERMISSIONS"
             if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
                 $allDefaultPermissions = Get-TSDefaultPermission -ProjectId $ProjectId
-                foreach ($contentType in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
-                    $contentTypePermissions = $allDefaultPermissions | Where-Object contentType -eq $contentType
+                foreach ($ct in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
+                    $contentTypePermissions = $allDefaultPermissions | Where-Object contentType -eq $ct
                     if ($contentTypePermissions.Length -gt 0) {
                         foreach ($permission in $contentTypePermissions) {
                             $permission.capabilities.GetEnumerator() | ForEach-Object {
-                                $uriAdd = "{0}/{1}s/{2}/{3}/{4}" -f $contentType,$permission.granteeType.ToLower(),$permission.granteeId,$_.Key,$_.Value
+                                $uriAdd = "{0}/{1}s/{2}/{3}/{4}" -f $ct,$permission.granteeType.ToLower(),$permission.granteeId,$_.Key,$_.Value
                                 $null = Invoke-RestMethod -Uri "$uri$uriAdd" -Method Delete -Headers (Get-TSRequestHeaderDict)
                             }
                         }

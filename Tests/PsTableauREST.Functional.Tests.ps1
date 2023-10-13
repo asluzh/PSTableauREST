@@ -317,9 +317,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $permissions = Set-TSDefaultPermission -ProjectId $testProjectId -PermissionTable $savedPermissionTable
                     $permissions.Length | Should -Be $savedPermissionTable.Length
                     # remove all default permissions for one grantee for the first content type
-                    $ContentTypeParam = @{}
-                    $ContentTypeParam.Add($permissions[0].contentType,$true)
-                    {Remove-TSDefaultPermission -ProjectId $testProjectId -GranteeType $permissions[0].granteeType -GranteeId $permissions[0].granteeId @ContentTypeParam} | Should -Not -Throw
+                    {Remove-TSDefaultPermission -ProjectId $testProjectId -GranteeType $permissions[0].granteeType -GranteeId $permissions[0].granteeId -ContentType $permissions[0].contentType} | Should -Not -Throw
                     $permissions = Get-TSDefaultPermission -ProjectId $testProjectId
                     $permissions.Length | Should -BeLessThan $savedPermissionTable.Length
                 }
@@ -329,11 +327,9 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $permissions.Length | Should -Be $savedPermissionTable.Length
                     # remove again each permission/capability one-by-one
                     foreach ($permission in $permissions) {
-                        $ContentTypeParam = @{}
-                        $ContentTypeParam.Add($permission.contentType,$true)
                         if ($permission.capabilities -and $permission.capabilities.Count -gt 0) {
                             $permission.capabilities.GetEnumerator() | ForEach-Object {
-                                {Remove-TSDefaultPermission -ProjectId $testProjectId -GranteeType $permission.granteeType -GranteeId $permission.granteeId -CapabilityName $_.Key -CapabilityMode $_.Value @ContentTypeParam} | Should -Not -Throw
+                                {Remove-TSDefaultPermission -ProjectId $testProjectId -GranteeType $permission.granteeType -GranteeId $permission.granteeId -CapabilityName $_.Key -CapabilityMode $_.Value -ContentType $permission.contentType} | Should -Not -Throw
                             }
                         }
                     }
