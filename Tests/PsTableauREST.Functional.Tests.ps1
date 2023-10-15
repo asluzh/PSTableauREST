@@ -214,14 +214,14 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 $defaultProject = Get-TSDefaultProject
                 $defaultProject.id | Should -BeOfType String
                 $defaultProject.name | Should -Be "Default"
-                # $defProjectPermissions = Get-TSContentPermission -ProjectId $defaultProject.id
-                # $newProjectPermissions = Get-TSContentPermission -ProjectId $testProjectId
-                # Assert-Equivalent -Actual $newProjectPermissions -Expected $defProjectPermissions
+                $defProjectPermissionTable = Get-TSContentPermission -ProjectId $defaultProject.id | ConvertTo-TSPermissionTable
+                $newProjectPermissionTable = Get-TSContentPermission -ProjectId $testProjectId | ConvertTo-TSPermissionTable
+                Assert-Equivalent -Actual $defProjectPermissionTable -Expected $newProjectPermissionTable
                 $defProjectPermissions = Get-TSDefaultPermission -ProjectId $defaultProject.id
                 $newProjectPermissions = Get-TSDefaultPermission -ProjectId $testProjectId
                 Assert-Equivalent -Actual $newProjectPermissions -Expected $defProjectPermissions
                 # another approach to deep compare permissions tables: convert to json
-                # however this doesn't work for differences in capabilities sort order
+                # however this doesn't work with differences in capabilities sort order
                 # $defProjectPermissionsJson = $defProjectPermissions | ConvertTo-Json -Compress
                 # $newProjectPermissionsJson = $newProjectPermissions | ConvertTo-Json -Compress
                 # $newProjectPermissionsJson | Should -Be $defProjectPermissionsJson

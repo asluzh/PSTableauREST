@@ -308,7 +308,7 @@ function Get-TSSite {
         } else { # get all sites
             $pageNumber = 0
             do {
-                $pageNumber += 1
+                $pageNumber++
                 $uri = Get-TSRequestUri -Endpoint Site
                 $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
                 $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
@@ -431,7 +431,7 @@ function Get-TSProject {
     try {
         $pageNumber = 0
         do {
-            $pageNumber += 1
+            $pageNumber++
             $uri = Get-TSRequestUri -Endpoint Project
             $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
             $uriParam.Add("pageSize", $PageSize)
@@ -583,7 +583,7 @@ function Get-TSUser {
         } else { # Get Users on Site
             $pageNumber = 0
             do {
-                $pageNumber += 1
+                $pageNumber++
                 $uri = Get-TSRequestUri -Endpoint User
                 $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
                 $uriParam.Add("pageSize", $PageSize)
@@ -710,7 +710,7 @@ function Get-TSGroup {
     try {
         $pageNumber = 0
         do {
-            $pageNumber += 1
+            $pageNumber++
             $uri = Get-TSRequestUri -Endpoint Group
             $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
             $uriParam.Add("pageSize", $PageSize)
@@ -895,7 +895,7 @@ function Get-TSUsersInGroup {
     try {
         $pageNumber = 0
         do {
-            $pageNumber += 1
+            $pageNumber++
             $uri = Get-TSRequestUri -Endpoint Group -Param $GroupId/users
             $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
             $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
@@ -917,7 +917,7 @@ function Get-TSGroupsForUser {
     try {
         $pageNumber = 0
         do {
-            $pageNumber += 1
+            $pageNumber++
             $uri = Get-TSRequestUri -Endpoint User -Param $UserId/groups
             $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
             $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
@@ -950,7 +950,7 @@ function Send-TSFileUpload {
         $bytesUploaded = 0
         $startTime = Get-Date
         do {
-            $chunkNumber += 1
+            $chunkNumber++
             $boundaryString = (New-Guid).ToString("N")
             $multipartContent = New-Object System.Net.Http.MultipartFormDataContent($boundaryString)
             [void]$multipartContent.Headers.Remove("Content-Type")
@@ -1015,7 +1015,7 @@ function Get-TSWorkbook {
             # Assert-TSRestApiVersion -AtLeast 2.3
             $pageNumber = 0
             do {
-                $pageNumber += 1
+                $pageNumber++
                 $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/revisions
                 $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
                 $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
@@ -1033,7 +1033,7 @@ function Get-TSWorkbook {
         } else { # Query Workbooks on Site
             $pageNumber = 0
             do {
-                $pageNumber += 1
+                $pageNumber++
                 $uri = Get-TSRequestUri -Endpoint Workbook
                 $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
                 $uriParam.Add("pageSize", $PageSize)
@@ -1070,7 +1070,7 @@ function Get-TSWorkbooksForUser {
     try {
         $pageNumber = 0
         do {
-            $pageNumber += 1
+            $pageNumber++
             $uri = Get-TSRequestUri -Endpoint User -Param $UserId/workbooks
             $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
             if ($IsOwner) { $uri += "&ownedBy=true" }
@@ -1492,7 +1492,7 @@ function Get-TSDatasource {
             # Assert-TSRestApiVersion -AtLeast 2.3
             $pageNumber = 0
             do {
-                $pageNumber += 1
+                $pageNumber++
                 $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/revisions
                 $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
                 $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
@@ -1505,7 +1505,7 @@ function Get-TSDatasource {
         } else { # Query Data Sources
             $pageNumber = 0
             do {
-                $pageNumber += 1
+                $pageNumber++
                 $uri = Get-TSRequestUri -Endpoint Datasource
                 $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
                 $uriParam.Add("pageSize", $PageSize)
@@ -1890,7 +1890,7 @@ function Get-TSView {
             # Assert-TSRestApiVersion -AtLeast 2.2
             $pageNumber = 0
             do {
-                $pageNumber += 1
+                $pageNumber++
                 $uri = Get-TSRequestUri -Endpoint View
                 $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
                 $uriParam.Add("pageSize", $PageSize)
@@ -2087,7 +2087,7 @@ function Get-TSCustomView {
         } else { # List Custom Views
             $pageNumber = 0
             do {
-                $pageNumber += 1
+                $pageNumber++
                 $uri = Get-TSRequestUri -Endpoint CustomView
                 $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
                 $uriParam.Add("pageSize", $PageSize)
@@ -2280,7 +2280,7 @@ function Get-TSFlow {
         if ($Revisions) { # Get Flow Revisions
             $pageNumber = 0
             do {
-                $pageNumber += 1
+                $pageNumber++
                 $uri = Get-TSRequestUri -Endpoint Flow -Param $FlowId/revisions
                 $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
                 $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
@@ -2297,7 +2297,7 @@ function Get-TSFlow {
         } else { # Query Flows on Site
             $pageNumber = 0
             do {
-                $pageNumber += 1
+                $pageNumber++
                 $uri = Get-TSRequestUri -Endpoint Flow
                 $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
                 $uriParam.Add("pageSize", $PageSize)
@@ -2334,7 +2334,7 @@ function Get-TSFlowsForUser {
     try {
         $pageNumber = 0
         do {
-            $pageNumber += 1
+            $pageNumber++
             $uri = Get-TSRequestUri -Endpoint User -Param $UserId/flows
             $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
             if ($IsOwner) { $uri += "&ownedBy=true" }
@@ -2619,7 +2619,7 @@ function Start-TSFlowNow {
 }
 
 ### Permissions methods
-function Get-TSContentPermission { # TODO convert output to hashtable[], add contentType
+function Get-TSContentPermission {
     [OutputType([PSCustomObject[]])]
     Param(
         [Parameter(Mandatory,ParameterSetName='Workbook')][string] $WorkbookId,
@@ -2653,7 +2653,7 @@ function Get-TSContentPermission { # TODO convert output to hashtable[], add con
     }
 }
 
-function Add-TSContentPermission { # TODO convert output to hashtable[], add contentType
+function Add-TSContentPermission {
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType([PSCustomObject])]
     Param(
@@ -2761,7 +2761,7 @@ function Set-TSContentPermission { # TODO add support for permission templates
                 $capabilityName = $_.Key
                 $capabilityMode = $_.Value
                 if ($permission.capabilities.ContainsKey($capabilityName) -and $capabilityMode -ne $permission.capabilities[$capabilityName]) {
-                    $permissionOverrides += @{granteeType=$permission.granteeType;granteeId=$permission.granteeId;capabilityName=$capabilityName;capabilityMode=$capabilityMode}
+                    $permissionOverrides += @{granteeType=$permission.granteeType; granteeId=$permission.granteeId; capabilityName=$capabilityName; capabilityMode=$capabilityMode}
                 }
             }
         }
@@ -2947,7 +2947,7 @@ function ConvertTo-TSPermissionTable {
                     Write-Error -Message "Invalid permission capability in the input object" -Exception -Category InvalidArgument
                 }
             }
-            $permissionTable += @{granteeType=$granteeType;granteeId=$granteeId;capabilities=$capabilitiesHashtable}
+            $permissionTable += @{granteeType=$granteeType; granteeId=$granteeId; capabilities=$capabilitiesHashtable}
         }
     }
     return $permissionTable
@@ -2985,7 +2985,7 @@ function Get-TSDefaultPermission {
                                 Write-Error -Message "Invalid permission capability in the input object" -Exception -Category InvalidArgument
                             }
                         }
-                        $permissionTable += @{contentType=$ct;granteeType=$granteeType;granteeId=$granteeId;capabilities=$capabilitiesHashtable}
+                        $permissionTable += @{contentType=$ct; granteeType=$granteeType; granteeId=$granteeId; capabilities=$capabilitiesHashtable}
                     }
                 }
             }
@@ -3047,7 +3047,7 @@ function Set-TSDefaultPermission {
                                     Write-Error -Message "Invalid permission capability in the input object" -Exception -Category InvalidArgument
                                 }
                             }
-                            $outputPermissionTable += @{contentType=$ct;granteeType=$granteeType;granteeId=$granteeId;capabilities=$capabilitiesHashtable}
+                            $outputPermissionTable += @{contentType=$ct; granteeType=$granteeType; granteeId=$granteeId; capabilities=$capabilitiesHashtable}
                         }
                     }
                 }
@@ -3211,7 +3211,7 @@ function Get-TSUserFavorite {
     try {
         $pageNumber = 0
         do {
-            $pageNumber += 1
+            $pageNumber++
             $uri = Get-TSRequestUri -Endpoint Favorite -Param $UserId
             $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
             $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
@@ -3378,7 +3378,7 @@ function Get-TSDatabase {
         } else {
             $pageNumber = 0
             do {
-                $pageNumber += 1
+                $pageNumber++
                 $uri = Get-TSRequestUri -Endpoint Database
                 $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
                 $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
@@ -3405,7 +3405,7 @@ function Get-TSTable {
         } else {
             $pageNumber = 0
             do {
-                $pageNumber += 1
+                $pageNumber++
                 $uri = Get-TSRequestUri -Endpoint Table
                 $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
                 $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
@@ -3433,7 +3433,7 @@ function Get-TSTableColumn {
         } else {
             $pageNumber = 0
             do {
-                $pageNumber += 1
+                $pageNumber++
                 $uri = Get-TSRequestUri -Endpoint Table -Param $TableId/columns
                 $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
                 $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
