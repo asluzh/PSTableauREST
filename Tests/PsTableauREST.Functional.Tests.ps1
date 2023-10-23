@@ -289,6 +289,12 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $permissions = Get-TSContentPermission -ProjectId $testProjectId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                 }
+                # permissions by template for the current user
+                foreach ($pt in 'Denied','None','View','Publish','None') {
+                    $permissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); template=$pt}
+                    $permissions = Set-TSContentPermission -ProjectId $testProjectId -PermissionTable $permissionTable
+                    $permissions.project.id | Should -Be $testProjectId
+                }
             }
             It "Query/remove/set default project permissions on <ConfigFile.server>" {
                 $savedPermissionTable = Get-TSDefaultPermission -ProjectId $testProjectId
@@ -680,6 +686,13 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         $permissions = Get-TSContentPermission -WorkbookId $sampleWorkbookId
                         $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     }
+                    # permissions by template for the current user
+                    foreach ($pt in 'View','Denied','Explore','Publish','None','Administer') {
+                        $permissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); template=$pt}
+                        $permissions = Set-TSContentPermission -WorkbookId $sampleWorkbookId -PermissionTable $permissionTable
+                        $permissions.workbook.id | Should -Be $sampleWorkbookId
+                        $permissions.workbook.name | Should -Be $sampleWorkbookName
+                    }
                 }
                 It "Publish workbook with invalid extension on <ConfigFile.server>" {
                     {Publish-TSWorkbook -Name "Workbook" -InFile "Tests/Assets/Misc/Workbook.txt" -ProjectId $samplesProjectId} | Should -Throw
@@ -886,6 +899,13 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         $permissions = Get-TSContentPermission -DatasourceId $sampleDatasourceId
                         $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     }
+                    # permissions by template for the current user
+                    foreach ($pt in 'None','View','Explore','Denied','Publish','Administer') {
+                        $permissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); template=$pt}
+                        $permissions = Set-TSContentPermission -DatasourceId $sampleDatasourceId -PermissionTable $permissionTable
+                        $permissions.datasource.id | Should -Be $sampleDatasourceId
+                        $permissions.datasource.name | Should -Be $sampleDatasourceName
+                    }
                 }
                 It "Publish datasource with connections on <ConfigFile.server>" -Skip {
                     Publish-TSDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/Datasource.txt" -ProjectId $samplesProjectId
@@ -1026,7 +1046,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $permissions = Get-TSContentPermission -ViewId $sampleViewId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # add all possible permissions (random Allow/Deny) for the current user
-                    $possibleCap = 'Read','Filter','ViewComments','AddComment','ExportImage','ExportData','ShareView','ViewUnderlyingData','WebAuthoring','Delete','ChangePermissions' # 'ExportXml','Write' capabilities are not supported here (despite documentation)
+                    $possibleCap = 'Read','Filter','ViewComments','AddComment','ExportImage','ExportData','ShareView','ViewUnderlyingData','WebAuthoring','Delete','ChangePermissions' # 'ExportXml','Write','ChangeHierarchy','RunExplainData' capabilities are not supported (cf. Workbooks)
                     $allPermissionTable = @()
                     $capabilitiesHashtable = @{}
                     foreach ($cap in $possibleCap) {
@@ -1077,6 +1097,13 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         }
                         $permissions = Get-TSContentPermission -ViewId $sampleViewId
                         $permissions.granteeCapabilities | Should -BeNullOrEmpty
+                    }
+                    # permissions by template for the current user
+                    foreach ($pt in 'Denied','View','None','Explore','Publish','Administer') {
+                        $permissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); template=$pt}
+                        $permissions = Set-TSContentPermission -ViewId $sampleViewId -PermissionTable $permissionTable
+                        $permissions.view.id | Should -Be $sampleViewId
+                        $permissions.view.name | Should -Be $sampleViewName
                     }
                 }
                 It "Get/hide/unhide view recommendations on <ConfigFile.server>" -Skip {
@@ -1235,6 +1262,13 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         }
                         $permissions = Get-TSContentPermission -FlowId $sampleFlowId
                         $permissions.granteeCapabilities | Should -BeNullOrEmpty
+                    }
+                    # permissions by template for the current user
+                    foreach ($pt in 'View','Explore','None','Publish','Denied','Administer') {
+                        $permissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); template=$pt}
+                        $permissions = Set-TSContentPermission -FlowId $sampleFlowId -PermissionTable $permissionTable
+                        $permissions.flow.id | Should -Be $sampleFlowId
+                        $permissions.flow.name | Should -Be $sampleFlowName
                     }
                 }
                 It "Remove sample flow on <ConfigFile.server>" -Skip {

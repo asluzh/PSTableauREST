@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.1.18'
+ModuleVersion = '0.1.19'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
