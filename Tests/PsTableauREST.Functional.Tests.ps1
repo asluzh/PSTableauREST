@@ -96,7 +96,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             }
             It "Update site <testSite> on <ConfigFile.server>" {
                 if ($ConfigFile.test_site_name) {
-                    {Switch-TSSite -Site $testSite} | Should -Not -Throw
+                    Switch-TSSite -Site $testSite
                     $siteNewName = New-Guid
                     $site = Update-TSSite -SiteId $testSiteId -SiteParams @{
                         name = $siteNewName
@@ -105,11 +105,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $site.id | Should -Be $testSiteId
                     $site.contentUrl | Should -Be $testSite
                     $site.name | Should -Be $siteNewName
-                    {Update-TSSite -SiteId $testSiteId -SiteParams @{
-                        name = $ConfigFile.test_site_name
-                        adminMode = "ContentAndUsers"
-                        userQuota = "1"
-                    }} | Should -Not -Throw
+                    Update-TSSite -SiteId $testSiteId -SiteParams @{name=$ConfigFile.test_site_name; adminMode="ContentAndUsers"; userQuota="1"}
                 }
             }
             It "Query sites on <ConfigFile.server>" {
@@ -122,7 +118,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             }
             It "Get current site on <ConfigFile.server>" {
                 if ($ConfigFile.test_site_name) {
-                    {Switch-TSSite -Site $testSite} | Should -Not -Throw
+                    Switch-TSSite -Site $testSite
                     $sites = Get-TSSite -Current
                     ($sites | Measure-Object).Count | Should -Be 1
                     $sites | Where-Object id -eq $script:testSiteId | Should -Not -BeNullOrEmpty
@@ -133,7 +129,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             }
             It "Delete site <testSite> on <ConfigFile.server>" {
                 if ($ConfigFile.test_site_name) {
-                    {Switch-TSSite -Site $testSite} | Should -Not -Throw
+                    Switch-TSSite -Site $testSite
                     $response = Remove-TSSite -SiteId $testSiteId
                     $response | Should -BeOfType String
                     $script:testSiteId = $null
@@ -152,7 +148,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $site = Add-TSSite -Name $tempSiteName -ContentUrl $tempSiteName
                     $site.id | Should -BeOfType String
                     $tempSiteId = $site.id
-                    {Switch-TSSite -Site $tempSiteName} | Should -Not -Throw
+                    Switch-TSSite -Site $tempSiteName
                     $response = Remove-TSSite -SiteId $tempSiteId -BackgroundTask
                     $response | Should -BeOfType String
                     # because we've just deleted the current site, we need to sign-in again
@@ -231,7 +227,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 $permissions.project.id | Should -Be $testProjectId
                 $savedPermissionTable = $permissions | ConvertTo-TSPermissionTable
                 # remove all permissions for all grantees
-                {Remove-TSContentPermission -ProjectId $testProjectId -All} | Should -Not -Throw
+                Remove-TSContentPermission -ProjectId $testProjectId -All
                 $permissions = Get-TSContentPermission -ProjectId $testProjectId
                 $permissions.granteeCapabilities | Should -BeNullOrEmpty
                 # add all possible permissions (random Allow/Deny) for the current user
@@ -262,7 +258,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
                 ($permissions.granteeCapabilities.capabilities.capability | Measure-Object).Count | Should -Be $possibleCap.Length
                 # remove all permissions for the current user
-                {Remove-TSContentPermission -ProjectId $testProjectId -GranteeType User -GranteeId (Get-TSCurrentUserId)} | Should -Not -Throw
+                Remove-TSContentPermission -ProjectId $testProjectId -GranteeType User -GranteeId (Get-TSCurrentUserId)
                 $permissions = Get-TSContentPermission -ProjectId $testProjectId
                 $permissions.granteeCapabilities | Should -BeNullOrEmpty
                 # add back initial permissions configuration
@@ -282,7 +278,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                             $_.capabilities.capability | ForEach-Object {
                                 $capName = $_.name
                                 $capMode = $_.mode
-                                {Remove-TSContentPermission -ProjectId $testProjectId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode} | Should -Not -Throw
+                                Remove-TSContentPermission -ProjectId $testProjectId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode
                             }
                         }
                     }
@@ -294,14 +290,33 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $permissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); template=$pt}
                     $permissions = Set-TSContentPermission -ProjectId $testProjectId -PermissionTable $permissionTable
                     $permissions.project.id | Should -Be $testProjectId
+                    $actualPermissionTable = Get-TSContentPermission -ProjectId $testProjectId | ConvertTo-TSPermissionTable
+                    switch ($pt) {
+                        'View' {
+                            $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"}}
+                        }
+                        'Publish' {
+                            $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; Write="Allow"}}
+                        }
+                        'Administer' {
+                            $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; Write="Allow"}}
+                        }
+                        'Denied' {
+                            $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Deny"; Write="Deny"}}
+                        }
+                        default {
+                            $expectedPermissionTable = $null
+                        }
+                    }
+                    Assert-Equivalent -Actual $actualPermissionTable -Expected $expectedPermissionTable
                 }
             }
             It "Query/remove/set default project permissions on <ConfigFile.server>" {
                 $savedPermissionTable = Get-TSDefaultPermission -ProjectId $testProjectId
-                $wbPermissionTable = Get-TSDefaultPermission -ProjectId $testProjectId -ContentType Workbooks
+                $wbPermissionTable = Get-TSDefaultPermission -ProjectId $testProjectId -ContentType workbooks
                 $wbPermissionTable.Length | Should -BeLessOrEqual $savedPermissionTable.Length
                 # remove all default permissions for all grantees
-                {Remove-TSDefaultPermission -ProjectId $testProjectId -All} | Should -Not -Throw
+                Remove-TSDefaultPermission -ProjectId $testProjectId -All
                 $permissions = Get-TSDefaultPermission -ProjectId $testProjectId
                 $permissions.Length | Should -Be 0
                 # add all possible permissions (random Allow/Deny) for the current user
@@ -314,7 +329,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                             $possibleCap = 'Read','Connect','ExportXml','Write','SaveAs','ChangeHierarchy','Delete','ChangePermissions'
                         }
                         'flows' {
-                            $possibleCap = 'Read','ExportXml','Execute','Write','ChangeHierarchy','Delete','ChangePermissions' # ,'WebAuthoring'
+                            $possibleCap = 'Read','ExportXml','Execute','WebAuthoringForFlows','Write','ChangeHierarchy','Delete','ChangePermissions'
                         }
                         {$_ -in 'dataroles','metrics','lenses'} {
                             $possibleCap = 'Read','Write','ChangeHierarchy','Delete','ChangePermissions'
@@ -334,14 +349,14 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     ($permissions | Where-Object contentType -eq $ct).capabilities.Count | Should -Be $possibleCap.Length
                 }
                 # remove all default permissions for one grantee
-                {Remove-TSDefaultPermission -ProjectId $testProjectId -GranteeType User -GranteeId (Get-TSCurrentUserId)} | Should -Not -Throw
+                Remove-TSDefaultPermission -ProjectId $testProjectId -GranteeType User -GranteeId (Get-TSCurrentUserId)
                 $permissions = Get-TSDefaultPermission -ProjectId $testProjectId
                 $permissions.Length | Should -Be 0
                 # restore initial permissions configuration
                 if ($savedPermissionTable.Length -gt 0) {
                     $permissions = Set-TSDefaultPermission -ProjectId $testProjectId -PermissionTable $savedPermissionTable
                     # remove all default permissions for one grantee for the first content type
-                    {Remove-TSDefaultPermission -ProjectId $testProjectId -GranteeType $permissions[0].granteeType -GranteeId $permissions[0].granteeId -ContentType $permissions[0].contentType} | Should -Not -Throw
+                    Remove-TSDefaultPermission -ProjectId $testProjectId -GranteeType $permissions[0].granteeType -GranteeId $permissions[0].granteeId -ContentType $permissions[0].contentType
                     $permissions = Get-TSDefaultPermission -ProjectId $testProjectId
                     $permissions.Length | Should -BeLessThan $savedPermissionTable.Length
                 }
@@ -352,12 +367,27 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     foreach ($permission in $permissions) {
                         if ($permission.capabilities -and $permission.capabilities.Count -gt 0) {
                             $permission.capabilities.GetEnumerator() | ForEach-Object {
-                                {Remove-TSDefaultPermission -ProjectId $testProjectId -GranteeType $permission.granteeType -GranteeId $permission.granteeId -CapabilityName $_.Key -CapabilityMode $_.Value -ContentType $permission.contentType} | Should -Not -Throw
+                                Remove-TSDefaultPermission -ProjectId $testProjectId -GranteeType $permission.granteeType -GranteeId $permission.granteeId -CapabilityName $_.Key -CapabilityMode $_.Value -ContentType $permission.contentType
                             }
                         }
                     }
                     $permissions = Get-TSDefaultPermission -ProjectId $testProjectId
                     $permissions.Length | Should -Be 0
+                }
+            }
+            It "Set default project permissions with templates on <ConfigFile.server>" {
+                Remove-TSDefaultPermission -ProjectId $testProjectId -All
+                # apply all possible permission templates for the current user
+                foreach ($ct in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
+                    foreach ($tpl in 'View','Explore','Denied','Publish','Administer','None') {
+                        $tplPermissionTable = @{contentType=$ct; granteeType="User"; granteeId=(Get-TSCurrentUserId); template=$tpl}
+                        $permissions = Set-TSDefaultPermission -ProjectId $testProjectId -PermissionTable $tplPermissionTable
+                        if ($tpl -eq 'None') {
+                            $permissions.Length | Should -Be 0
+                        } else {
+                            $permissions.Length | Should -Be 1 # because we set default permissions only for one user, one content type
+                        }
+                    }
                 }
             }
         }
@@ -691,7 +721,28 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         $permissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); template=$pt}
                         $permissions = Set-TSContentPermission -WorkbookId $sampleWorkbookId -PermissionTable $permissionTable
                         $permissions.workbook.id | Should -Be $sampleWorkbookId
-                        $permissions.workbook.name | Should -Be $sampleWorkbookName
+                        $actualPermissionTable = Get-TSContentPermission -WorkbookId $sampleWorkbookId | ConvertTo-TSPermissionTable
+                        switch ($pt) {
+                            'View' {
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; Filter="Allow"; ViewComments="Allow"; AddComment="Allow"; ExportImage="Allow"; ExportData="Allow"}}
+                            }
+                            'Explore' {
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; Filter="Allow"; ViewComments="Allow"; AddComment="Allow"; ExportImage="Allow"; ExportData="Allow"; ShareView="Allow"; ViewUnderlyingData="Allow"; WebAuthoring="Allow"; RunExplainData="Allow"}}
+                            }
+                            'Publish' {
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; Filter="Allow"; ViewComments="Allow"; AddComment="Allow"; ExportImage="Allow"; ExportData="Allow"; ShareView="Allow"; ViewUnderlyingData="Allow"; WebAuthoring="Allow"; RunExplainData="Allow"; ExportXml="Allow"; Write="Allow"; CreateRefreshMetrics="Allow"}}
+                            }
+                            'Administer' {
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; Filter="Allow"; ViewComments="Allow"; AddComment="Allow"; ExportImage="Allow"; ExportData="Allow"; ShareView="Allow"; ViewUnderlyingData="Allow"; WebAuthoring="Allow"; RunExplainData="Allow"; ExportXml="Allow"; Write="Allow"; CreateRefreshMetrics="Allow"; ChangeHierarchy="Allow"; Delete="Allow"; ChangePermissions="Allow"}}
+                            }
+                            'Denied' {
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Deny"; Filter="Deny"; ViewComments="Deny"; AddComment="Deny"; ExportImage="Deny"; ExportData="Deny"; ShareView="Deny"; ViewUnderlyingData="Deny"; WebAuthoring="Deny"; RunExplainData="Deny"; ExportXml="Deny"; Write="Deny"; CreateRefreshMetrics="Deny"; ChangeHierarchy="Deny"; Delete="Deny"; ChangePermissions="Deny"}}
+                            }
+                            default {
+                                $expectedPermissionTable = $null
+                            }
+                        }
+                        Assert-Equivalent -Actual $actualPermissionTable -Expected $expectedPermissionTable
                     }
                 }
                 It "Publish workbook with invalid extension on <ConfigFile.server>" {
@@ -904,7 +955,28 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         $permissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); template=$pt}
                         $permissions = Set-TSContentPermission -DatasourceId $sampleDatasourceId -PermissionTable $permissionTable
                         $permissions.datasource.id | Should -Be $sampleDatasourceId
-                        $permissions.datasource.name | Should -Be $sampleDatasourceName
+                        $actualPermissionTable = Get-TSContentPermission -DatasourceId $sampleDatasourceId | ConvertTo-TSPermissionTable
+                        switch ($pt) {
+                            'View' {
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; Connect="Allow"}}
+                            }
+                            'Explore' {
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; Connect="Allow"; ExportXml="Allow"}}
+                            }
+                            'Publish' {
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; Connect="Allow"; ExportXml="Allow"; Write="Allow"; SaveAs="Allow"}}
+                            }
+                            'Administer' {
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; Connect="Allow"; ExportXml="Allow"; Write="Allow"; SaveAs="Allow"; ChangeHierarchy="Allow"; Delete="Allow"; ChangePermissions="Allow"}}
+                            }
+                            'Denied' {
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Deny"; Connect="Deny"; ExportXml="Deny"; Write="Deny"; SaveAs="Deny"; ChangeHierarchy="Deny"; Delete="Deny"; ChangePermissions="Deny"}}
+                            }
+                            default {
+                                $expectedPermissionTable = $null
+                            }
+                        }
+                        Assert-Equivalent -Actual $actualPermissionTable -Expected $expectedPermissionTable
                     }
                 }
                 It "Publish datasource with connections on <ConfigFile.server>" -Skip {
@@ -1103,7 +1175,28 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         $permissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); template=$pt}
                         $permissions = Set-TSContentPermission -ViewId $sampleViewId -PermissionTable $permissionTable
                         $permissions.view.id | Should -Be $sampleViewId
-                        $permissions.view.name | Should -Be $sampleViewName
+                        $actualPermissionTable = Get-TSContentPermission -ViewId $sampleViewId | ConvertTo-TSPermissionTable
+                        switch ($pt) {
+                            'View' {
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; Filter="Allow"; ViewComments="Allow"; AddComment="Allow"; ExportImage="Allow"; ExportData="Allow"}}
+                            }
+                            'Explore' {
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; Filter="Allow"; ViewComments="Allow"; AddComment="Allow"; ExportImage="Allow"; ExportData="Allow"; ShareView="Allow"; ViewUnderlyingData="Allow"; WebAuthoring="Allow"}}
+                            }
+                            'Publish' {
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; Filter="Allow"; ViewComments="Allow"; AddComment="Allow"; ExportImage="Allow"; ExportData="Allow"; ShareView="Allow"; ViewUnderlyingData="Allow"; WebAuthoring="Allow"}}
+                            }
+                            'Administer' {
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; Filter="Allow"; ViewComments="Allow"; AddComment="Allow"; ExportImage="Allow"; ExportData="Allow"; ShareView="Allow"; ViewUnderlyingData="Allow"; WebAuthoring="Allow"; Delete="Allow"; ChangePermissions="Allow"}}
+                            }
+                            'Denied' {
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Deny"; Filter="Deny"; ViewComments="Deny"; AddComment="Deny"; ExportImage="Deny"; ExportData="Deny"; ShareView="Deny"; ViewUnderlyingData="Deny"; WebAuthoring="Deny"; Delete="Deny"; ChangePermissions="Deny"}}
+                            }
+                            default {
+                                $expectedPermissionTable = $null
+                            }
+                        }
+                        Assert-Equivalent -Actual $actualPermissionTable -Expected $expectedPermissionTable
                     }
                 }
                 It "Get/hide/unhide view recommendations on <ConfigFile.server>" -Skip {
@@ -1211,7 +1304,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $permissions = Get-TSContentPermission -FlowId $sampleFlowId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # add all possible permissions (random Allow/Deny) for the current user
-                    $possibleCap = 'Read','ExportXml','Execute','Write','ChangeHierarchy','Delete','ChangePermissions' # ,'WebAuthoring' not suported
+                    $possibleCap = 'Read','ExportXml','Execute','WebAuthoringForFlows','Write','ChangeHierarchy','Delete','ChangePermissions'
                     $allPermissionTable = @()
                     $capabilitiesHashtable = @{}
                     foreach ($cap in $possibleCap) {
@@ -1268,7 +1361,28 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         $permissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); template=$pt}
                         $permissions = Set-TSContentPermission -FlowId $sampleFlowId -PermissionTable $permissionTable
                         $permissions.flow.id | Should -Be $sampleFlowId
-                        $permissions.flow.name | Should -Be $sampleFlowName
+                        $actualPermissionTable = Get-TSContentPermission -FlowId $sampleFlowId | ConvertTo-TSPermissionTable
+                        switch ($pt) {
+                            'View' {
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"}}
+                            }
+                            'Explore' {
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; ExportXml="Allow"}}
+                            }
+                            'Publish' {
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; ExportXml="Allow"; Execute="Allow"; Write="Allow"; WebAuthoringForFlows="Allow"}}
+                            }
+                            'Administer' {
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; ExportXml="Allow"; Execute="Allow"; Write="Allow"; WebAuthoringForFlows="Allow"; ChangeHierarchy="Allow"; Delete="Allow"; ChangePermissions="Allow"}}
+                            }
+                            'Denied' {
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Deny"; ExportXml="Deny"; Execute="Deny"; Write="Deny"; WebAuthoringForFlows="Deny"; ChangeHierarchy="Deny"; Delete="Deny"; ChangePermissions="Deny"}}
+                            }
+                            default {
+                                $expectedPermissionTable = $null
+                            }
+                        }
+                        Assert-Equivalent -Actual $actualPermissionTable -Expected $expectedPermissionTable
                     }
                 }
                 It "Remove sample flow on <ConfigFile.server>" -Skip {

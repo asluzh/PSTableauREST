@@ -2804,7 +2804,7 @@ function Set-TSContentPermission {
                     } elseif ($DatasourceId) {
                         $capabilities = 'Read','Connect','ExportXml','Write','SaveAs'
                     } elseif ($FlowId) {
-                        $capabilities = 'Read','ExportXml','Execute','Write'
+                        $capabilities = 'Read','ExportXml','Execute','Write','WebAuthoringForFlows'
                     } elseif ($ProjectId) {
                         $capabilities = 'Read','Write'
                     }
@@ -2817,7 +2817,7 @@ function Set-TSContentPermission {
                     } elseif ($DatasourceId) {
                         $capabilities = 'Read','Connect','ExportXml','Write','SaveAs','ChangeHierarchy','Delete','ChangePermissions'
                     } elseif ($FlowId) {
-                        $capabilities = 'Read','ExportXml','Execute','Write','ChangeHierarchy','Delete','ChangePermissions'
+                        $capabilities = 'Read','ExportXml','Execute','Write','WebAuthoringForFlows','ChangeHierarchy','Delete','ChangePermissions'
                     } elseif ($ProjectId) {
                         $capabilities = 'Read','Write'
                     }
@@ -2852,7 +2852,7 @@ function Set-TSContentPermission {
     $shouldProcessItem += ", grantees:{0}, permissions:{1}, overrides:{2}" -f $PermissionTable.Length, $permissionsCount, $permissionOverrides.Length
     try {
         if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-            $permissionOverrides | ForEach-Object { # remove all incompatible permissions (overrides)
+            $permissionOverrides | ForEach-Object { # remove all existing incompatible permissions (or that are not included in the permission template)
                 Remove-TSContentPermission @MainParam -GranteeType $_.granteeType -GranteeId $_.granteeId -CapabilityName $_.capabilityName -CapabilityMode $_.capabilityMode
             }
             Add-TSContentPermission @MainParam -PermissionTable $addPermissionTable
@@ -2913,7 +2913,7 @@ function Remove-TSContentPermission {
         [Parameter(Mandatory,ParameterSetName='ViewOne')]
         [Parameter(Mandatory,ParameterSetName='ProjectOne')]
         [Parameter(Mandatory,ParameterSetName='FlowOne')]
-        [ValidateSet('AddComment','ChangeHierarchy','ChangePermissions','Connect','Delete','Execute',
+        [ValidateSet('AddComment','ChangeHierarchy','ChangePermissions','Connect','Delete','Execute','WebAuthoringForFlows',
             'ExportData','ExportImage','ExportXml','Filter','ProjectLeader','Read','ShareView','ViewComments','ViewUnderlyingData',
             'WebAuthoring','Write','RunExplainData','CreateRefreshMetrics','SaveAs')][string] $CapabilityName,
         [Parameter(Mandatory,ParameterSetName='WorkbookOne')]
@@ -3091,46 +3091,152 @@ function Set-TSDefaultPermission {
     foreach ($ct in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
         $shouldProcessItem = "project:$ProjectId"
         $contentTypePermissions = $PermissionTable | Where-Object contentType -eq $ct
+        $currentPermissionTable = Get-TSDefaultPermission -ProjectId $ProjectId -ContentType $ct
         if ($contentTypePermissions.Length -gt 0) {
             $xml = New-Object System.Xml.XmlDocument
             $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
             $el_pm = $tsRequest.AppendChild($xml.CreateElement("permissions"))
             $permissionsCount = 0
+            $permissionOverrides = @()
             foreach ($permission in $contentTypePermissions) {
-                $el_gc = $el_pm.AppendChild($xml.CreateElement("granteeCapabilities"))
-                $el_gc.AppendChild($xml.CreateElement($permission.granteeType.ToLower())).SetAttribute("id", $permission.granteeId)
-                $el_caps = $el_gc.AppendChild($xml.CreateElement("capabilities"))
-                $permissionsCount += $permission.capabilities.Count
-                $permission.capabilities.GetEnumerator() | ForEach-Object {
-                    $el_cap = $el_caps.AppendChild($xml.CreateElement("capability"))
-                    $el_cap.SetAttribute("name", $_.Key)
-                    $el_cap.SetAttribute("mode", $_.Value)
-                }
-            }
-            $shouldProcessItem += ", {0}:{1}/{2}" -f $ct, $contentTypePermissions.Length, $permissionsCount
-            try {
-                if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-                    $response = Invoke-RestMethod -Uri $uri$ct -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
-                    if ($response.tsResponse.permissions.granteeCapabilities) {
-                        $response.tsResponse.permissions.granteeCapabilities | ForEach-Object {
-                            if ($_.group -and $_.group.id) {
-                                $granteeType = 'group'
-                                $granteeId = $_.group.id
-                            } elseif ($_.user -and $_.user.id) {
-                                $granteeType = 'user'
-                                $granteeId = $_.user.id
-                            } else {
-                                Write-Error -Message "Invalid grantee in the response object" -Exception -Category InvalidArgument
-                            }
-                            $capabilitiesHashtable = @{}
-                            $_.capabilities.capability | ForEach-Object {
-                                if ($_.name -and $_.mode) {
-                                    $capabilitiesHashtable.Add($_.name, $_.mode)
-                                } else {
-                                    Write-Error -Message "Invalid permission capability in the input object" -Exception -Category InvalidArgument
+                if ($permission.capabilities -and $permission.capabilities.Count -gt 0) {
+                    $permissionsCount += $permission.capabilities.Count
+                    $el_gc = $el_pm.AppendChild($xml.CreateElement("granteeCapabilities"))
+                    $el_gc.AppendChild($xml.CreateElement($permission.granteeType.ToLower())).SetAttribute("id", $permission.granteeId)
+                    $el_caps = $el_gc.AppendChild($xml.CreateElement("capabilities"))
+                    $permission.capabilities.GetEnumerator() | ForEach-Object {
+                        $el_cap = $el_caps.AppendChild($xml.CreateElement("capability"))
+                        $el_cap.SetAttribute("name", $_.Key)
+                        $el_cap.SetAttribute("mode", $_.Value)
+                    }
+                } elseif ($permission.template) { # support for permission templates
+                    switch ($permission.template) {
+                        'View' {
+                            switch ($ct) {
+                                'workbooks' {
+                                    $capabilities = 'Read','Filter','ViewComments','AddComment','ExportImage','ExportData'
+                                }
+                                'datasources' {
+                                    $capabilities = 'Read','Connect'
+                                }
+                                {$_ -in 'flows','dataroles','metrics','lenses','databases','tables'} {
+                                    $capabilities = 'Read'
                                 }
                             }
-                            $outputPermissionTable += @{contentType=$ct; granteeType=$granteeType; granteeId=$granteeId; capabilities=$capabilitiesHashtable}
+                        }
+                        'Explore' {
+                            switch ($ct) {
+                                'workbooks' {
+                                    $capabilities = 'Read','Filter','ViewComments','AddComment','ExportImage','ExportData','ShareView','ViewUnderlyingData','WebAuthoring','RunExplainData'
+                                }
+                                'datasources' {
+                                    $capabilities = 'Read','Connect','ExportXml'
+                                }
+                                'flows' {
+                                    $capabilities = 'Read','ExportXml'
+                                }
+                                {$_ -in 'dataroles','metrics','lenses','databases','tables'} {
+                                    $capabilities = 'Read'
+                                }
+                            }
+                        }
+                        'Publish' {
+                            switch ($ct) {
+                                'workbooks' {
+                                    $capabilities = 'Read','Filter','ViewComments','AddComment','ExportImage','ExportData','ShareView','ViewUnderlyingData','WebAuthoring','RunExplainData','ExportXml','Write','CreateRefreshMetrics'
+                                }
+                                'datasources' {
+                                    $capabilities = 'Read','Connect','ExportXml','Write','SaveAs'
+                                }
+                                'flows' {
+                                    $capabilities = 'Read','ExportXml','Execute','Write','WebAuthoringForFlows'
+                                }
+                                {$_ -in 'dataroles','metrics','lenses','databases','tables'} {
+                                    $capabilities = 'Read','Write'
+                                }
+                            }
+                        }
+                        {$_ -in 'Administer','Denied'} { # full capabilities for both cases
+                            switch ($ct) {
+                                'workbooks' {
+                                    $capabilities = 'Read','Filter','ViewComments','AddComment','ExportImage','ExportData','ShareView','ViewUnderlyingData','WebAuthoring','RunExplainData','ExportXml','Write','CreateRefreshMetrics','ChangeHierarchy','Delete','ChangePermissions'
+                                }
+                                'datasources' {
+                                    $capabilities = 'Read','Connect','ExportXml','Write','SaveAs','ChangeHierarchy','Delete','ChangePermissions'
+                                }
+                                'flows' {
+                                    $capabilities = 'Read','ExportXml','Execute','Write','WebAuthoringForFlows','ChangeHierarchy','Delete','ChangePermissions'
+                                }
+                                {$_ -in 'dataroles','metrics','lenses'} {
+                                    $capabilities = 'Read','Write','ChangeHierarchy','Delete','ChangePermissions'
+                                }
+                                {$_ -in 'databases','tables'} {
+                                    $capabilities = 'Read','Write','ChangeHierarchy','ChangePermissions'
+                                }
+                            }
+                        }
+                        default { # incl. None
+                            $capabilities = @()
+                        }
+                    }
+                    $permissionsCount += $capabilities.Length
+                    $currentPermissionTable | Where-Object -FilterScript {($_.granteeType -eq $permission.granteeType) -and ($_.granteeId -eq $permission.granteeId)} | ForEach-Object {
+                        $currentCapabilities = $_.capabilities
+                        $currentCapabilities.GetEnumerator() | ForEach-Object {
+                            $capabilityName = $_.Key
+                            $capabilityMode = $_.Value
+                            if ((-not ($capabilities -Contains $capabilityName)) -or (($permission.template -ne 'Denied' -and $capabilityMode -ne 'Allow') -or ($permission.template -eq 'Denied' -and $capabilityMode -ne 'Deny'))) {
+                                $permissionOverrides += @{granteeType=$permission.granteeType; granteeId=$permission.granteeId; capabilityName=$capabilityName; capabilityMode=$capabilityMode}
+                            }
+                        }
+                    }
+                    if ($capabilities.Length -gt 0) { # only for non-empty capabilities (template=None doesn't add permissions)
+                        $el_gc = $el_pm.AppendChild($xml.CreateElement("granteeCapabilities"))
+                        $el_gc.AppendChild($xml.CreateElement($permission.granteeType.ToLower())).SetAttribute("id", $permission.granteeId)
+                        $el_caps = $el_gc.AppendChild($xml.CreateElement("capabilities"))
+                        foreach ($cap in $capabilities) {
+                            $el_cap = $el_caps.AppendChild($xml.CreateElement("capability"))
+                            if ($permission.template -eq 'Denied') {
+                                $mode = "Deny"
+                            } else {
+                                $mode = "Allow"
+                            }
+                            $el_cap.SetAttribute("name", $cap)
+                            $el_cap.SetAttribute("mode", $mode)
+                        }
+                    }
+                }
+            }
+            $shouldProcessItem += ", {0}, grantees:{1}, permissions:{2}, overrides:{3}" -f $ct, $contentTypePermissions.Length, $permissionsCount, $permissionOverrides.Length
+            try {
+                if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
+                    $permissionOverrides | ForEach-Object { # remove all existing incompatible permissions (or that are not included in the permission template)
+                        # note: it's also possible to remove all permissions for one grantee, one content type first, using the following method
+                        Remove-TSDefaultPermission -ProjectId $ProjectId -ContentType $ct -GranteeType $_.granteeType -GranteeId $_.granteeId -CapabilityName $_.capabilityName -CapabilityMode $_.capabilityMode
+                    }
+                    if ($permissionsCount -gt 0) { # empty permissions element in xml is not allowed
+                        $response = Invoke-RestMethod -Uri $uri$ct -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+                        if ($response.tsResponse.permissions.granteeCapabilities) {
+                            $response.tsResponse.permissions.granteeCapabilities | ForEach-Object {
+                                if ($_.group -and $_.group.id) {
+                                    $granteeType = 'group'
+                                    $granteeId = $_.group.id
+                                } elseif ($_.user -and $_.user.id) {
+                                    $granteeType = 'user'
+                                    $granteeId = $_.user.id
+                                } else {
+                                    Write-Error -Message "Invalid grantee in the response object" -Exception -Category InvalidArgument
+                                }
+                                $capabilitiesHashtable = @{}
+                                $_.capabilities.capability | ForEach-Object {
+                                    if ($_.name -and $_.mode) {
+                                        $capabilitiesHashtable.Add($_.name, $_.mode)
+                                    } else {
+                                        Write-Error -Message "Invalid permission capability in the input object" -Exception -Category InvalidArgument
+                                    }
+                                }
+                                $outputPermissionTable += @{contentType=$ct; granteeType=$granteeType; granteeId=$granteeId; capabilities=$capabilitiesHashtable}
+                            }
                         }
                     }
                 }
@@ -3156,7 +3262,7 @@ function Remove-TSDefaultPermission {
         [Parameter(Mandatory,ParameterSetName='OneCapability')]
         [string] $GranteeId,
         [Parameter(Mandatory,ParameterSetName='OneCapability')]
-        [ValidateSet('AddComment','ChangeHierarchy','ChangePermissions','Connect','Delete','Execute',
+        [ValidateSet('AddComment','ChangeHierarchy','ChangePermissions','Connect','Delete','Execute','WebAuthoringForFlows',
             'ExportData','ExportImage','ExportXml','Filter','ProjectLeader','Read','ShareView','ViewComments','ViewUnderlyingData',
             'WebAuthoring','Write','RunExplainData','CreateRefreshMetrics','SaveAs')][string] $CapabilityName,
         [Parameter(Mandatory,ParameterSetName='OneCapability')]
