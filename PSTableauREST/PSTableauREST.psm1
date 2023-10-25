@@ -1349,6 +1349,7 @@ function Update-TSWorkbookConnection {
         $el_connection.SetAttribute("embedPassword", "true")
     }
     if ($QueryTagging) {
+        Assert-TSRestApiVersion -AtLeast 3.13
         $el_connection.SetAttribute("queryTaggingEnabled", "true")
     }
     $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/connections/$ConnectionId
@@ -1802,6 +1803,7 @@ function Update-TSDatasourceConnection {
         $el_connection.SetAttribute("embedPassword", "true")
     }
     if ($QueryTagging) {
+        Assert-TSRestApiVersion -AtLeast 3.13
         $el_connection.SetAttribute("queryTaggingEnabled", "true")
     }
     $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/connections/$ConnectionId
@@ -3047,6 +3049,11 @@ function Get-TSDefaultPermission {
     $uri = Get-TSRequestUri -Endpoint Project -Param "$ProjectId/default-permissions/"
     try {
         foreach ($ct in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') { #,'virtualconnections' not supported yet
+            if ($ct -eq 'dataroles' -and (Get-TSRestApiVersion) -lt [version]3.13) {
+                continue
+            } elseif ($ct -eq 'lenses' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
+                continue
+            }
             if ((-Not ($ContentType)) -or $ContentType -eq $ct) {
                 $response = Invoke-RestMethod -Uri $uri$ct -Method Get -Headers (Get-TSRequestHeaderDict)
                 if ($response.tsResponse.permissions.granteeCapabilities) {
@@ -3089,6 +3096,11 @@ function Set-TSDefaultPermission {
     $uri = Get-TSRequestUri -Endpoint Project -Param "$ProjectId/default-permissions/"
     $outputPermissionTable = @()
     foreach ($ct in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
+        if ($ct -eq 'dataroles' -and (Get-TSRestApiVersion) -lt [version]3.13) {
+            continue
+        } elseif ($ct -eq 'lenses' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
+            continue
+        }
         $shouldProcessItem = "project:$ProjectId"
         $contentTypePermissions = $PermissionTable | Where-Object contentType -eq $ct
         $currentPermissionTable = Get-TSDefaultPermission -ProjectId $ProjectId -ContentType $ct
@@ -3287,6 +3299,11 @@ function Remove-TSDefaultPermission {
             if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
                 $allDefaultPermissions = Get-TSDefaultPermission -ProjectId $ProjectId
                 foreach ($ct in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
+                    if ($ct -eq 'dataroles' -and (Get-TSRestApiVersion) -lt [version]3.13) {
+                        continue
+                    } elseif ($ct -eq 'lenses' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
+                        continue
+                    }
                     if ((-Not ($ContentType)) -or $ContentType -eq $ct) {
                         $permissions = $allDefaultPermissions | Where-Object -FilterScript {
                             ($_.contentType -eq $ct) -and
@@ -3308,6 +3325,11 @@ function Remove-TSDefaultPermission {
             if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
                 $allDefaultPermissions = Get-TSDefaultPermission -ProjectId $ProjectId
                 foreach ($ct in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
+                    if ($ct -eq 'dataroles' -and (Get-TSRestApiVersion) -lt [version]3.13) {
+                        continue
+                    } elseif ($ct -eq 'lenses' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
+                        continue
+                    }
                     $contentTypePermissions = $allDefaultPermissions | Where-Object contentType -eq $ct
                     if ($contentTypePermissions.Length -gt 0) {
                         foreach ($permission in $contentTypePermissions) {
