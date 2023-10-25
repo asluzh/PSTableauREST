@@ -560,28 +560,28 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $workbook.name | Should -Be $script:sampleWorkbookName
                 }
                 It "Download sample workbook from <ConfigFile.server>" {
-                    {Export-TSWorkbook -WorkbookId $sampleWorkbookId -OutFile "Tests/Output/$sampleWorkbookName.twbx"} | Should -Not -Throw
+                    Export-TSWorkbook -WorkbookId $sampleWorkbookId -OutFile "Tests/Output/$sampleWorkbookName.twbx"
                     Test-Path -Path "Tests/Output/$sampleWorkbookName.twbx" | Should -BeTrue
-                    {Export-TSWorkbook -WorkbookId $sampleWorkbookId -OutFile "Tests/Output/$sampleWorkbookName.twb" -ExcludeExtract} | Should -Not -Throw
+                    Export-TSWorkbook -WorkbookId $sampleWorkbookId -OutFile "Tests/Output/$sampleWorkbookName.twb" -ExcludeExtract
                     Test-Path -Path "Tests/Output/$sampleWorkbookName.twb" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/$sampleWorkbookName.twb"
                 }
                 It "Download sample workbook as PDF from <ConfigFile.server>" {
-                    {Export-TSWorkbookToFormat -WorkbookId $sampleWorkbookId -Format pdf -OutFile "Tests/Output/$sampleWorkbookName.pdf"} | Should -Not -Throw
+                    Export-TSWorkbookToFormat -WorkbookId $sampleWorkbookId -Format pdf -OutFile "Tests/Output/$sampleWorkbookName.pdf"
                     Test-Path -Path "Tests/Output/$sampleWorkbookName.pdf" | Should -BeTrue
-                    {Export-TSWorkbookToFormat -WorkbookId $sampleWorkbookId -Format pdf -OutFile "Tests/Output/$sampleWorkbookName.pdf" -PageType 'A3' -PageOrientation 'Landscape' -MaxAge 1} | Should -Not -Throw
+                    Export-TSWorkbookToFormat -WorkbookId $sampleWorkbookId -Format pdf -OutFile "Tests/Output/$sampleWorkbookName.pdf" -PageType 'A3' -PageOrientation 'Landscape' -MaxAge 1
                     Test-Path -Path "Tests/Output/$sampleWorkbookName.pdf" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/$sampleWorkbookName.pdf"
                 }
                 It "Download sample workbook as PowerPoint from <ConfigFile.server>" {
-                    {Export-TSWorkbookToFormat -WorkbookId $sampleWorkbookId -Format powerpoint -OutFile "Tests/Output/$sampleWorkbookName.pptx"} | Should -Not -Throw
+                    Export-TSWorkbookToFormat -WorkbookId $sampleWorkbookId -Format powerpoint -OutFile "Tests/Output/$sampleWorkbookName.pptx"
                     Test-Path -Path "Tests/Output/$sampleWorkbookName.pptx" | Should -BeTrue
-                    # {Export-TSWorkbookToFormat -WorkbookId $sampleWorkbookId -Format powerpoint -OutFile "Tests/Output/$sampleWorkbookName.pptx" -MaxAge 1} | Should -Not -Throw
+                    # Export-TSWorkbookToFormat -WorkbookId $sampleWorkbookId -Format powerpoint -OutFile "Tests/Output/$sampleWorkbookName.pptx" -MaxAge 1
                     # Test-Path -Path "Tests/Output/$sampleWorkbookName.pptx" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/$sampleWorkbookName.pptx"
                 }
                 It "Download sample workbook as PNG from <ConfigFile.server>" {
-                    {Export-TSWorkbookToFormat -WorkbookId $sampleWorkbookId -Format image -OutFile "Tests/Output/$sampleWorkbookName.png"} | Should -Not -Throw
+                    Export-TSWorkbookToFormat -WorkbookId $sampleWorkbookId -Format image -OutFile "Tests/Output/$sampleWorkbookName.png"
                     Test-Path -Path "Tests/Output/$sampleWorkbookName.png" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/$sampleWorkbookName.png"
                 }
@@ -632,26 +632,26 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $revisions = Get-TSWorkbook -WorkbookId $sampleWorkbookId -Revisions
                     if (($revisions | Measure-Object).Count -gt 1) {
                         $revision = $revisions | Sort-Object revisionNumber -Descending | Select-Object -Skip 1 -First 1 -ExpandProperty revisionNumber
-                        {Export-TSWorkbook -WorkbookId $sampleWorkbookId -Revision $revision -OutFile "Tests/Output/download_revision.twbx"} | Should -Not -Throw
+                        Export-TSWorkbook -WorkbookId $sampleWorkbookId -Revision $revision -OutFile "Tests/Output/download_revision.twbx"
                         Test-Path -Path "Tests/Output/download_revision.twbx" | Should -BeTrue
                         Remove-Item -Path "Tests/Output/download_revision.twbx"
-                        {Remove-TSWorkbook -WorkbookId $sampleWorkbookId -Revision $revision} | Should -Not -Throw
+                        Remove-TSWorkbook -WorkbookId $sampleWorkbookId -Revision $revision
                     } else {
                         Set-ItResult -Skipped
                     }
                 }
                 It "Download latest workbook revision on <ConfigFile.server>" {
                     $revision = Get-TSWorkbook -WorkbookId $sampleWorkbookId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
-                    {Export-TSWorkbook -WorkbookId $sampleWorkbookId -Revision $revision -OutFile "Tests/Output/download_revision.twbx"} | Should -Not -Throw
+                    Export-TSWorkbook -WorkbookId $sampleWorkbookId -Revision $revision -OutFile "Tests/Output/download_revision.twbx"
                     Test-Path -Path "Tests/Output/download_revision.twbx" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/download_revision.twbx"
                 }
                 It "Add/remove tags for sample workbook on <ConfigFile.server>" {
-                    {Add-TSTagsToContent -WorkbookId $sampleWorkbookId -Tags "active","test"} | Should -Not -Throw
+                    Add-TSTagsToContent -WorkbookId $sampleWorkbookId -Tags "active","test"
                     ((Get-TSWorkbook -WorkbookId $sampleWorkbookId).tags.tag | Measure-Object).Count | Should -Be 2
-                    {Remove-TSTagFromContent -WorkbookId $sampleWorkbookId -Tag "test"} | Should -Not -Throw
+                    Remove-TSTagFromContent -WorkbookId $sampleWorkbookId -Tag "test"
                     ((Get-TSWorkbook -WorkbookId $sampleWorkbookId).tags.tag | Measure-Object).Count | Should -Be 1
-                    {Remove-TSTagFromContent -WorkbookId $sampleWorkbookId -Tag "active"} | Should -Not -Throw
+                    Remove-TSTagFromContent -WorkbookId $sampleWorkbookId -Tag "active"
                     (Get-TSWorkbook -WorkbookId $sampleWorkbookId).tags | Should -BeNullOrEmpty
                 }
                 It "Query/remove/add/set workbook permissions on <ConfigFile.server>" {
@@ -660,7 +660,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $permissions.workbook.name | Should -Be $sampleWorkbookName
                     $savedPermissionTable = $permissions | ConvertTo-TSPermissionTable
                     # remove all permissions for all grantees
-                    {Remove-TSContentPermission -WorkbookId $sampleWorkbookId -All} | Should -Not -Throw
+                    Remove-TSContentPermission -WorkbookId $sampleWorkbookId -All
                     $permissions = Get-TSContentPermission -WorkbookId $sampleWorkbookId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # add all possible permissions (random Allow/Deny) for the current user
@@ -689,7 +689,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
                     ($permissions.granteeCapabilities.capabilities.capability | Measure-Object).Count | Should -Be $possibleCap.Length
                     # remove all permissions for the current user
-                    {Remove-TSContentPermission -WorkbookId $sampleWorkbookId -GranteeType User -GranteeId (Get-TSCurrentUserId)} | Should -Not -Throw
+                    Remove-TSContentPermission -WorkbookId $sampleWorkbookId -GranteeType User -GranteeId (Get-TSCurrentUserId)
                     $permissions = Get-TSContentPermission -WorkbookId $sampleWorkbookId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # add back initial permissions configuration
@@ -709,7 +709,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                                 $_.capabilities.capability | ForEach-Object {
                                     $capName = $_.name
                                     $capMode = $_.mode
-                                    {Remove-TSContentPermission -WorkbookId $sampleWorkbookId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode} | Should -Not -Throw
+                                    Remove-TSContentPermission -WorkbookId $sampleWorkbookId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode
                                 }
                             }
                         }
@@ -779,7 +779,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         $script:sampleWorkbookId = $workbook.id
                     }
                     It "Download workbook ""<sampleWorkbookName>"" from <ConfigFile.server>" {
-                        {Export-TSWorkbook -WorkbookId $sampleWorkbookId -OutFile "Tests/Output/download.twbx"} | Should -Not -Throw
+                        Export-TSWorkbook -WorkbookId $sampleWorkbookId -OutFile "Tests/Output/download.twbx"
                         Test-Path -Path "Tests/Output/download.twbx" | Should -BeTrue
                         Remove-Item -Path "Tests/Output/download.twbx"
                     }
@@ -834,7 +834,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $sampleDatasourceId | Should -BeOfType String
                 }
                 It "Download sample datasource from <ConfigFile.server>" {
-                    {Export-TSDatasource -DatasourceId $sampleDatasourceId -OutFile "Tests/Output/$sampleDatasourceName.tdsx"} | Should -Not -Throw
+                    Export-TSDatasource -DatasourceId $sampleDatasourceId -OutFile "Tests/Output/$sampleDatasourceName.tdsx"
                     Test-Path -Path "Tests/Output/$sampleDatasourceName.tdsx" | Should -BeTrue
                     # Remove-Item -Path "Tests/Output/$sampleDatasourceName.tdsx"
                 }
@@ -851,17 +851,17 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $revisions = Get-TSDatasource -DatasourceId $sampleDatasourceId -Revisions
                     if (($revisions | Measure-Object).Count -gt 1) {
                         $revision = $revisions | Sort-Object revisionNumber -Descending | Select-Object -Skip 1 -First 1 -ExpandProperty revisionNumber
-                        {Export-TSDatasource -DatasourceId $sampleDatasourceId -Revision $revision -OutFile "Tests/Output/download_revision.tdsx"} | Should -Not -Throw
+                        Export-TSDatasource -DatasourceId $sampleDatasourceId -Revision $revision -OutFile "Tests/Output/download_revision.tdsx"
                         Test-Path -Path "Tests/Output/download_revision.tdsx" | Should -BeTrue
                         Remove-Item -Path "Tests/Output/download_revision.tdsx"
-                        {Remove-TSDatasource -DatasourceId $sampleDatasourceId -Revision $revision} | Should -Not -Throw
+                        Remove-TSDatasource -DatasourceId $sampleDatasourceId -Revision $revision
                     } else {
                         Set-ItResult -Skipped
                     }
                 }
                 It "Download latest datasource revision on <ConfigFile.server>" {
                     $revision = Get-TSDatasource -DatasourceId $sampleDatasourceId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
-                    {Export-TSDatasource -DatasourceId $sampleDatasourceId -Revision $revision -OutFile "Tests/Output/download_revision.tdsx"} | Should -Not -Throw
+                    Export-TSDatasource -DatasourceId $sampleDatasourceId -Revision $revision -OutFile "Tests/Output/download_revision.tdsx"
                     Test-Path -Path "Tests/Output/download_revision.tdsx" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/download_revision.tdsx"
                 }
@@ -881,11 +881,11 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $datasource.id | Should -BeOfType String
                 }
                 It "Add/remove tags for sample datasource on <ConfigFile.server>" {
-                    {Add-TSTagsToContent -DatasourceId $sampleDatasourceId -Tags "active","test"} | Should -Not -Throw
+                    Add-TSTagsToContent -DatasourceId $sampleDatasourceId -Tags "active","test"
                     ((Get-TSDatasource -DatasourceId $sampleDatasourceId).tags.tag | Measure-Object).Count | Should -Be 2
-                    {Remove-TSTagFromContent -DatasourceId $sampleDatasourceId -Tag "test"} | Should -Not -Throw
+                    Remove-TSTagFromContent -DatasourceId $sampleDatasourceId -Tag "test"
                     ((Get-TSDatasource -DatasourceId $sampleDatasourceId).tags.tag | Measure-Object).Count | Should -Be 1
-                    {Remove-TSTagFromContent -DatasourceId $sampleDatasourceId -Tag "active"} | Should -Not -Throw
+                    Remove-TSTagFromContent -DatasourceId $sampleDatasourceId -Tag "active"
                     (Get-TSDatasource -DatasourceId $sampleDatasourceId).tags | Should -BeNullOrEmpty
                 }
                 It "Query/remove/add/set datasource permissions on <ConfigFile.server>" {
@@ -894,7 +894,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $permissions.datasource.name | Should -Be $sampleDatasourceName
                     $savedPermissionTable = $permissions | ConvertTo-TSPermissionTable
                     # remove all permissions for all grantees
-                    {Remove-TSContentPermission -DatasourceId $sampleDatasourceId -All} | Should -Not -Throw
+                    Remove-TSContentPermission -DatasourceId $sampleDatasourceId -All
                     $permissions = Get-TSContentPermission -DatasourceId $sampleDatasourceId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # add all possible permissions (random Allow/Deny) for the current user
@@ -923,7 +923,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
                     ($permissions.granteeCapabilities.capabilities.capability | Measure-Object).Count | Should -Be $possibleCap.Length
                     # remove all permissions for the current user
-                    {Remove-TSContentPermission -DatasourceId $sampleDatasourceId -GranteeType User -GranteeId (Get-TSCurrentUserId)} | Should -Not -Throw
+                    Remove-TSContentPermission -DatasourceId $sampleDatasourceId -GranteeType User -GranteeId (Get-TSCurrentUserId)
                     $permissions = Get-TSContentPermission -DatasourceId $sampleDatasourceId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # add back initial permissions configuration
@@ -943,7 +943,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                                 $_.capabilities.capability | ForEach-Object {
                                     $capName = $_.name
                                     $capMode = $_.mode
-                                    {Remove-TSContentPermission -DatasourceId $sampleDatasourceId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode} | Should -Not -Throw
+                                    Remove-TSContentPermission -DatasourceId $sampleDatasourceId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode
                                 }
                             }
                         }
@@ -1004,7 +1004,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         $script:sampleDatasourceId = $datasource.id
                     }
                     It "Download datasource ""<sampleDatasourceName>"" from <ConfigFile.server>" {
-                        {Export-TSDatasource -DatasourceId $sampleDatasourceId -OutFile "Tests/Output/download.tdsx"} | Should -Not -Throw
+                        Export-TSDatasource -DatasourceId $sampleDatasourceId -OutFile "Tests/Output/download.tdsx"
                         Test-Path -Path "Tests/Output/download.tdsx" | Should -BeTrue
                         Remove-Item -Path "Tests/Output/download.tdsx"
                     }
@@ -1052,53 +1052,53 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $script:sampleViewName = (Get-TSView -ViewId $sampleViewId).name
                 }
                 It "Download sample view as PDF from <ConfigFile.server>" {
-                    {Export-TSViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "Tests/Output/$sampleViewName.pdf"} | Should -Not -Throw
+                    Export-TSViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "Tests/Output/$sampleViewName.pdf"
                     Test-Path -Path "Tests/Output/$sampleViewName.pdf" | Should -BeTrue
-                    {Export-TSViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "Tests/Output/$sampleViewName.pdf" -PageType 'A5' -PageOrientation 'Landscape' -MaxAge 1} | Should -Not -Throw
+                    Export-TSViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "Tests/Output/$sampleViewName.pdf" -PageType 'A5' -PageOrientation 'Landscape' -MaxAge 1
                     Test-Path -Path "Tests/Output/$sampleViewName.pdf" | Should -BeTrue
-                    {Export-TSViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "Tests/Output/$sampleViewName.pdf" -VizWidth 500 -VizHeight 300} | Should -Not -Throw
+                    Export-TSViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "Tests/Output/$sampleViewName.pdf" -VizWidth 500 -VizHeight 300
                     Test-Path -Path "Tests/Output/$sampleViewName.pdf" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/$sampleViewName.pdf"
                 }
                 It "Download sample view as PNG from <ConfigFile.server>" {
-                    {Export-TSViewToFormat -ViewId $sampleViewId -Format image -OutFile "Tests/Output/$sampleViewName.png"} | Should -Not -Throw
+                    Export-TSViewToFormat -ViewId $sampleViewId -Format image -OutFile "Tests/Output/$sampleViewName.png"
                     Test-Path -Path "Tests/Output/$sampleViewName.png" | Should -BeTrue
-                    {Export-TSViewToFormat -ViewId $sampleViewId -Format image -OutFile "Tests/Output/$sampleViewName.png" -Resolution high} | Should -Not -Throw
+                    Export-TSViewToFormat -ViewId $sampleViewId -Format image -OutFile "Tests/Output/$sampleViewName.png" -Resolution high
                     Test-Path -Path "Tests/Output/$sampleViewName.png" | Should -BeTrue
-                    {Export-TSViewToFormat -ViewId $sampleViewId -Format image -OutFile "Tests/Output/$sampleViewName.png" -Resolution standard} | Should -Not -Throw
+                    Export-TSViewToFormat -ViewId $sampleViewId -Format image -OutFile "Tests/Output/$sampleViewName.png" -Resolution standard
                     Test-Path -Path "Tests/Output/$sampleViewName.png" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/$sampleViewName.png"
                 }
                 It "Download sample workbook as CSV from <ConfigFile.server>" {
-                    {Export-TSViewToFormat -ViewId $sampleViewId -Format csv -OutFile "Tests/Output/$sampleViewName.csv"} | Should -Not -Throw
+                    Export-TSViewToFormat -ViewId $sampleViewId -Format csv -OutFile "Tests/Output/$sampleViewName.csv"
                     Test-Path -Path "Tests/Output/$sampleViewName.csv" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/$sampleViewName.csv"
                 }
                 It "Download sample workbook as Excel from <ConfigFile.server>" {
-                    {Export-TSViewToFormat -ViewId $sampleViewId -Format excel -OutFile "Tests/Output/$sampleViewName.xlsx"} | Should -Not -Throw
+                    Export-TSViewToFormat -ViewId $sampleViewId -Format excel -OutFile "Tests/Output/$sampleViewName.xlsx"
                     Test-Path -Path "Tests/Output/$sampleViewName.xlsx" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/$sampleViewName.xlsx"
                 }
                 It "Download sample view with data filters applied from <ConfigFile.server>" {
-                    {Export-TSViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "Tests/Output/$sampleViewName.pdf" -ViewFilters @{Region="Europe"}} | Should -Not -Throw
+                    Export-TSViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "Tests/Output/$sampleViewName.pdf" -ViewFilters @{Region="Europe"}
                     Test-Path -Path "Tests/Output/$sampleViewName.pdf" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/$sampleViewName.pdf"
-                    {Export-TSViewToFormat -ViewId $sampleViewId -Format image -OutFile "Tests/Output/$sampleViewName.png" -ViewFilters @{Region="Africa"}} | Should -Not -Throw
+                    Export-TSViewToFormat -ViewId $sampleViewId -Format image -OutFile "Tests/Output/$sampleViewName.png" -ViewFilters @{Region="Africa"}
                     Test-Path -Path "Tests/Output/$sampleViewName.png" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/$sampleViewName.png"
-                    {Export-TSViewToFormat -ViewId $sampleViewId -Format csv -OutFile "Tests/Output/$sampleViewName.csv" -ViewFilters @{"Ease of Business (clusters)"="Low"}} | Should -Not -Throw
+                    Export-TSViewToFormat -ViewId $sampleViewId -Format csv -OutFile "Tests/Output/$sampleViewName.csv" -ViewFilters @{"Ease of Business (clusters)"="Low"}
                     Test-Path -Path "Tests/Output/$sampleViewName.csv" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/$sampleViewName.csv"
-                    {Export-TSViewToFormat -ViewId $sampleViewId -Format excel -OutFile "Tests/Output/$sampleViewName.xlsx" -ViewFilters @{"Country/Region"="Kyrgyzstan"}} | Should -Not -Throw
+                    Export-TSViewToFormat -ViewId $sampleViewId -Format excel -OutFile "Tests/Output/$sampleViewName.xlsx" -ViewFilters @{"Country/Region"="Kyrgyzstan"}
                     Test-Path -Path "Tests/Output/$sampleViewName.xlsx" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/$sampleViewName.xlsx"
                 }
                 It "Add/remove tags for sample view on <ConfigFile.server>" {
-                    {Add-TSTagsToContent -ViewId $sampleViewId -Tags "active","test"} | Should -Not -Throw
+                    Add-TSTagsToContent -ViewId $sampleViewId -Tags "active","test"
                     ((Get-TSView -ViewId $sampleViewId).tags.tag | Measure-Object).Count | Should -Be 2
-                    {Remove-TSTagFromContent -ViewId $sampleViewId -Tag "test"} | Should -Not -Throw
+                    Remove-TSTagFromContent -ViewId $sampleViewId -Tag "test"
                     ((Get-TSView -ViewId $sampleViewId).tags.tag | Measure-Object).Count | Should -Be 1
-                    {Remove-TSTagFromContent -ViewId $sampleViewId -Tag "active"} | Should -Not -Throw
+                    Remove-TSTagFromContent -ViewId $sampleViewId -Tag "active"
                     (Get-TSView -ViewId $sampleViewId).tags | Should -BeNullOrEmpty
                 }
                 It "Update sample workbook (showTabs=false) on <ConfigFile.server>" {
@@ -1114,7 +1114,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $permissions.view.name | Should -Be $sampleViewName
                     $savedPermissionTable = $permissions | ConvertTo-TSPermissionTable
                     # remove all permissions for all grantees
-                    {Remove-TSContentPermission -ViewId $sampleViewId -All} | Should -Not -Throw
+                    Remove-TSContentPermission -ViewId $sampleViewId -All
                     $permissions = Get-TSContentPermission -ViewId $sampleViewId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # add all possible permissions (random Allow/Deny) for the current user
@@ -1143,7 +1143,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
                     ($permissions.granteeCapabilities.capabilities.capability | Measure-Object).Count | Should -Be $possibleCap.Length
                     # remove all permissions for the current user
-                    {Remove-TSContentPermission -ViewId $sampleViewId -GranteeType User -GranteeId (Get-TSCurrentUserId)} | Should -Not -Throw
+                    Remove-TSContentPermission -ViewId $sampleViewId -GranteeType User -GranteeId (Get-TSCurrentUserId)
                     $permissions = Get-TSContentPermission -ViewId $sampleViewId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # add back initial permissions configuration
@@ -1163,7 +1163,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                                 $_.capabilities.capability | ForEach-Object {
                                     $capName = $_.name
                                     $capMode = $_.mode
-                                    {Remove-TSContentPermission -ViewId $sampleViewId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode} | Should -Not -Throw
+                                    Remove-TSContentPermission -ViewId $sampleViewId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode
                                 }
                             }
                         }
@@ -1255,7 +1255,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $flows | Select-Object -First 1 -ExpandProperty id | Should -BeOfType String
                 }
                 It "Download sample flow from <ConfigFile.server>" {
-                    {Export-TSFlow -FlowId $sampleflowId -OutFile "Tests/Output/$sampleFlowName.tflx"} | Should -Not -Throw
+                    Export-TSFlow -FlowId $sampleflowId -OutFile "Tests/Output/$sampleFlowName.tflx"
                     Test-Path -Path "Tests/Output/$sampleFlowName.tflx" | Should -BeTrue
                 }
                 It "Publish sample flow on <ConfigFile.server>" {
@@ -1272,26 +1272,26 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $revisions = Get-TSFlow -FlowId $sampleFlowId -Revisions
                     if (($revisions | Measure-Object).Count -gt 1) {
                         $revision = $revisions | Sort-Object revisionNumber -Descending | Select-Object -Skip 1 -First 1 -ExpandProperty revisionNumber
-                        {Export-TSFlow -FlowId $sampleFlowId -Revision $revision -OutFile "Tests/Output/download_revision.tflx"} | Should -Not -Throw
+                        Export-TSFlow -FlowId $sampleFlowId -Revision $revision -OutFile "Tests/Output/download_revision.tflx"
                         Test-Path -Path "Tests/Output/download_revision.tflx" | Should -BeTrue
                         Remove-Item -Path "Tests/Output/download_revision.tflx"
-                        {Remove-TSFlow -FlowId $sampleFlowId -Revision $revision} | Should -Not -Throw
+                        Remove-TSFlow -FlowId $sampleFlowId -Revision $revision
                     } else {
                         Set-ItResult -Skipped
                     }
                 }
                 It "Download latest flow revision on <ConfigFile.server>" -Skip {
                     $revision = Get-TSFlow -FlowId $sampleFlowId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
-                    {Export-TSFlow -FlowId $sampleFlowId -Revision $revision -OutFile "Tests/Output/download_revision.tflx"} | Should -Not -Throw
+                    Export-TSFlow -FlowId $sampleFlowId -Revision $revision -OutFile "Tests/Output/download_revision.tflx"
                     Test-Path -Path "Tests/Output/download_revision.tflx" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/download_revision.tflx"
                 }
                 It "Add/remove tags for sample flow on <ConfigFile.server>" {
-                    {Add-TSTagsToContent -FlowId $sampleFlowId -Tags "active","test"} | Should -Not -Throw
+                    Add-TSTagsToContent -FlowId $sampleFlowId -Tags "active","test"
                     ((Get-TSFlow -FlowId $sampleFlowId).tags.tag | Measure-Object).Count | Should -Be 2
-                    {Remove-TSTagFromContent -FlowId $sampleFlowId -Tag "test"} | Should -Not -Throw
+                    Remove-TSTagFromContent -FlowId $sampleFlowId -Tag "test"
                     ((Get-TSFlow -FlowId $sampleFlowId).tags.tag | Measure-Object).Count | Should -Be 1
-                    {Remove-TSTagFromContent -FlowId $sampleFlowId -Tag "active"} | Should -Not -Throw
+                    Remove-TSTagFromContent -FlowId $sampleFlowId -Tag "active"
                     (Get-TSFlow -FlowId $sampleFlowId).tags | Should -BeNullOrEmpty
                 }
                 It "Query/remove/add/set flow permissions on <ConfigFile.server>" {
@@ -1300,7 +1300,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $permissions.flow.name | Should -Be $sampleFlowName
                     $savedPermissionTable = $permissions | ConvertTo-TSPermissionTable
                     # remove all permissions for all grantees
-                    {Remove-TSContentPermission -FlowId $sampleFlowId -All} | Should -Not -Throw
+                    Remove-TSContentPermission -FlowId $sampleFlowId -All
                     $permissions = Get-TSContentPermission -FlowId $sampleFlowId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # add all possible permissions (random Allow/Deny) for the current user
@@ -1329,7 +1329,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
                     ($permissions.granteeCapabilities.capabilities.capability | Measure-Object).Count | Should -Be $possibleCap.Length
                     # remove all permissions for the current user
-                    {Remove-TSContentPermission -FlowId $sampleFlowId -GranteeType User -GranteeId (Get-TSCurrentUserId)} | Should -Not -Throw
+                    Remove-TSContentPermission -FlowId $sampleFlowId -GranteeType User -GranteeId (Get-TSCurrentUserId)
                     $permissions = Get-TSContentPermission -FlowId $sampleFlowId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # add back initial permissions configuration
@@ -1349,7 +1349,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                                 $_.capabilities.capability | ForEach-Object {
                                     $capName = $_.name
                                     $capMode = $_.mode
-                                    {Remove-TSContentPermission -FlowId $sampleFlowId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode} | Should -Not -Throw
+                                    Remove-TSContentPermission -FlowId $sampleFlowId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode
                                 }
                             }
                         }
@@ -1386,7 +1386,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     }
                 }
                 It "Remove sample flow on <ConfigFile.server>" -Skip {
-                    {Remove-TSFlow -FlowId $sampleFlowId} | Should -Not -Throw
+                    Remove-TSFlow -FlowId $sampleFlowId
                 }
                 It "Publish flow with invalid extension on <ConfigFile.server>" {
                     {Publish-TSFlow -Name "Flow" -InFile "Tests/Assets/Misc/Flow.txt" -ProjectId $samplesProjectId} | Should -Throw
@@ -1423,7 +1423,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         $script:sampleflowId = $flow.id
                     }
                     It "Download flow ""<sampleFlowName>"" from <ConfigFile.server>" {
-                        {Export-TSFlow -FlowId $sampleflowId -OutFile "Tests/Output/download.tflx"} | Should -Not -Throw
+                        Export-TSFlow -FlowId $sampleflowId -OutFile "Tests/Output/download.tflx"
                         Test-Path -Path "Tests/Output/download.tflx" | Should -BeTrue
                         Remove-Item -Path "Tests/Output/download.tflx"
                     }
@@ -1444,18 +1444,18 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 }
             }
             It "Add sample contents to user favorites on <ConfigFile.server>" {
-                {Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -ProjectId $script:samplesProjectId} | Should -Not -Throw
+                Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -ProjectId $script:samplesProjectId
                 Get-TSDatasource -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
-                    {Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -DatasourceId $_.id} | Should -Not -Throw
+                    Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -DatasourceId $_.id
                 }
                 Get-TSWorkbook -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
-                    {Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -WorkbookId $_.id} | Should -Not -Throw
+                    Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -WorkbookId $_.id
                 }
                 Get-TSView -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
-                    {Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -ViewId $_.id} | Should -Not -Throw
+                    Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -ViewId $_.id
                 }
                 Get-TSFlow -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
-                    {Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -FlowId $_.id} | Should -Not -Throw
+                    Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -FlowId $_.id
                 }
             }
             It "Get/reorder user favorites for sample contents on <ConfigFile.server>" {
@@ -1472,7 +1472,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 if ($workbook_id) {
                     $pos_workbook = $favorites | Where-Object -FilterScript {$_.workbook.id -eq $workbook_id} | Select-Object -First 1 -ExpandProperty position
                     $pos_workbook | Should -BeLessThan $pos_project
-                    {Move-TSUserFavorite -UserId (Get-TSCurrentUserId) -FavoriteId $workbook_id -FavoriteType Workbook -AfterFavoriteId $script:samplesProjectId -AfterFavoriteType Project} | Should -Not -Throw
+                    Move-TSUserFavorite -UserId (Get-TSCurrentUserId) -FavoriteId $workbook_id -FavoriteType Workbook -AfterFavoriteId $script:samplesProjectId -AfterFavoriteType Project
                     $favorites = Get-TSUserFavorite -UserId (Get-TSCurrentUserId)
                     $pos_project = $favorites | Where-Object -FilterScript {$_.project.id -eq $script:samplesProjectId} | Select-Object -First 1 -ExpandProperty position
                     $pos_workbook = $favorites | Where-Object -FilterScript {$_.workbook.id -eq $workbook_id} | Select-Object -First 1 -ExpandProperty position
@@ -1481,7 +1481,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 if ($datasource_id) {
                     $pos_datasource = $favorites | Where-Object -FilterScript {$_.datasource.id -eq $datasource_id} | Select-Object -First 1 -ExpandProperty position
                     $pos_datasource | Should -BeLessThan $pos_project
-                    {Move-TSUserFavorite -UserId (Get-TSCurrentUserId) -FavoriteId $datasource_id -FavoriteType Datasource -AfterFavoriteId $script:samplesProjectId -AfterFavoriteType Project} | Should -Not -Throw
+                    Move-TSUserFavorite -UserId (Get-TSCurrentUserId) -FavoriteId $datasource_id -FavoriteType Datasource -AfterFavoriteId $script:samplesProjectId -AfterFavoriteType Project
                     $favorites = Get-TSUserFavorite -UserId (Get-TSCurrentUserId)
                     $pos_project = $favorites | Where-Object -FilterScript {$_.project.id -eq $script:samplesProjectId} | Select-Object -First 1 -ExpandProperty position
                     $pos_datasource = $favorites | Where-Object -FilterScript {$_.datasource.id -eq $datasource_id} | Select-Object -First 1 -ExpandProperty position
@@ -1491,7 +1491,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $pos_view0 = $favorites | Where-Object -FilterScript {$_.view.id -eq $views[0].id} | Select-Object -First 1 -ExpandProperty position
                     $pos_view1 = $favorites | Where-Object -FilterScript {$_.view.id -eq $views[1].id} | Select-Object -First 1 -ExpandProperty position
                     $pos_view1 | Should -BeLessThan $pos_view0
-                    {Move-TSUserFavorite -UserId (Get-TSCurrentUserId) -FavoriteId $views[1].id -FavoriteType View -AfterFavoriteId $views[0].id -AfterFavoriteType View} | Should -Not -Throw
+                    Move-TSUserFavorite -UserId (Get-TSCurrentUserId) -FavoriteId $views[1].id -FavoriteType View -AfterFavoriteId $views[0].id -AfterFavoriteType View
                     $favorites = Get-TSUserFavorite -UserId (Get-TSCurrentUserId)
                     $pos_view0 = $favorites | Where-Object -FilterScript {$_.view.id -eq $views[0].id} | Select-Object -First 1 -ExpandProperty position
                     $pos_view1 = $favorites | Where-Object -FilterScript {$_.view.id -eq $views[1].id} | Select-Object -First 1 -ExpandProperty position
@@ -1499,18 +1499,18 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 }
             }
             It "Remove sample contents from user favorites on <ConfigFile.server>" {
-                {Remove-TSUserFavorite -UserId (Get-TSCurrentUserId) -ProjectId $script:samplesProjectId} | Should -Not -Throw
+                Remove-TSUserFavorite -UserId (Get-TSCurrentUserId) -ProjectId $script:samplesProjectId
                 Get-TSDatasource -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
-                    {Remove-TSUserFavorite -UserId (Get-TSCurrentUserId) -DatasourceId $_.id} | Should -Not -Throw
+                    Remove-TSUserFavorite -UserId (Get-TSCurrentUserId) -DatasourceId $_.id
                 }
                 Get-TSWorkbook -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
-                    {Remove-TSUserFavorite -UserId (Get-TSCurrentUserId) -WorkbookId $_.id} | Should -Not -Throw
+                    Remove-TSUserFavorite -UserId (Get-TSCurrentUserId) -WorkbookId $_.id
                 }
                 Get-TSView -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
-                    {Remove-TSUserFavorite -UserId (Get-TSCurrentUserId) -ViewId $_.id} | Should -Not -Throw
+                    Remove-TSUserFavorite -UserId (Get-TSCurrentUserId) -ViewId $_.id
                 }
                 Get-TSFlow -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
-                    {Remove-TSUserFavorite -UserId (Get-TSCurrentUserId) -FlowId $_.id} | Should -Not -Throw
+                    Remove-TSUserFavorite -UserId (Get-TSCurrentUserId) -FlowId $_.id
                 }
             }
         }
