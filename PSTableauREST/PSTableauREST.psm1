@@ -207,7 +207,7 @@ function Open-TSSignIn {
         $private:PlainSecret = (New-Object System.Net.NetworkCredential("", $PersonalAccessTokenSecret)).Password
         $el_credentials.SetAttribute("personalAccessTokenName", $PersonalAccessTokenName)
         $el_credentials.SetAttribute("personalAccessTokenSecret", $private:PlainSecret)
-        # if ($ImpersonateUserId) { Assert-TSRestApiVersion -AtLeast 2.0 }
+        if ($ImpersonateUserId) { Assert-TSRestApiVersion -AtLeast 3.11 }
     } else {
         Write-Error "Sign-in parameters not provided (needs either username/password or PAT)."
         return $null
@@ -2044,7 +2044,7 @@ function Hide-TSViewRecommendation {
     Param(
         [Parameter(Mandatory)][string] $ViewId
     )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    Assert-TSRestApiVersion -AtLeast 3.7
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_rd = $tsRequest.AppendChild($xml.CreateElement("recommendationDismissal"))
@@ -2063,7 +2063,7 @@ function Show-TSViewRecommendation {
     Param(
         [Parameter(Mandatory)][string] $ViewId
     )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    Assert-TSRestApiVersion -AtLeast 3.7
     $uri = Get-TSRequestUri -Endpoint Recommendation -Param "dismissals/?type=view&id=$ViewId"
     try {
         Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
@@ -3053,6 +3053,8 @@ function Get-TSDefaultPermission {
                 continue
             } elseif ($ct -eq 'lenses' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
                 continue
+            } elseif ($ct -in 'databases','tables' -and (Get-TSRestApiVersion) -lt [version]3.6) {
+                continue
             }
             if ((-Not ($ContentType)) -or $ContentType -eq $ct) {
                 $response = Invoke-RestMethod -Uri $uri$ct -Method Get -Headers (Get-TSRequestHeaderDict)
@@ -3099,6 +3101,8 @@ function Set-TSDefaultPermission {
         if ($ct -eq 'dataroles' -and (Get-TSRestApiVersion) -lt [version]3.13) {
             continue
         } elseif ($ct -eq 'lenses' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
+            continue
+        } elseif ($ct -in 'databases','tables' -and (Get-TSRestApiVersion) -lt [version]3.6) {
             continue
         }
         $shouldProcessItem = "project:$ProjectId"
@@ -3303,6 +3307,8 @@ function Remove-TSDefaultPermission {
                         continue
                     } elseif ($ct -eq 'lenses' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
                         continue
+                    } elseif ($ct -in 'databases','tables' -and (Get-TSRestApiVersion) -lt [version]3.6) {
+                        continue
                     }
                     if ((-Not ($ContentType)) -or $ContentType -eq $ct) {
                         $permissions = $allDefaultPermissions | Where-Object -FilterScript {
@@ -3328,6 +3334,8 @@ function Remove-TSDefaultPermission {
                     if ($ct -eq 'dataroles' -and (Get-TSRestApiVersion) -lt [version]3.13) {
                         continue
                     } elseif ($ct -eq 'lenses' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
+                        continue
+                    } elseif ($ct -in 'databases','tables' -and (Get-TSRestApiVersion) -lt [version]3.6) {
                         continue
                     }
                     $contentTypePermissions = $allDefaultPermissions | Where-Object contentType -eq $ct
@@ -3790,8 +3798,8 @@ Export-ModuleMember -Function Update-TSDatasource
 Export-ModuleMember -Function Update-TSDatasourceConnection
 Export-ModuleMember -Function Remove-TSDatasource
 Export-ModuleMember -Function Update-TSDatasourceNow
-# Update Data in Hyper Connection - requires json body
-# Update Data in Hyper Data Source - requires json body
+# Update Data in Hyper Connection - requires json body - API 3.12
+# Update Data in Hyper Data Source - requires json body - API 3.12
 
 ### Views methods
 Export-ModuleMember -Function Get-TSView
@@ -3821,13 +3829,13 @@ Export-ModuleMember -Function Remove-TSFlow
 Export-ModuleMember -Function Start-TSFlowNow
 # Get Flow Run Task
 # Get Flow Run Tasks
-# Get Flow Run
-# Get Flow Runs
+# Get Flow Run - API 3.10
+# Get Flow Runs - API 3.10
 # Run Flow Task
 # Get Linked Task
 # Get Linked Tasks
 # Run Linked Task Now
-# Cancel Flow Run
+# Cancel Flow Run - API 3.10
 
 ### Permissions methods
 Export-ModuleMember -Function Get-TSContentPermission
@@ -3861,7 +3869,7 @@ Export-ModuleMember -Function Remove-TSTagFromContent
 # Get Data Acceleration Tasks in a Site
 # Delete Data Acceleration Task
 
-### Extract and Encryption methods
+### Extract and Encryption methods - API 3.5
 # List Extract Refresh Tasks in Site
 # List Extract Refresh Tasks in Server Schedule
 # Get Extract Refresh Task
@@ -3891,7 +3899,7 @@ Export-ModuleMember -Function Move-TSUserFavorite
 # Update Subscription
 # Delete Subscription
 
-### Dashboard Extensions Settings methods
+### Dashboard Extensions Settings methods - API 3.8
 # List settings for dashboard extensions on server
 # List allowed dashboard extensions on site
 # List blocked dashboard extensions on server
@@ -3906,7 +3914,7 @@ Export-ModuleMember -Function Move-TSUserFavorite
 # Update settings for allowed dashboard extension on site
 # Update dashboard extension settings of site
 
-### Analytics Extensions Settings methods
+### Analytics Extensions Settings methods - API 3.8
 # List analytics extension connections on site
 # Add analytics extension connection to site
 # Update analytics extension connection of site
@@ -3937,7 +3945,7 @@ Export-ModuleMember -Function Move-TSUserFavorite
 # Delete EAS
 
 ### Notifications methods
-# List Webhooks
+# List Webhooks - API 3.6
 # Get a Webhook
 # Create a Webhook
 # Test a Webhook
@@ -3994,7 +4002,7 @@ Export-ModuleMember -Function Move-TSUserFavorite
 # List Virtual Connection Database Connections
 # Update Virtual Connection Database Connections
 
-### Metadata methods
+### Metadata methods - API API 3.5
 Export-ModuleMember -Function Get-TSDatabase
 Export-ModuleMember -Function Get-TSTable
 Export-ModuleMember -Function Get-TSTableColumn
@@ -4010,15 +4018,15 @@ Export-ModuleMember -Function Get-TSMetadataGraphQL
 # Query Table Permissions
 # Add Database Permissions
 # Add Default Database Permissions
-# Add Data Quality Warning
+# Add Data Quality Warning - API 3.9
 # Batch Add or Update Data Quality Warnings
 # Batch Add or Update Data Quality Certifications
 # Add (or Update) Quality Warning Trigger
 # Add Table Permissions
-# Add Tags to Column
-# Add Tags to Database
-# Add Tags to Table
-# Batch Add Tags
+# Add Tags to Column - API 3.9
+# Add Tags to Database - API 3.9
+# Add Tags to Table - API 3.9
+# Batch Add Tags - API 3.9
 # Create or Update labelValue
 # Delete Database Permissions
 # Delete Default Database Permissions
@@ -4033,10 +4041,10 @@ Export-ModuleMember -Function Get-TSMetadataGraphQL
 # Delete Labels
 # Delete labelValue
 # Delete Table Permissions
-# Delete Tag from Column
-# Delete Tag from Database
-# Delete Tag from Table
-# Batch Delete Tags
+# Delete Tag from Column - API 3.9
+# Delete Tag from Database - API 3.9
+# Delete Tag from Table - API 3.9
+# Batch Delete Tags - API 3.9
 # Get Label
 # Get Labels
 # Get labelValue

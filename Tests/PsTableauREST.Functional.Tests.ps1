@@ -230,6 +230,9 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 Remove-TSContentPermission -ProjectId $testProjectId -All
                 $permissions = Get-TSContentPermission -ProjectId $testProjectId
                 $permissions.granteeCapabilities | Should -BeNullOrEmpty
+                # attempt to set permissions with empty capabilities
+                $permissions = Set-TSContentPermission -ProjectId $testProjectId -PermissionTable @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{}}
+                $permissions.granteeCapabilities | Should -BeNullOrEmpty
                 # add all possible permissions (random Allow/Deny) for the current user
                 $possibleCap = 'ProjectLeader','Read','Write' #
                 $allPermissionTable = @()
@@ -663,6 +666,9 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     Remove-TSContentPermission -WorkbookId $sampleWorkbookId -All
                     $permissions = Get-TSContentPermission -WorkbookId $sampleWorkbookId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
+                    # attempt to set permissions with empty capabilities
+                    $permissions = Set-TSContentPermission -WorkbookId $sampleWorkbookId -PermissionTable @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{}}
+                    $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # add all possible permissions (random Allow/Deny) for the current user
                     $possibleCap = 'Read','Filter','ViewComments','AddComment','ExportImage','ExportData','ShareView','ViewUnderlyingData','WebAuthoring','RunExplainData','ExportXml','Write','CreateRefreshMetrics','ChangeHierarchy','Delete','ChangePermissions'
                     $allPermissionTable = @()
@@ -897,6 +903,9 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     Remove-TSContentPermission -DatasourceId $sampleDatasourceId -All
                     $permissions = Get-TSContentPermission -DatasourceId $sampleDatasourceId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
+                    # attempt to set permissions with empty capabilities
+                    $permissions = Set-TSContentPermission -DatasourceId $sampleDatasourceId -PermissionTable @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{}}
+                    $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # add all possible permissions (random Allow/Deny) for the current user
                     $possibleCap = 'Read','Connect','ExportXml','Write','SaveAs','ChangeHierarchy','Delete','ChangePermissions'
                     $allPermissionTable = @()
@@ -1117,6 +1126,9 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     Remove-TSContentPermission -ViewId $sampleViewId -All
                     $permissions = Get-TSContentPermission -ViewId $sampleViewId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
+                    # attempt to set permissions with empty capabilities
+                    $permissions = Set-TSContentPermission -ViewId $sampleViewId -PermissionTable @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{}}
+                    $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # add all possible permissions (random Allow/Deny) for the current user
                     $possibleCap = 'Read','Filter','ViewComments','AddComment','ExportImage','ExportData','ShareView','ViewUnderlyingData','WebAuthoring','Delete','ChangePermissions' # 'ExportXml','Write','ChangeHierarchy','RunExplainData' capabilities are not supported (cf. Workbooks)
                     $allPermissionTable = @()
@@ -1302,6 +1314,9 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     # remove all permissions for all grantees
                     Remove-TSContentPermission -FlowId $sampleFlowId -All
                     $permissions = Get-TSContentPermission -FlowId $sampleFlowId
+                    $permissions.granteeCapabilities | Should -BeNullOrEmpty
+                    # attempt to set permissions with empty capabilities
+                    $permissions = Set-TSContentPermission -FlowId $sampleFlowId -PermissionTable @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{}}
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # add all possible permissions (random Allow/Deny) for the current user
                     $possibleCap = 'Read','ExportXml','Execute','WebAuthoringForFlows','Write','ChangeHierarchy','Delete','ChangePermissions'
