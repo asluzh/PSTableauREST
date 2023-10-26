@@ -142,7 +142,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     }
                 }
             }
-            It "Delete site <testSite> on <ConfigFile.server> asynchronously" {
+            It "Delete site on <ConfigFile.server> asynchronously" {
                 if ($ConfigFile.test_site_name) {
                     $tempSiteName = New-Guid # get UUID for site name and content URL
                     $site = Add-TSSite -Name $tempSiteName -ContentUrl $tempSiteName
@@ -552,6 +552,10 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 }
                 It "Get sample workbook id from <ConfigFile.server>" {
                     $workbook = Get-TSWorkbook -Filter "projectName:eq:$samplesProjectName","name:eq:Superstore" | Select-Object -First 1
+                    if (-not $workbook) { # fallback: wait and retry with generic query
+                        Start-Sleep -s 3 # small delay is needed to finalize published samples
+                        $workbook = Get-TSWorkbook | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
+                    }
                     $script:sampleWorkbookId = $workbook.id
                     $script:sampleWorkbookName = $workbook.name
                     $script:sampleWorkbookContentUrl = $workbook.contentUrl
@@ -835,6 +839,10 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 }
                 It "Get sample datasource id from <ConfigFile.server>" {
                     $datasource = Get-TSDatasource -Filter "projectName:eq:$samplesProjectName" | Select-Object -First 1
+                    if (-not $datasource) { # fallback: wait and retry with generic query
+                        Start-Sleep -s 3 # small delay is needed to finalize published samples
+                        $datasource = Get-TSDatasource | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
+                    }
                     $script:sampleDatasourceId = $datasource.id
                     $script:sampleDatasourceName = $datasource.name
                     $sampleDatasourceId | Should -BeOfType String
@@ -1056,7 +1064,13 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     }
                 }
                 It "Get sample view id from <ConfigFile.server>" {
-                    $script:sampleViewId = Get-TSView -Filter "workbookName:eq:World Indicators","projectName:eq:$samplesProjectName" | Select-Object -First 1 -ExpandProperty id
+                    $view = Get-TSView -Filter "workbookName:eq:Superstore","projectName:eq:$samplesProjectName" | Select-Object -First 1
+                    if (-not $view) { # fallback: wait and retry with generic query
+                        Start-Sleep -s 3 # small delay is needed to finalize published samples
+                        $workbook = Get-TSWorkbook | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId -and $_.name -eq "Superstore"} | Select-Object -First 1
+                        $view = Get-TSView | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId -and $_.workbook.id -eq $workbook.id} | Select-Object -First 1
+                    }
+                    $script:sampleViewId = $view.id
                     $sampleViewId | Should -BeOfType String
                     $script:sampleViewName = (Get-TSView -ViewId $sampleViewId).name
                 }
@@ -1111,7 +1125,10 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     (Get-TSView -ViewId $sampleViewId).tags | Should -BeNullOrEmpty
                 }
                 It "Update sample workbook (showTabs=false) on <ConfigFile.server>" {
-                    $workbook = Get-TSWorkbook -Filter "name:eq:World Indicators","projectName:eq:$samplesProjectName"
+                    $workbook = Get-TSWorkbook -Filter "name:eq:Superstore","projectName:eq:$samplesProjectName"
+                    if (-not $workbook) { # fallback: wait and retry with generic query
+                        $workbook = Get-TSWorkbook | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId -and $_.name -eq "Superstore"} | Select-Object -First 1
+                    }
                     $workbook.id | Should -BeOfType String
                     $workbook = Update-TSWorkbook -WorkbookId $workbook.id -ShowTabs:$false
                     $workbook.showTabs | Should -Be "false"
@@ -1226,7 +1243,6 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 BeforeAll {
                     $project = Add-TSProject -Name (New-Guid)
                     Update-TSProject -ProjectId $project.id -PublishSamples
-                    Start-Sleep -Seconds 2 # small delay is needed to finalize published samples
                     $script:samplesProjectId = $project.id
                     $script:samplesProjectName = $project.name
                 }
@@ -1238,6 +1254,10 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 }
                 It "Get sample flow id from <ConfigFile.server>" {
                     $flow = Get-TSFlow -Filter "projectName:eq:$samplesProjectName" | Select-Object -First 1
+                    if (-not $flow) { # fallback: wait and retry with generic query
+                        Start-Sleep -s 3 # small delay is needed to finalize published samples
+                        $flow = Get-TSFlow | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
+                    }
                     $script:sampleflowId = $flow.id
                     $script:sampleFlowName = $flow.name
                     $sampleflowId | Should -BeOfType String
@@ -1460,16 +1480,33 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             }
             It "Add sample contents to user favorites on <ConfigFile.server>" {
                 Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -ProjectId $script:samplesProjectId
-                Get-TSDatasource -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
-                    Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -DatasourceId $_.id
+                $workbooks = Get-TSWorkbook -Filter "projectName:eq:$samplesProjectName"
+                if (-not $workbooks) { # fallback: wait and retry with generic query
+                    Start-Sleep -s 3 # small delay is needed to finalize published samples
+                    $workbooks = Get-TSWorkbook | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
                 }
-                Get-TSWorkbook -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
+                $workbooks | ForEach-Object {
                     Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -WorkbookId $_.id
                 }
-                Get-TSView -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
+                $datasources = Get-TSDatasource -Filter "projectName:eq:$samplesProjectName"
+                if (-not $datasources) { # fallback: wait and retry with generic query
+                    $datasources = Get-TSDatasource | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
+                }
+                $datasources | ForEach-Object {
+                    Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -DatasourceId $_.id
+                }
+                $views = Get-TSView -Filter "projectName:eq:$samplesProjectName"
+                if (-not $views) { # fallback: wait and retry with generic query
+                    $views = Get-TSView | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
+                }
+                $views | ForEach-Object {
                     Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -ViewId $_.id
                 }
-                Get-TSFlow -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
+                $flows = Get-TSFlow -Filter "projectName:eq:$samplesProjectName"
+                if (-not $flows) { # fallback: wait and retry with generic query
+                    $flows = Get-TSFlow | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
+                }
+                $flows | ForEach-Object {
                     Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -FlowId $_.id
                 }
             }
