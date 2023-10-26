@@ -402,7 +402,8 @@ function Remove-TSSite {
     # Assert-TSRestApiVersion -AtLeast 2.0
     $uri = Get-TSRequestUri -Endpoint Site -Param $SiteId
     if ($BackgroundTask) {
-        Assert-TSRestApiVersion -AtLeast 3.18
+        # Assert-TSRestApiVersion -AtLeast 3.18
+        # no restriction by the Tableau Server implied, don't need to assert API version
         $uri += "?asJob=true"
     }
     if ($SiteId -eq $script:TSSiteId) {
@@ -938,6 +939,10 @@ function Send-TSFileUpload {
         [Parameter()][switch] $ShowProgress
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
+    if ($FileName -match '[^\x20-\x7e]') { # if any special non-ASCII characters in the filename
+        $FileName = "tableau_file" # fallback to standard filename (doesn't matter for file upload)
+        Write-Verbose "Filename $FileName contains special characters, replacing with tableau_file"
+    }
     try {
         $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint FileUpload) -Method Post -Headers (Get-TSRequestHeaderDict)
         $uploadSessionId = $response.tsResponse.fileUpload.GetAttribute("uploadSessionId")
@@ -966,7 +971,7 @@ function Send-TSFileUpload {
             $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream")
             $fileContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
             $fileContent.Headers.ContentDisposition.Name = "tableau_file"
-            $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`"" # TODO check/escape filenames with special chars, e.g. using Uri.EscapeDataString()
+            $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`""
             $multipartContent.Add($fileContent)
             $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint FileUpload -Param $uploadSessionId) -Body $multipartContent -Method Put -Headers (Get-TSRequestHeaderDict)
             $bytesUploaded += $bytesRead
@@ -1179,6 +1184,10 @@ function Publish-TSWorkbook {
     }
     if (-Not ($FileType -In @("twb", "twbx"))) {
         throw "File type unsupported (supported types are: twb, twbx)"
+    }
+    if ($FileName -match '[^\x20-\x7e]') { # if any special non-ASCII characters in the filename
+        $FileName = "tableau_workbook.$FileType" # fallback to standard filename (doesn't matter for file upload)
+        Write-Verbose "Filename $FileName contains special characters, replacing with tableau_workbook.$FileType"
     }
     if ($fileItem.Length -ge $script:TSRestApiFileSizeLimit) {
         $Chunked = $true
@@ -1626,6 +1635,10 @@ function Publish-TSDatasource {
     }
     if (-Not ($FileType -In @("tds", "tdsx", "tde", "hyper", "parquet"))) {
         throw "File type unsupported (supported types are: tds, tdsx, tde, hyper, parquet)"
+    }
+    if ($FileName -match '[^\x20-\x7e]') { # if any special non-ASCII characters in the filename
+        $FileName = "tableau_datasource.$FileType" # fallback to standard filename (doesn't matter for file upload)
+        Write-Verbose "Filename $FileName contains special characters, replacing with tableau_datasource.$FileType"
     }
     if ($fileItem.Length -ge $script:TSRestApiFileSizeLimit) {
         $Chunked = $true
@@ -2432,6 +2445,10 @@ function Publish-TSFlow {
     }
     if (-Not ($FileType -In @("tfl", "tflx"))) {
         throw "File type unsupported (supported types are: tfl, tflx)"
+    }
+    if ($FileName -match '[^\x20-\x7e]') { # if any special non-ASCII characters in the filename
+        $FileName = "tableau_flow.$FileType" # fallback to standard filename (doesn't matter for file upload)
+        Write-Verbose "Filename $FileName contains special characters, replacing with tableau_flow.$FileType"
     }
     if ($fileItem.Length -ge $script:TSRestApiFileSizeLimit) {
         $Chunked = $true
