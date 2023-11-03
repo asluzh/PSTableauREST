@@ -2676,6 +2676,27 @@ function Get-TSFlowRun {
     }
 }
 
+function Stop-TSFlowRun {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $FlowRunId
+    )
+    Assert-TSRestApiVersion -AtLeast 3.10
+    try {
+        if ($PSCmdlet.ShouldProcess($FlowRunId)) {
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param runs/$FlowRunId) -Method Put -Headers (Get-TSRequestHeaderDict)
+            if ($response.tsResponse.error) {
+                return $response.tsResponse.error
+            } else {
+                return $null # Flow run cancelled successfully
+            }
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
 ### Permissions methods
 function Get-TSContentPermission {
     [OutputType([PSCustomObject[]])]
@@ -4352,9 +4373,9 @@ Export-ModuleMember -Function Update-TSFlowConnection
 Export-ModuleMember -Function Remove-TSFlow
 Export-ModuleMember -Function Start-TSFlowNow
 Export-ModuleMember -Function Get-TSFlowRun
+Export-ModuleMember -Function Stop-TSFlowRun
 # Run Flow Task
 # Run Linked Task Now
-# Cancel Flow Run - API 3.10
 
 ### Permissions methods
 Export-ModuleMember -Function Get-TSContentPermission
