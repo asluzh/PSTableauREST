@@ -3885,6 +3885,23 @@ function Get-TSFlowRunTask {
     }
 }
 
+function Start-TSFlowRunTaskNow {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $TaskId
+    )
+    Assert-TSRestApiVersion -AtLeast 3.3
+    try {
+        if ($PSCmdlet.ShouldProcess($TaskId)) {
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Task -Param runFlow/$TaskId/runNow) -Method Post -Headers (Get-TSRequestHeaderDict)
+            return $response.tsResponse.job
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
 function Get-TSLinkedTask {
     [OutputType([PSCustomObject[]])]
     Param(
@@ -3906,6 +3923,23 @@ function Get-TSLinkedTask {
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.linkedTasks.linkedTasks
             } until ($PageSize*$pageNumber -ge $totalAvailable)
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Start-TSLinkedTaskNow {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $TaskId
+    )
+    Assert-TSRestApiVersion -AtLeast 3.15
+    try {
+        if ($PSCmdlet.ShouldProcess($TaskId)) {
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Task -Param linked/$TaskId/runNow) -Method Post -Headers (Get-TSRequestHeaderDict)
+            return $response.tsResponse.linkedTaskJob
         }
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
@@ -4403,7 +4437,9 @@ Export-ModuleMember -Function Add-TSContentToSchedule
 Export-ModuleMember -Function Get-TSJob
 Export-ModuleMember -Function Stop-TSJob
 Export-ModuleMember -Function Get-TSFlowRunTask
+Export-ModuleMember -Function Start-TSFlowRunTaskNow
 Export-ModuleMember -Function Get-TSLinkedTask
+Export-ModuleMember -Function Start-TSLinkedTaskNow
 Export-ModuleMember -Function Get-TSDataAccelerationTask
 Export-ModuleMember -Function Remove-TSDataAccelerationTask
 
