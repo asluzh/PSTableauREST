@@ -24,7 +24,7 @@ function Get-TSRequestUri {
     [OutputType([string])]
     Param(
         [Parameter(Mandatory)][ValidateSet('Auth','Site','Project','User','Group','Workbook','Datasource','View','Flow','FileUpload',
-            'Recommendation','CustomView','Favorite','OrderFavorites','Schedule','ServerSchedule','Job',
+            'Recommendation','CustomView','Favorite','OrderFavorites','Schedule','ServerSchedule','Job','Task',
             'Database','Table','GraphQL')][string] $Endpoint,
         [Parameter()][string] $Param
     )
@@ -3802,6 +3802,35 @@ function Stop-TSJob {
     }
 }
 
+function Get-TSDataAccelerationTask {
+    [OutputType([PSCustomObject[]])]
+    Param(
+    )
+    Assert-TSRestApiVersion -AtLeast 3.8 -LessThan 3.16
+    try {
+        $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Task -Param dataAcceleration) -Method Get -Headers (Get-TSRequestHeaderDict)
+        $response.tsResponse.tasks.task
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Remove-TSDataAccelerationTask {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $TaskId
+    )
+    Assert-TSRestApiVersion -AtLeast 3.8 -LessThan 3.16
+    try {
+        if ($PSCmdlet.ShouldProcess($TaskId)) {
+            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Task -Param dataAcceleration/$TaskId) -Method Delete -Headers (Get-TSRequestHeaderDict)
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
 ### Extract and Encryption methods - API 3.5
 function Get-TSExtractRefreshTasksInSchedule {
     [OutputType([PSCustomObject[]])]
@@ -4268,8 +4297,8 @@ Export-ModuleMember -Function Remove-TSSchedule
 Export-ModuleMember -Function Add-TSContentToSchedule
 Export-ModuleMember -Function Get-TSJob
 Export-ModuleMember -Function Stop-TSJob
-# Get Data Acceleration Tasks in a Site
-# Delete Data Acceleration Task
+Export-ModuleMember -Function Get-TSDataAccelerationTask
+Export-ModuleMember -Function Remove-TSDataAccelerationTask
 
 ### Extract and Encryption methods - API 3.5
 Export-ModuleMember -Function Get-TSExtractRefreshTasksInSchedule
