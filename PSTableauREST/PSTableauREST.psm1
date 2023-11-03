@@ -1,6 +1,3 @@
-# Legacy code
-# [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
 ### Module variables and helper functions
 $TSRestApiVersion = [version]'2.4' # minimum supported version
 $TSRestApiMinVersion = [version]'2.4' # supported version for initial sign-in calls
@@ -26,18 +23,22 @@ function Get-TSRequestHeaderDict {
 function Get-TSRequestUri {
     [OutputType([string])]
     Param(
-        [Parameter(Mandatory)][ValidateSet('Auth','Site','Project','User','Group','Workbook','Datasource','View','Recommendation',
-            'CustomView','Flow','FileUpload','Favorite','OrderFavorites','Database','Table','GraphQL')][string] $Endpoint,
+        [Parameter(Mandatory)][ValidateSet('Auth','Site','Project','User','Group','Workbook','Datasource','View','Flow','FileUpload',
+            'Recommendation','CustomView','Favorite','OrderFavorites','Schedule','ServerSchedule','Job',
+            'Database','Table','GraphQL')][string] $Endpoint,
         [Parameter()][string] $Param
     )
     $Uri = "$script:TSServerUrl/api/$script:TSRestApiVersion/"
     switch ($Endpoint) {
-        'Auth' { $Uri += "auth/$Param" }
-        'GraphQL' {
-            $Uri = "$script:TSServerUrl/api/metadata/graphql"
+        'Auth' {
+            $Uri += "auth/$Param"
         }
         'Site' {
             $Uri += "sites"
+            if ($Param) { $Uri += "/$Param" }
+        }
+        'ServerSchedule' {
+            $Uri += "schedules"
             if ($Param) { $Uri += "/$Param" }
         }
         'FileUpload' {
@@ -47,6 +48,9 @@ function Get-TSRequestUri {
         'OrderFavorites' {
             $Uri += "sites/$script:TSSiteId/orderFavorites"
             if ($Param) { $Uri += "/$Param" }
+        }
+        'GraphQL' {
+            $Uri = "$script:TSServerUrl/api/metadata/graphql"
         }
         default {
             $Uri += "sites/$script:TSSiteId/" + $Endpoint.ToLower() + "s" # User -> users, etc.
@@ -939,7 +943,7 @@ function Send-TSFileUpload {
         [Parameter()][switch] $ShowProgress
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
-    if ($FileName -match '[^\x20-\x7e]') { # if any special non-ASCII characters in the filename
+    if ($FileName -match '[^\x20-\x7e]') { # special non-ASCII characters in the filename cause issues on some API versions
         $FileName = "tableau_file" # fallback to standard filename (doesn't matter for file upload)
         Write-Verbose "Filename $FileName contains special characters, replacing with tableau_file"
     }
@@ -1185,7 +1189,7 @@ function Publish-TSWorkbook {
     if (-Not ($FileType -In @("twb", "twbx"))) {
         throw "File type unsupported (supported types are: twb, twbx)"
     }
-    if ($FileName -match '[^\x20-\x7e]') { # if any special non-ASCII characters in the filename
+    if ($FileName -match '[^\x20-\x7e]') { # special non-ASCII characters in the filename cause issues on some API versions
         $FileName = "tableau_workbook.$FileType" # fallback to standard filename (doesn't matter for file upload)
         Write-Verbose "Filename $FileName contains special characters, replacing with tableau_workbook.$FileType"
     }
@@ -1636,7 +1640,7 @@ function Publish-TSDatasource {
     if (-Not ($FileType -In @("tds", "tdsx", "tde", "hyper", "parquet"))) {
         throw "File type unsupported (supported types are: tds, tdsx, tde, hyper, parquet)"
     }
-    if ($FileName -match '[^\x20-\x7e]') { # if any special non-ASCII characters in the filename
+    if ($FileName -match '[^\x20-\x7e]') { # special non-ASCII characters in the filename cause issues on some API versions
         $FileName = "tableau_datasource.$FileType" # fallback to standard filename (doesn't matter for file upload)
         Write-Verbose "Filename $FileName contains special characters, replacing with tableau_datasource.$FileType"
     }
@@ -2446,7 +2450,7 @@ function Publish-TSFlow {
     if (-Not ($FileType -In @("tfl", "tflx"))) {
         throw "File type unsupported (supported types are: tfl, tflx)"
     }
-    if ($FileName -match '[^\x20-\x7e]') { # if any special non-ASCII characters in the filename
+    if ($FileName -match '[^\x20-\x7e]') { # special non-ASCII characters in the filename cause issues on some API versions
         $FileName = "tableau_flow.$FileType" # fallback to standard filename (doesn't matter for file upload)
         Write-Verbose "Filename $FileName contains special characters, replacing with tableau_flow.$FileType"
     }
@@ -2602,24 +2606,24 @@ function Start-TSFlowNow {
     [OutputType([PSCustomObject])]
     Param(
         [Parameter(Mandatory)][string] $FlowId,
-        [Parameter()][ValidateSet('full','incremental')][string] $RunMode = "full", # TODO test
-        [Parameter()][string] $OutputStepId, # TODO test
-        [Parameter()][hashtable] $FlowParams # TODO test
+        [Parameter()][ValidateSet('full','incremental')][string] $RunMode = "full",
+        [Parameter()][string] $OutputStepId,
+        [Parameter()][hashtable] $FlowParams
     )
     Assert-TSRestApiVersion -AtLeast 3.3
     $xml = New-Object System.Xml.XmlDocument
-    $xml.AppendChild($xml.CreateElement("tsRequest"))
-    $el_flow = $tsRequest.AppendChild($xml.CreateElement("flowRunSpec"))
-    $el_flow.SetAttribute("flowId", $FlowId)
-    $el_flow.SetAttribute("runMode", $RunMode)
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_frs = $tsRequest.AppendChild($xml.CreateElement("flowRunSpec"))
+    $el_frs.SetAttribute("flowId", $FlowId)
+    $el_frs.SetAttribute("runMode", $RunMode)
     if ($OutputStepId) {
-        $el_steps = $el_flow.AppendChild($xml.CreateElement("flowOutputSteps"))
+        $el_steps = $el_frs.AppendChild($xml.CreateElement("flowOutputSteps"))
         $el_step = $el_steps.AppendChild($xml.CreateElement("flowOutputStep"))
         $el_step.SetAttribute("id", $OutputStepId)
     }
     if ($FlowParams) {
         Assert-TSRestApiVersion -AtLeast 3.15
-        $el_params = $el_flow.AppendChild($xml.CreateElement("flowParameterSpecs"))
+        $el_params = $el_frs.AppendChild($xml.CreateElement("flowParameterSpecs"))
         $FlowParams.GetEnumerator() | ForEach-Object {
             $el_param = $el_params.AppendChild($xml.CreateElement("flowParameterSpec"))
             $el_param.SetAttribute("parameterId", $_.Key)
@@ -3436,6 +3440,391 @@ function Remove-TSTagFromContent {
     }
 }
 
+### Jobs, Tasks and Schedules methods
+function Get-TSSchedule {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter(Mandatory,ParameterSetName='ScheduleById')][string] $ScheduleId,
+        [Parameter(ParameterSetName='Schedules')][ValidateRange(1,100)][int] $PageSize = 100
+    )
+    # Assert-TSRestApiVersion -AtLeast 2.3
+    if ($ScheduleId) { # Get Server Schedule
+        Assert-TSRestApiVersion -AtLeast 3.8
+    }
+    try {
+        if ($ScheduleId) { # Get Server Schedule
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint ServerSchedule -Param $ScheduleId) -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response.tsResponse.schedule
+        } else { # List Server Schedules
+            $pageNumber = 0
+            do {
+                $pageNumber++
+                $uri = Get-TSRequestUri -Endpoint ServerSchedule
+                $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+                $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+                $totalAvailable = $response.tsResponse.pagination.totalAvailable
+                $response.tsResponse.schedules.schedule
+            } until ($PageSize*$pageNumber -ge $totalAvailable)
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Add-TSSchedule {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $Name,
+        [Parameter(Mandatory)][ValidateSet('Extract','Subscription','Flow','DataAcceleration')][string] $Type,
+        [Parameter()][ValidateRange(1,100)][int] $Priority = 50,
+        [Parameter()][ValidateSet('Parallel','Serial')][string] $ExecutionOrder = "Parallel",
+        [Parameter(Mandatory,ParameterSetName='HourlyHours')]
+        [Parameter(Mandatory,ParameterSetName='HourlyMinutes')]
+        [Parameter(Mandatory,ParameterSetName='Daily')]
+        [Parameter(Mandatory,ParameterSetName='Weekly')]
+        [Parameter(Mandatory,ParameterSetName='Monthly')]
+        [ValidateSet('Hourly','Daily','Weekly','Monthly')][string] $Frequency = "Daily",
+        [Parameter(Mandatory,ParameterSetName='HourlyHours')]
+        [Parameter(Mandatory,ParameterSetName='HourlyMinutes')]
+        [Parameter(Mandatory,ParameterSetName='Daily')]
+        [Parameter(Mandatory,ParameterSetName='Weekly')]
+        [Parameter(Mandatory,ParameterSetName='Monthly')]
+        [ValidatePattern('^[0-2][0-9]:[0-5][0-9]:[0-5][0-9]$')][string] $StartTime = "00:00:00",
+        [Parameter(ParameterSetName='HourlyHours')]
+        [Parameter(ParameterSetName='HourlyMinutes')]
+        [ValidatePattern('^[0-2][0-9]:[0-5][0-9]:[0-5][0-9]$')][string] $EndTime,
+        [Parameter(Mandatory,ParameterSetName='HourlyHours')][ValidateSet(1,2,4,6,8,12)][int] $IntervalHours,
+        [Parameter(Mandatory,ParameterSetName='HourlyMinutes')][ValidateSet(15,30)][int] $IntervalMinutes,
+        [Parameter(Mandatory,ParameterSetName='Weekly')][ValidateSet('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')][string[]] $IntervalWeekdays,
+        [Parameter(Mandatory,ParameterSetName='Monthly')][ValidateRange(0,31)][int] $IntervalMonthday # 0 for last day
+    )
+    # Assert-TSRestApiVersion -AtLeast 2.3
+    if ($Type -eq 'DataAcceleration') {
+        Assert-TSRestApiVersion -AtLeast 3.8 -LessThan 3.16
+    }
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_sched = $tsRequest.AppendChild($xml.CreateElement("schedule"))
+    $el_sched.SetAttribute("name", $Name)
+    $el_sched.SetAttribute("type", $Type)
+    $el_sched.SetAttribute("priority", $Priority)
+    $el_sched.SetAttribute("executionOrder", $ExecutionOrder)
+    $el_sched.SetAttribute("frequency", $Frequency)
+    $el_freq = $el_sched.AppendChild($xml.CreateElement("frequencyDetails"))
+    $el_freq.SetAttribute("start", $StartTime)
+    if ($EndTime) {
+        $el_freq.SetAttribute("end", $EndTime)
+    }
+    switch ($Frequency) {
+        'Hourly' {
+            $el_ints = $el_freq.AppendChild($xml.CreateElement("intervals"))
+            $el_int = $el_ints.AppendChild($xml.CreateElement("interval"))
+            if ($IntervalHours) {
+                $el_int.SetAttribute("hours", $IntervalHours)
+            } elseif ($IntervalMinutes) {
+                $el_int.SetAttribute("minutes", $IntervalMinutes)
+            }
+        }
+        'Weekly' {
+            if ($IntervalWeekdays) {
+                $el_ints = $el_freq.AppendChild($xml.CreateElement("intervals"))
+                foreach ($weekday in $IntervalWeekdays) {
+                    $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("weekDay", $weekday)
+                }
+            }
+        }
+        'Monthly' {
+            if ($IntervalMonthday -ge 0) {
+                $el_ints = $el_freq.AppendChild($xml.CreateElement("intervals"))
+                $el_int = $el_ints.AppendChild($xml.CreateElement("interval"))
+                if ($IntervalMonthday -eq 0) {
+                    $el_int.SetAttribute("monthDay", "LastDay")
+                } else {
+                    $el_int.SetAttribute("monthDay", $IntervalMonthday)
+                }
+            }
+        }
+    }
+    try {
+        if ($PSCmdlet.ShouldProcess($Name)) {
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint ServerSchedule) -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+            return $response.tsResponse.schedule
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Update-TSSchedule {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $ScheduleId,
+        [Parameter()][string] $Name,
+        [Parameter()][ValidateSet('Active','Suspended')][string] $State,
+        [Parameter()][ValidateRange(1,100)][int] $Priority,
+        [Parameter()][ValidateSet('Parallel','Serial')][string] $ExecutionOrder,
+        [Parameter(ParameterSetName='HourlyHours')]
+        [Parameter(ParameterSetName='HourlyMinutes')]
+        [Parameter(ParameterSetName='Daily')]
+        [Parameter(ParameterSetName='Weekly')]
+        [Parameter(ParameterSetName='Monthly')]
+        [ValidateSet('Hourly','Daily','Weekly','Monthly')][string] $Frequency,
+        [Parameter(ParameterSetName='HourlyHours')]
+        [Parameter(ParameterSetName='HourlyMinutes')]
+        [Parameter(ParameterSetName='Daily')]
+        [Parameter(ParameterSetName='Weekly')]
+        [Parameter(ParameterSetName='Monthly')]
+        [ValidatePattern('^[0-2][0-9]:[0-5][0-9]:[0-5][0-9]$')][string] $StartTime,
+        [Parameter(ParameterSetName='HourlyHours')]
+        [Parameter(ParameterSetName='HourlyMinutes')]
+        [ValidatePattern('^[0-2][0-9]:[0-5][0-9]:[0-5][0-9]$')][string] $EndTime,
+        [Parameter(Mandatory,ParameterSetName='HourlyHours')][ValidateSet(1,2,4,6,8,12)][int] $IntervalHours,
+        [Parameter(Mandatory,ParameterSetName='HourlyMinutes')][ValidateSet(15,30)][int] $IntervalMinutes,
+        [Parameter(Mandatory,ParameterSetName='Weekly')][ValidateSet('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')][string[]] $IntervalWeekdays,
+        [Parameter(Mandatory,ParameterSetName='Monthly')][ValidateRange(0,31)][int] $IntervalMonthday # 0 for last day
+    )
+    # Assert-TSRestApiVersion -AtLeast 2.3
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_sched = $tsRequest.AppendChild($xml.CreateElement("schedule"))
+    if ($Name) {
+        $el_sched.SetAttribute("name", $Name)
+    }
+    if ($State) {
+        $el_sched.SetAttribute("state", $State)
+    }
+    if ($Priority) {
+        $el_sched.SetAttribute("priority", $Priority)
+    }
+    if ($ExecutionOrder) {
+        $el_sched.SetAttribute("executionOrder", $ExecutionOrder)
+    }
+    if ($Frequency) {
+        $el_sched.SetAttribute("frequency", $Frequency)
+    }
+    if ($Frequency -or $StartTime -or $EndTime) {
+        $el_freq = $el_sched.AppendChild($xml.CreateElement("frequencyDetails"))
+    }
+    if ($StartTime) {
+        $el_freq.SetAttribute("start", $StartTime)
+    }
+    if ($EndTime) {
+        $el_freq.SetAttribute("end", $EndTime)
+    }
+    switch ($Frequency) {
+        'Hourly' {
+            $el_ints = $el_freq.AppendChild($xml.CreateElement("intervals"))
+            $el_int = $el_ints.AppendChild($xml.CreateElement("interval"))
+            if ($IntervalHours) {
+                $el_int.SetAttribute("hours", $IntervalHours)
+            } elseif ($IntervalMinutes) {
+                $el_int.SetAttribute("minutes", $IntervalMinutes)
+            }
+        }
+        'Weekly' {
+            if ($IntervalWeekdays) {
+                $el_ints = $el_freq.AppendChild($xml.CreateElement("intervals"))
+                foreach ($weekday in $IntervalWeekdays) {
+                    $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("weekDay", $weekday)
+                }
+            }
+        }
+        'Monthly' { # note: updating monthly schedule via REST API doesn't seem to work
+            if ($IntervalMonthday -ge 0) {
+                $el_ints = $el_freq.AppendChild($xml.CreateElement("intervals"))
+                $el_int = $el_ints.AppendChild($xml.CreateElement("interval"))
+                if ($IntervalMonthday -eq 0) {
+                    $el_int.SetAttribute("monthDay", "LastDay")
+                } else {
+                    $el_int.SetAttribute("monthDay", $IntervalMonthday)
+                }
+            }
+        }
+    }
+    try {
+        if ($PSCmdlet.ShouldProcess($ScheduleId)) {
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint ServerSchedule -Param $ScheduleId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            return $response.tsResponse.schedule
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Remove-TSSchedule {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $ScheduleId
+    )
+    # Assert-TSRestApiVersion -AtLeast 2.3
+    try {
+        if ($PSCmdlet.ShouldProcess($ScheduleId)) {
+            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint ServerSchedule -Param $ScheduleId) -Method Delete -Headers (Get-TSRequestHeaderDict)
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Add-TSContentToSchedule {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $ScheduleId,
+        [Parameter(ParameterSetName='Workbook')][string] $WorkbookId,
+        [Parameter(ParameterSetName='Workbook')][switch] $DataAccelerationTask,
+        [Parameter(ParameterSetName='Datasource')][string] $DatasourceId,
+        [Parameter(ParameterSetName='Flow')][string] $FlowId,
+        [Parameter(ParameterSetName='Flow')][string] $OutputStepId, # note: this input is ignored by the API, maybe will be supported later
+        [Parameter(ParameterSetName='Flow')][hashtable] $FlowParams
+    )
+    Assert-TSRestApiVersion -AtLeast 2.8
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_task = $tsRequest.AppendChild($xml.CreateElement("task"))
+    if ($WorkbookId) {
+        $el_extr = $el_task.AppendChild($xml.CreateElement("extractRefresh"))
+        $el_workbook = $el_extr.AppendChild($xml.CreateElement("workbook"))
+        $el_workbook.SetAttribute("id", $WorkbookId)
+        $uri = Get-TSRequestUri -Endpoint Schedule -Param $ScheduleId/workbooks
+        $shouldProcessItem = "schedule:$ScheduleId, workbook:$WorkbookId"
+        if ($DataAccelerationTask) {
+            Assert-TSRestApiVersion -AtLeast 3.8 -LessThan 3.16
+            $el_da = $el_task.AppendChild($xml.CreateElement("dataAcceleration"))
+            $el_workbook = $el_da.AppendChild($xml.CreateElement("workbook"))
+            $el_workbook.SetAttribute("id", $WorkbookId)
+            $shouldProcessItem += ", data acceleration"
+        }
+    } elseif ($DatasourceId) {
+        $el_extr = $el_task.AppendChild($xml.CreateElement("extractRefresh"))
+        $el_datasource = $el_extr.AppendChild($xml.CreateElement("datasource"))
+        $el_datasource.SetAttribute("id", $DatasourceId)
+        $uri = Get-TSRequestUri -Endpoint Schedule -Param $ScheduleId/datasources
+        $shouldProcessItem = "schedule:$ScheduleId, datasource:$DatasourceId"
+    } elseif ($FlowId) {
+        Assert-TSRestApiVersion -AtLeast 3.3
+        $el_fr = $el_task.AppendChild($xml.CreateElement("flowRun"))
+        $el_flow = $el_fr.AppendChild($xml.CreateElement("flow"))
+        $el_flow.SetAttribute("id", $FlowId)
+        $uri = Get-TSRequestUri -Endpoint Schedule -Param $ScheduleId/flows
+        $shouldProcessItem = "schedule:$ScheduleId, flow:$FlowId"
+        $el_frs = $el_fr.AppendChild($xml.CreateElement("flowRunSpec"))
+        if ($OutputStepId) {
+            $el_steps = $el_frs.AppendChild($xml.CreateElement("flowOutputSteps"))
+            $el_step = $el_steps.AppendChild($xml.CreateElement("flowOutputStep"))
+            $el_step.SetAttribute("id", $OutputStepId)
+        }
+        if ($FlowParams) {
+            Assert-TSRestApiVersion -AtLeast 3.15
+            $el_params = $el_frs.AppendChild($xml.CreateElement("flowParameterSpecs"))
+            $FlowParams.GetEnumerator() | ForEach-Object {
+                $el_param = $el_params.AppendChild($xml.CreateElement("flowParameterSpec"))
+                $el_param.SetAttribute("parameterId", $_.Key)
+                $el_param.SetAttribute("overrideValue", $_.Value)
+            }
+        }
+    }
+    try {
+        if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
+            $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            return $response.tsResponse.task.extractRefresh
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+# note: return objects are different for two use cases
+function Get-TSJob {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter(Mandatory,ParameterSetName='JobById')][string] $JobId,
+        [Parameter(ParameterSetName='Jobs')][string[]] $Filter,
+        [Parameter(ParameterSetName='Jobs')][string[]] $Sort,
+        [Parameter(ParameterSetName='Jobs')][string[]] $Fields,
+        [Parameter(ParameterSetName='Jobs')][ValidateRange(1,100)][int] $PageSize = 100
+    )
+    Assert-TSRestApiVersion -AtLeast 3.1
+    try {
+        if ($JobId) { # Query Job
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Job -Param $JobId) -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response.tsResponse.job
+        } else { # Get Jobs
+            $pageNumber = 0
+            do {
+                $pageNumber++
+                $uri = Get-TSRequestUri -Endpoint Job
+                $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
+                $uriParam.Add("pageSize", $PageSize)
+                $uriParam.Add("pageNumber", $pageNumber)
+                if ($Filter) {
+                    $uriParam.Add("filter", $Filter -join ',')
+                }
+                if ($Sort) {
+                    $uriParam.Add("sort", $Sort -join ',')
+                }
+                if ($Fields) {
+                    $uriParam.Add("fields", $Fields -join ',')
+                }
+                $uriRequest = [System.UriBuilder]$uri
+                $uriRequest.Query = $uriParam.ToString()
+                $response = Invoke-RestMethod -Uri $uriRequest.Uri.OriginalString -Method Get -Headers (Get-TSRequestHeaderDict)
+                $totalAvailable = $response.tsResponse.pagination.totalAvailable
+                $response.tsResponse.backgroundJobs.backgroundJob
+            } until ($PageSize*$pageNumber -ge $totalAvailable)
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Stop-TSJob {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $JobId
+    )
+    Assert-TSRestApiVersion -AtLeast 3.1
+    try {
+        if ($PSCmdlet.ShouldProcess($JobId)) {
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Job -Param $JobId) -Method Put -Headers (Get-TSRequestHeaderDict)
+            if ($response.tsResponse.error) {
+                return $response.tsResponse.error
+            } else {
+                return $null # Job cancelled successfully
+            }
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+### Extract and Encryption methods - API 3.5
+function Get-TSExtractRefreshTasksInSchedule {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter(Mandatory)][string] $ScheduleId,
+        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+    )
+    # Assert-TSRestApiVersion -AtLeast 2.3
+    try {
+        $pageNumber = 0
+        do {
+            $pageNumber++
+            $uri = Get-TSRequestUri -Endpoint Schedule -Param $ScheduleId/extracts
+            $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+            $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+            $totalAvailable = $response.tsResponse.pagination.totalAvailable
+            $response.tsResponse.extracts.extract
+        } until ($PageSize*$pageNumber -ge $totalAvailable)
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
 ### Favorites methods
 function Get-TSUserFavorite {
     [OutputType([PSCustomObject[]])]
@@ -3872,21 +4261,18 @@ Export-ModuleMember -Function Add-TSTagsToContent
 Export-ModuleMember -Function Remove-TSTagFromContent
 
 ### Jobs, Tasks and Schedules methods
-# List Server Schedules
-# Get Server Schedule
-# Create Server Schedule
-# Update Server Schedule
-# Delete Server Schedule
-# Add Workbook to Server Schedule
-# Add Data Source to Server Schedule
-# Add Flow Task to Schedule
-# Query Job
-# Query Jobs
-# Cancel Job
+Export-ModuleMember -Function Get-TSSchedule
+Export-ModuleMember -Function Add-TSSchedule
+Export-ModuleMember -Function Update-TSSchedule
+Export-ModuleMember -Function Remove-TSSchedule
+Export-ModuleMember -Function Add-TSContentToSchedule
+Export-ModuleMember -Function Get-TSJob
+Export-ModuleMember -Function Stop-TSJob
 # Get Data Acceleration Tasks in a Site
 # Delete Data Acceleration Task
 
 ### Extract and Encryption methods - API 3.5
+Export-ModuleMember -Function Get-TSExtractRefreshTasksInSchedule
 # List Extract Refresh Tasks in Site
 # List Extract Refresh Tasks in Server Schedule
 # Get Extract Refresh Task

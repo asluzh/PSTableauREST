@@ -83,7 +83,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
         }
         Context "Site operations" -Tag Site {
             It "Create new site on <ConfigFile.server>" {
-                if ($ConfigFile.test_site_name) {
+                if ($ConfigFile.server_admin -and $ConfigFile.test_site_name) {
                     $site = Add-TSSite -Name $ConfigFile.test_site_name -ContentUrl $ConfigFile.test_site_contenturl -SiteParams @{
                         adminMode = "ContentOnly"
                         revisionLimit = 20
@@ -92,10 +92,12 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $site.contentUrl | Should -BeOfType String
                     $script:testSiteId = $site.id
                     $script:testSite = $site.contentUrl
+                } else {
+                    Set-ItResult -Skipped
                 }
             }
             It "Update site <testSite> on <ConfigFile.server>" {
-                if ($ConfigFile.test_site_name) {
+                if ($ConfigFile.server_admin -and $ConfigFile.test_site_name) {
                     Switch-TSSite -Site $testSite
                     $siteNewName = New-Guid
                     $site = Update-TSSite -SiteId $testSiteId -SiteParams @{
@@ -106,6 +108,8 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $site.contentUrl | Should -Be $testSite
                     $site.name | Should -Be $siteNewName
                     Update-TSSite -SiteId $testSiteId -SiteParams @{name=$ConfigFile.test_site_name; adminMode="ContentAndUsers"; userQuota="1"}
+                } else {
+                    Set-ItResult -Skipped
                 }
             }
             It "Query sites on <ConfigFile.server>" {
@@ -128,7 +132,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 }
             }
             It "Delete site <testSite> on <ConfigFile.server>" {
-                if ($ConfigFile.test_site_name) {
+                if ($ConfigFile.server_admin -and $ConfigFile.test_site_name) {
                     Switch-TSSite -Site $testSite
                     $response = Remove-TSSite -SiteId $testSiteId
                     $response | Should -BeOfType String
@@ -140,10 +144,12 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     } else {
                         Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
                     }
+                } else {
+                    Set-ItResult -Skipped
                 }
             }
             It "Delete site on <ConfigFile.server> asynchronously" {
-                if ($ConfigFile.test_site_name) {
+                if ($ConfigFile.server_admin -and $ConfigFile.test_site_name) {
                     $tempSiteName = New-Guid # get UUID for site name and content URL
                     $site = Add-TSSite -Name $tempSiteName -ContentUrl $tempSiteName
                     $site.id | Should -BeOfType String
@@ -157,6 +163,8 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     } else {
                         Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
                     }
+                } else {
+                    Set-ItResult -Skipped
                 }
             }
         }
@@ -545,8 +553,8 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $script:samplesProjectName = $project.name
                 }
                 AfterAll {
-                    if ($script:samplesProjectId) {
-                        Remove-TSProject -ProjectId $script:samplesProjectId
+                    if ($samplesProjectId) {
+                        Remove-TSProject -ProjectId $samplesProjectId
                         $script:samplesProjectId = $null
                     }
                 }
@@ -832,8 +840,8 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $script:samplesProjectName = $project.name
                 }
                 AfterAll {
-                    if ($script:samplesProjectId) {
-                        Remove-TSProject -ProjectId $script:samplesProjectId
+                    if ($samplesProjectId) {
+                        Remove-TSProject -ProjectId $samplesProjectId
                         $script:samplesProjectId = $null
                     }
                 }
@@ -1058,8 +1066,8 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $script:samplesProjectName = $project.name
                 }
                 AfterAll {
-                    if ($script:samplesProjectId) {
-                        Remove-TSProject -ProjectId $script:samplesProjectId
+                    if ($samplesProjectId) {
+                        Remove-TSProject -ProjectId $samplesProjectId
                         $script:samplesProjectId = $null
                     }
                 }
@@ -1247,8 +1255,8 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $script:samplesProjectName = $project.name
                 }
                 AfterAll {
-                    if ($script:samplesProjectId) {
-                        Remove-TSProject -ProjectId $script:samplesProjectId
+                    if ($samplesProjectId) {
+                        Remove-TSProject -ProjectId $samplesProjectId
                         $script:samplesProjectId = $null
                     }
                 }
@@ -1473,13 +1481,13 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 $script:samplesProjectName = $project.name
             }
             AfterAll {
-                if ($script:samplesProjectId) {
-                    Remove-TSProject -ProjectId $script:samplesProjectId
+                if ($samplesProjectId) {
+                    Remove-TSProject -ProjectId $samplesProjectId
                     $script:samplesProjectId = $null
                 }
             }
             It "Add sample contents to user favorites on <ConfigFile.server>" {
-                Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -ProjectId $script:samplesProjectId
+                Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -ProjectId $samplesProjectId
                 $workbooks = Get-TSWorkbook -Filter "projectName:eq:$samplesProjectName"
                 if (-not $workbooks) { # fallback: wait and retry with generic query
                     Start-Sleep -s 3 # small delay is needed to finalize published samples
@@ -1520,22 +1528,22 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 $favorites = Get-TSUserFavorite -UserId (Get-TSCurrentUserId)
                 ($favorites | Measure-Object).Count | Should -BeGreaterThan $totalCount
                 # swap favorites order for first workbook/datasource and sample
-                $pos_project = $favorites | Where-Object -FilterScript {$_.project.id -eq $script:samplesProjectId} | Select-Object -First 1 -ExpandProperty position
+                $pos_project = $favorites | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1 -ExpandProperty position
                 if ($workbook_id) {
                     $pos_workbook = $favorites | Where-Object -FilterScript {$_.workbook.id -eq $workbook_id} | Select-Object -First 1 -ExpandProperty position
                     $pos_workbook | Should -BeLessThan $pos_project
-                    Move-TSUserFavorite -UserId (Get-TSCurrentUserId) -FavoriteId $workbook_id -FavoriteType Workbook -AfterFavoriteId $script:samplesProjectId -AfterFavoriteType Project
+                    Move-TSUserFavorite -UserId (Get-TSCurrentUserId) -FavoriteId $workbook_id -FavoriteType Workbook -AfterFavoriteId $samplesProjectId -AfterFavoriteType Project
                     $favorites = Get-TSUserFavorite -UserId (Get-TSCurrentUserId)
-                    $pos_project = $favorites | Where-Object -FilterScript {$_.project.id -eq $script:samplesProjectId} | Select-Object -First 1 -ExpandProperty position
+                    $pos_project = $favorites | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1 -ExpandProperty position
                     $pos_workbook = $favorites | Where-Object -FilterScript {$_.workbook.id -eq $workbook_id} | Select-Object -First 1 -ExpandProperty position
                     $pos_workbook | Should -BeGreaterThan $pos_project
                 }
                 if ($datasource_id) {
                     $pos_datasource = $favorites | Where-Object -FilterScript {$_.datasource.id -eq $datasource_id} | Select-Object -First 1 -ExpandProperty position
                     $pos_datasource | Should -BeLessThan $pos_project
-                    Move-TSUserFavorite -UserId (Get-TSCurrentUserId) -FavoriteId $datasource_id -FavoriteType Datasource -AfterFavoriteId $script:samplesProjectId -AfterFavoriteType Project
+                    Move-TSUserFavorite -UserId (Get-TSCurrentUserId) -FavoriteId $datasource_id -FavoriteType Datasource -AfterFavoriteId $samplesProjectId -AfterFavoriteType Project
                     $favorites = Get-TSUserFavorite -UserId (Get-TSCurrentUserId)
-                    $pos_project = $favorites | Where-Object -FilterScript {$_.project.id -eq $script:samplesProjectId} | Select-Object -First 1 -ExpandProperty position
+                    $pos_project = $favorites | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1 -ExpandProperty position
                     $pos_datasource = $favorites | Where-Object -FilterScript {$_.datasource.id -eq $datasource_id} | Select-Object -First 1 -ExpandProperty position
                     $pos_datasource | Should -BeGreaterThan $pos_project
                 }
@@ -1551,7 +1559,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 }
             }
             It "Remove sample contents from user favorites on <ConfigFile.server>" {
-                Remove-TSUserFavorite -UserId (Get-TSCurrentUserId) -ProjectId $script:samplesProjectId
+                Remove-TSUserFavorite -UserId (Get-TSCurrentUserId) -ProjectId $samplesProjectId
                 Get-TSDatasource -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
                     Remove-TSUserFavorite -UserId (Get-TSCurrentUserId) -DatasourceId $_.id
                 }
@@ -1563,6 +1571,174 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 }
                 Get-TSFlow -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
                     Remove-TSUserFavorite -UserId (Get-TSCurrentUserId) -FlowId $_.id
+                }
+            }
+        }
+        Context "Schedule operations" -Tag Schedule {
+            It "Add new schedule on <ConfigFile.server>" {
+                if ($ConfigFile.server_admin) {
+                    $scheduleName = New-Guid
+                    $schedule = Add-TSSchedule -Name $scheduleName -Type Extract -Frequency Daily -StartTime "11:30:00"
+                    $schedule.id | Should -BeOfType String
+                    $script:testScheduleId = $schedule.id
+                } else {
+                    Set-ItResult -Skipped
+                }
+            }
+            It "Update schedule <testScheduleId> on <ConfigFile.server>" {
+                if ($ConfigFile.server_admin -and $testScheduleId) {
+                    $schedule = Update-TSSchedule -ScheduleId $testScheduleId -State Suspended -Priority 10 -Frequency Daily -StartTime "13:45:00"
+                    $schedule.state | Should -Be "Suspended"
+                    $schedule.priority | Should -Be 10
+                    $schedule.frequencyDetails.start | Should -Be "13:45:00"
+                    $scheduleNewName = New-Guid
+                    $schedule = Update-TSSchedule -ScheduleId $testScheduleId -Name $scheduleNewName -State Active -ExecutionOrder Serial
+                    $schedule.state | Should -Be "Active"
+                    $schedule.executionOrder | Should -Be "Serial"
+                    $schedule.name | Should -Be $scheduleNewName
+                    $schedule = Update-TSSchedule -ScheduleId $testScheduleId -Frequency Hourly -StartTime "12:00:00" -EndTime "16:00:00" -IntervalHours 1
+                    $schedule.frequency | Should -Be "Hourly"
+                    $schedule.frequencyDetails.start | Should -Be "12:00:00"
+                    $schedule.frequencyDetails.intervals.interval.hours | Should -Be "1"
+                    $schedule.frequencyDetails.end | Should -Be "16:00:00"
+                    $schedule = Update-TSSchedule -ScheduleId $testScheduleId -Frequency Hourly -StartTime "12:00:00" -EndTime "18:00:00" -IntervalHours 2
+                    $schedule.frequency | Should -Be "Hourly"
+                    $schedule.frequencyDetails.intervals.interval.hours | Should -Be "2"
+                    $schedule = Update-TSSchedule -ScheduleId $testScheduleId -Frequency Hourly -StartTime "08:00:00" -EndTime "18:00:00" -IntervalHours 4
+                    $schedule.frequency | Should -Be "Hourly"
+                    $schedule.frequencyDetails.intervals.interval.hours | Should -Be "4"
+                    $schedule = Update-TSSchedule -ScheduleId $testScheduleId -Frequency Hourly -StartTime "08:00:00" -EndTime "18:00:00" -IntervalHours 6
+                    $schedule.frequency | Should -Be "Hourly"
+                    $schedule.frequencyDetails.intervals.interval.hours | Should -Be "6"
+                    $schedule = Update-TSSchedule -ScheduleId $testScheduleId -Frequency Hourly -StartTime "08:00:00" -EndTime "18:00:00" -IntervalHours 8
+                    $schedule.frequency | Should -Be "Hourly"
+                    $schedule.frequencyDetails.intervals.interval.hours | Should -Be "8"
+                    $schedule = Update-TSSchedule -ScheduleId $testScheduleId -Frequency Hourly -StartTime "08:00:00" -EndTime "22:00:00" -IntervalHours 12
+                    $schedule.frequency | Should -Be "Hourly"
+                    $schedule.frequencyDetails.intervals.interval.hours | Should -Be "12"
+                    $schedule = Update-TSSchedule -ScheduleId $testScheduleId -Frequency Hourly -StartTime "14:00:00" -EndTime "15:30:00" -IntervalMinutes 30
+                    $schedule.frequency | Should -Be "Hourly"
+                    $schedule.frequencyDetails.start | Should -Be "14:00:00"
+                    $schedule.frequencyDetails.intervals.interval.minutes | Should -Be "30"
+                    $schedule.frequencyDetails.end | Should -Be "15:30:00"
+                    $schedule = Update-TSSchedule -ScheduleId $testScheduleId -Frequency Daily -StartTime "14:30:00" -EndTime "15:00:00" -IntervalMinutes 15
+                    $schedule.frequency | Should -Be "Daily"
+                    $schedule.frequencyDetails.start | Should -Be "14:30:00"
+                    $schedule.frequencyDetails.end | Should -BeNullOrEmpty
+                    $schedule.frequencyDetails.intervals.interval.minutes | Should -BeNullOrEmpty
+                    $schedule = Update-TSSchedule -ScheduleId $testScheduleId -Frequency Weekly -StartTime "10:00:00" -IntervalWeekdays Sunday
+                    $schedule.frequency | Should -Be "Weekly"
+                    $schedule.frequencyDetails.start | Should -Be "10:00:00"
+                    $schedule.frequencyDetails.intervals.interval | Should -HaveCount 1
+                    $schedule.frequencyDetails.intervals.interval.weekDay | Should -Be "Sunday"
+                    $schedule = Update-TSSchedule -ScheduleId $testScheduleId -Frequency Weekly -StartTime "10:00:00" -IntervalWeekdays Monday,Wednesday
+                    $schedule.frequency | Should -Be "Weekly"
+                    $schedule.frequencyDetails.intervals.interval | Should -HaveCount 2
+                    $schedule.frequencyDetails.intervals.interval.weekDay | Should -Contain "Monday"
+                    $schedule.frequencyDetails.intervals.interval.weekDay | Should -Contain "Wednesday"
+                    # note: updating monthly schedule via REST API doesn't seem to work
+                    # $schedule = Update-TSSchedule -ScheduleId $testScheduleId -Frequency Monthly -StartTime "08:00:00" -IntervalMonthday 3
+                    # $schedule.frequency | Should -Be "Monthly"
+                    # $schedule.frequencyDetails.start | Should -Be "08:00:00"
+                    # $schedule.frequencyDetails.intervals.interval.monthDay | Should -Be "3"
+                } else {
+                    Set-ItResult -Skipped
+                }
+            }
+            It "Query schedules on <ConfigFile.server>" {
+                $schedules = Get-TSSchedule
+                ($schedules | Measure-Object).Count | Should -BeGreaterThan 0
+                if ($testScheduleId) {
+                    $schedules | Where-Object id -eq $testScheduleId | Should -Not -BeNullOrEmpty
+                    $schedule = Get-TSSchedule -ScheduleId $testScheduleId
+                    $schedule.id | Should -Be $testScheduleId
+                } else {
+                    $firstScheduleId = $schedules | Select-Object -First 1 -ExpandProperty id
+                    $schedule = Get-TSSchedule -ScheduleId $firstScheduleId
+                    $schedule.id | Should -Be $firstScheduleId
+                }
+            }
+            It "Query extract refresh tasks on <ConfigFile.server>" {
+                $extractScheduleId = Get-TSSchedule | Where-Object type -eq "Extract" | Select-Object -First 1 -ExpandProperty id
+                (Get-TSExtractRefreshTasksInSchedule -ScheduleId $extractScheduleId | Measure-Object).Count | Should -BeGreaterOrEqual 0
+            }
+            It "Remove schedule <testScheduleId> on <ConfigFile.server>" {
+                if ($ConfigFile.server_admin -and $testScheduleId) {
+                    $response = Remove-TSSchedule -ScheduleId $testScheduleId
+                    $response | Should -BeOfType String
+                    $script:testScheduleId = $null
+                } else {
+                    Set-ItResult -Skipped
+                }
+            }
+            It "Add/remove monthly schedule on <ConfigFile.server>" {
+                if ($ConfigFile.server_admin) {
+                    $schedule = Add-TSSchedule -Name (New-Guid) -Type Extract -Frequency Monthly -StartTime "08:00:00" -IntervalMonthday 3
+                    $schedule.frequency | Should -Be "Monthly"
+                    $schedule.state | Should -Be "Active"
+                    $schedule.type | Should -Be "Extract"
+                    $schedule.frequencyDetails.intervals.interval.monthDay | Should -Be "3"
+                    $response = Remove-TSSchedule -ScheduleId $schedule.id
+                    $response | Should -BeOfType String
+                    $schedule = Add-TSSchedule -Name (New-Guid) -Type Subscription -Frequency Monthly -StartTime "08:00:00" -IntervalMonthday 0
+                    $schedule.frequency | Should -Be "Monthly"
+                    $schedule.state | Should -Be "Active"
+                    $schedule.type | Should -Be "Subscription"
+                    $schedule.frequencyDetails.intervals.interval.monthDay | Should -Be "LastDay"
+                    $response = Remove-TSSchedule -ScheduleId $schedule.id
+                    $response | Should -BeOfType String
+                } else {
+                    Set-ItResult -Skipped
+                }
+            }
+            Context "Sample contents for schedule operations" {
+                BeforeAll {
+                    if (-Not $ConfigFile.tableau_cloud) {
+                        $project = Add-TSProject -Name (New-Guid)
+                        Update-TSProject -ProjectId $project.id -PublishSamples
+                        $script:samplesProjectId = $project.id
+                        $script:samplesProjectName = $project.name
+                    }
+                }
+                AfterAll {
+                    if ($samplesProjectId) {
+                        Remove-TSProject -ProjectId $samplesProjectId
+                        $script:samplesProjectId = $null
+                    }
+                }
+                It "Add extract refresh tasks into a schedule on <ConfigFile.server>" {
+                    if (-Not $ConfigFile.tableau_cloud) {
+                        $extractScheduleId = Get-TSSchedule | Where-Object type -eq "Extract" | Select-Object -First 1 -ExpandProperty id
+                        $workbooks = Get-TSWorkbook -Filter "projectName:eq:$samplesProjectName"
+                        if (-not $workbooks) { # fallback: wait and retry with generic query
+                            $workbooks = Get-TSWorkbook | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
+                        }
+                        $workbooks | ForEach-Object {
+                            Add-TSContentToSchedule -ScheduleId $extractScheduleId -WorkbookId $_.id
+                        }
+                        $datasources = Get-TSDatasource -Filter "projectName:eq:$samplesProjectName"
+                        if (-not $datasources) { # fallback: wait and retry with generic query
+                            $datasources = Get-TSDatasource | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
+                        }
+                        $datasources | ForEach-Object {
+                            Add-TSContentToSchedule -ScheduleId $extractScheduleId -DatasourceId $_.id
+                        }
+                    } else {
+                        Set-ItResult -Skipped -Because "feature not available for Tableau Cloud"
+                    }
+                    (Get-TSExtractRefreshTasksInSchedule -ScheduleId $extractScheduleId | Measure-Object).Count | Should -BeGreaterThan 0
+                }
+            }
+            It "Add run flow tasks into a schedule on <ConfigFile.server>" {
+                $runFlowScheduleId = Get-TSSchedule | Where-Object type -eq "Flow" | Select-Object -First 1 -ExpandProperty id
+                Write-Warning $runFlowScheduleId
+                $flows = Get-TSFlow -Filter "projectName:eq:$samplesProjectName"
+                if (-not $flows) { # fallback: wait and retry with generic query
+                    Start-Sleep -s 3 # small delay is needed to finalize published samples
+                    $flows = Get-TSFlow | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
+                }
+                $flows | ForEach-Object {
+                    Add-TSContentToSchedule -ScheduleId $runFlowScheduleId -FlowId $_.id
                 }
             }
         }
