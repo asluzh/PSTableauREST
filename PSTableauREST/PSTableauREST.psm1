@@ -2641,6 +2641,41 @@ function Start-TSFlowNow {
     }
 }
 
+function Get-TSFlowRun {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter(Mandatory,ParameterSetName='FlowRunById')][string] $FlowRunId,
+        [Parameter(ParameterSetName='FlowRuns')][string[]] $Filter,
+        [Parameter(ParameterSetName='FlowRuns')][ValidateRange(1,100)][int] $PageSize = 100
+    )
+    Assert-TSRestApiVersion -AtLeast 3.10
+    try {
+        if ($FlowRunId) { # Get Flow Run
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param runs/$FlowRunId) -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response.tsResponse.flowRun
+        } else { # Get Flow Runs
+            $pageNumber = 0
+            do {
+                $pageNumber++
+                $uri = Get-TSRequestUri -Endpoint Flow -Param runs
+                $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
+                $uriParam.Add("pageSize", $PageSize)
+                $uriParam.Add("pageNumber", $pageNumber)
+                if ($Filter) {
+                    $uriParam.Add("filter", $Filter -join ',')
+                }
+                $uriRequest = [System.UriBuilder]$uri
+                $uriRequest.Query = $uriParam.ToString()
+                $response = Invoke-RestMethod -Uri $uriRequest.Uri.OriginalString -Method Get -Headers (Get-TSRequestHeaderDict)
+                $totalAvailable = $response.tsResponse.pagination.totalAvailable
+                $response.tsResponse.flowRuns.flowRuns
+            } until ($PageSize*$pageNumber -ge $totalAvailable)
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
 ### Permissions methods
 function Get-TSContentPermission {
     [OutputType([PSCustomObject[]])]
@@ -4316,8 +4351,7 @@ Export-ModuleMember -Function Update-TSFlow
 Export-ModuleMember -Function Update-TSFlowConnection
 Export-ModuleMember -Function Remove-TSFlow
 Export-ModuleMember -Function Start-TSFlowNow
-# Get Flow Run - API 3.10
-# Get Flow Runs - API 3.10
+Export-ModuleMember -Function Get-TSFlowRun
 # Run Flow Task
 # Run Linked Task Now
 # Cancel Flow Run - API 3.10
