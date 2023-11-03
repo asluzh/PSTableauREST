@@ -3802,6 +3802,60 @@ function Stop-TSJob {
     }
 }
 
+function Get-TSFlowRunTask {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter(Mandatory,ParameterSetName='TaskById')][string] $TaskId,
+        [Parameter(ParameterSetName='Tasks')][ValidateRange(1,100)][int] $PageSize = 100
+    )
+    Assert-TSRestApiVersion -AtLeast 3.3
+    try {
+        if ($TaskId) { # Get Flow Run Task
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Task -Param runFlow/$TaskId) -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response.tsResponse.task.flowRun
+        } else { # Get Flow Run Tasks
+            $pageNumber = 0
+            do {
+                $pageNumber++
+                $uri = Get-TSRequestUri -Endpoint Task -Param runFlow
+                $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+                $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+                $totalAvailable = $response.tsResponse.pagination.totalAvailable
+                $response.tsResponse.tasks.task.flowRun
+            } until ($PageSize*$pageNumber -ge $totalAvailable)
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
+function Get-TSLinkedTask {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter(Mandatory,ParameterSetName='TaskById')][string] $TaskId,
+        [Parameter(ParameterSetName='Tasks')][ValidateRange(1,100)][int] $PageSize = 100
+    )
+    Assert-TSRestApiVersion -AtLeast 3.15
+    try {
+        if ($TaskId) { # Get Linked Task
+            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Task -Param linked/$TaskId) -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response.tsResponse.linkedTask
+        } else { # Get Linked Tasks
+            $pageNumber = 0
+            do {
+                $pageNumber++
+                $uri = Get-TSRequestUri -Endpoint Task -Param linked
+                $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+                $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+                $totalAvailable = $response.tsResponse.pagination.totalAvailable
+                $response.tsResponse.linkedTasks.linkedTasks
+            } until ($PageSize*$pageNumber -ge $totalAvailable)
+        }
+    } catch {
+        Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
+    }
+}
+
 function Get-TSDataAccelerationTask {
     [OutputType([PSCustomObject[]])]
     Param(
@@ -4262,13 +4316,9 @@ Export-ModuleMember -Function Update-TSFlow
 Export-ModuleMember -Function Update-TSFlowConnection
 Export-ModuleMember -Function Remove-TSFlow
 Export-ModuleMember -Function Start-TSFlowNow
-# Get Flow Run Task
-# Get Flow Run Tasks
 # Get Flow Run - API 3.10
 # Get Flow Runs - API 3.10
 # Run Flow Task
-# Get Linked Task
-# Get Linked Tasks
 # Run Linked Task Now
 # Cancel Flow Run - API 3.10
 
@@ -4297,6 +4347,8 @@ Export-ModuleMember -Function Remove-TSSchedule
 Export-ModuleMember -Function Add-TSContentToSchedule
 Export-ModuleMember -Function Get-TSJob
 Export-ModuleMember -Function Stop-TSJob
+Export-ModuleMember -Function Get-TSFlowRunTask
+Export-ModuleMember -Function Get-TSLinkedTask
 Export-ModuleMember -Function Get-TSDataAccelerationTask
 Export-ModuleMember -Function Remove-TSDataAccelerationTask
 
