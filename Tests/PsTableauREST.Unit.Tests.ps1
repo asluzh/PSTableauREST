@@ -1,12 +1,10 @@
-BeforeDiscovery {
-    # Get-Module PSTableauREST | Remove-Module -Force
-    Import-Module ./PSTableauREST/PSTableauREST.psm1 -Force
-    # Get-Module Microsoft.PowerShell.SecretManagement | Remove-Module -Force
-    Import-Module Microsoft.PowerShell.SecretManagement -Force
-    $script:ConfigFiles = Get-ChildItem -Path "Tests/Config" -Filter "test_*.json" -Recurse
-}
 BeforeAll {
+    Import-Module ./PSTableauREST/PSTableauREST.psm1 -Force
+    Import-Module Assert
     . ./Tests/Test.Functions.ps1
+}
+BeforeDiscovery {
+    $script:ConfigFiles = Get-ChildItem -Path "Tests/Config" -Filter "test_*.json" -Recurse
 }
 
 Describe "Unit Tests for PSTableauREST" -Tag Unit {

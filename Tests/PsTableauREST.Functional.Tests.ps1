@@ -1,14 +1,13 @@
-BeforeDiscovery {
-    Import-Module ./PSTableauREST/PSTableauREST.psm1 -Force
-    Import-Module Microsoft.PowerShell.SecretManagement
-    Import-Module Assert
-    $script:ConfigFiles = Get-ChildItem -Path "Tests/Config" -Filter "test_*.json" -Recurse
-    $script:DatasourceFiles = Get-ChildItem -Path "Tests/Assets/Datasources" -Recurse
-    $script:WorkbookFiles = Get-ChildItem -Path "Tests/Assets/Workbooks" -Recurse
-    $script:FlowFiles = Get-ChildItem -Path "Tests/Assets/Flows" -Recurse
-}
 BeforeAll {
+    Import-Module ./PSTableauREST/PSTableauREST.psm1 -Force
+    Import-Module Assert
     . ./Tests/Test.Functions.ps1
+}
+BeforeDiscovery {
+    $script:ConfigFiles = Get-ChildItem -Path "./Tests/Config" -Filter "test_*.json" | Resolve-Path -Relative
+    $script:DatasourceFiles = Get-ChildItem -Path "./Tests/Assets/Datasources" -Recurse | Resolve-Path -Relative
+    $script:WorkbookFiles = Get-ChildItem -Path "./Tests/Assets/Workbooks" -Recurse | Resolve-Path -Relative
+    $script:FlowFiles = Get-ChildItem -Path "./Tests/Assets/Flows" -Recurse | Resolve-Path -Relative
 }
 
 Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFiles {
