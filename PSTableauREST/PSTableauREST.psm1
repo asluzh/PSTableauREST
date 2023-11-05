@@ -948,46 +948,49 @@ function Send-TSFileUpload {
         Write-Verbose "Filename $FileName contains special characters, replacing with tableau_file"
     }
     try {
+        $fileItem = Get-Item -LiteralPath $InFile
         $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint FileUpload) -Method Post -Headers (Get-TSRequestHeaderDict)
         $uploadSessionId = $response.tsResponse.fileUpload.GetAttribute("uploadSessionId")
         $chunkNumber = 0
         $buffer = New-Object System.Byte[]($script:TSRestApiChunkSize)
-        $fileStream = New-Object System.IO.FileStream($InFile, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read)
-        $byteReader = New-Object System.IO.BinaryReader($fileStream)
-        # $totalChunks = [Math]::Ceiling($fileItem.Length / $script:TSRestApiChunkSize)
-        $totalSizeMb = [Math]::Round($fileItem.Length / 1048576)
-        $bytesUploaded = 0
-        $startTime = Get-Date
-        do {
-            $chunkNumber++
-            $boundaryString = (New-Guid).ToString("N")
-            $multipartContent = New-Object System.Net.Http.MultipartFormDataContent($boundaryString)
-            [void]$multipartContent.Headers.Remove("Content-Type")
-            [void]$multipartContent.Headers.TryAddWithoutValidation("Content-Type", "multipart/mixed; boundary=$boundaryString")
-            $stringContent = New-Object System.Net.Http.StringContent("", "text/xml")
-            $stringContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
-            $stringContent.Headers.ContentDisposition.Name = "request_payload"
-            $multipartContent.Add($stringContent)
-            # read (next) chunk of the file into memory
-            $bytesRead = $byteReader.Read($buffer, 0, $buffer.Length)
-            $memoryStream = New-Object System.IO.MemoryStream($buffer, 0, $bytesRead)
-            $fileContent = New-Object System.Net.Http.StreamContent($memoryStream)
-            $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream")
-            $fileContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
-            $fileContent.Headers.ContentDisposition.Name = "tableau_file"
-            $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`""
-            $multipartContent.Add($fileContent)
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint FileUpload -Param $uploadSessionId) -Body $multipartContent -Method Put -Headers (Get-TSRequestHeaderDict)
-            $bytesUploaded += $bytesRead
-            $elapsedTime = $(Get-Date) - $startTime
-            $remainingTime = $elapsedTime * ($fileItem.Length / $bytesUploaded - 1)
-            if ($ShowProgress) {
-                $uploadedSizeMb = [Math]::Round($bytesUploaded / 1048576)
-                $percentCompleted = [Math]::Round($bytesUploaded / $fileItem.Length * 100)
-                Write-Progress -Activity "Uploading file $FileName" -Status "$uploadedSizeMb / $totalSizeMb MB uploaded ($percentCompleted%)" -PercentComplete $percentCompleted -SecondsRemaining $remainingTime.TotalSeconds
-            }
-        } until ($script:TSRestApiChunkSize*$chunkNumber -ge $fileItem.Length)
-        $fileStream.Close()
+        $fileStream = New-Object System.IO.FileStream($fileItem.FullName, [System.IO.FileMode]::Open)
+        try {
+            $byteReader = New-Object System.IO.BinaryReader($fileStream)
+            # $totalChunks = [Math]::Ceiling($fileItem.Length / $script:TSRestApiChunkSize)
+            $totalSizeMb = [Math]::Round($fileItem.Length / 1048576)
+            $bytesUploaded = 0
+            $startTime = Get-Date
+            do {
+                $chunkNumber++
+                $boundaryString = (New-Guid).ToString("N")
+                $multipartContent = New-Object System.Net.Http.MultipartFormDataContent($boundaryString)
+                [void]$multipartContent.Headers.Remove("Content-Type")
+                [void]$multipartContent.Headers.TryAddWithoutValidation("Content-Type", "multipart/mixed; boundary=$boundaryString")
+                $stringContent = New-Object System.Net.Http.StringContent("", [System.Text.Encoding]::UTF8)
+                $stringContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
+                $stringContent.Headers.ContentDisposition.Name = "request_payload"
+                $multipartContent.Add($stringContent)
+                $bytesRead = $byteReader.Read($buffer, 0, $buffer.Length)
+                $memoryStream = New-Object System.IO.MemoryStream($buffer, 0, $bytesRead)
+                $fileContent = New-Object System.Net.Http.StreamContent($memoryStream)
+                $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream")
+                $fileContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
+                $fileContent.Headers.ContentDisposition.Name = "tableau_file"
+                $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`""
+                $multipartContent.Add($fileContent)
+                $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint FileUpload -Param $uploadSessionId) -Body $multipartContent -Method Put -Headers (Get-TSRequestHeaderDict)
+                $bytesUploaded += $bytesRead
+                $elapsedTime = $(Get-Date) - $startTime
+                $remainingTime = $elapsedTime * ($fileItem.Length / $bytesUploaded - 1)
+                if ($ShowProgress) {
+                    $uploadedSizeMb = [Math]::Round($bytesUploaded / 1048576)
+                    $percentCompleted = [Math]::Round($bytesUploaded / $fileItem.Length * 100)
+                    Write-Progress -Activity "Uploading file $FileName" -Status "$uploadedSizeMb / $totalSizeMb MB uploaded ($percentCompleted%)" -PercentComplete $percentCompleted -SecondsRemaining $remainingTime.TotalSeconds
+                }
+            } until ($script:TSRestApiChunkSize*$chunkNumber -ge $fileItem.Length)
+        } finally {
+            $fileStream.Close()
+        }
         if ($ShowProgress) {
             Write-Progress -Activity "Uploading file $FileName" -Status "$totalSizeMb / $totalSizeMb MB uploaded (100%)" -PercentComplete 100
 			Start-Sleep -m 100
@@ -1243,7 +1246,7 @@ function Publish-TSWorkbook {
         $multipartContent = New-Object System.Net.Http.MultipartFormDataContent($boundaryString)
         [void]$multipartContent.Headers.Remove("Content-Type")
         [void]$multipartContent.Headers.TryAddWithoutValidation("Content-Type", "multipart/mixed; boundary=$boundaryString")
-        $stringContent = New-Object System.Net.Http.StringContent($xml.OuterXml, "text/xml")
+        $stringContent = New-Object System.Net.Http.StringContent($xml.OuterXml, [System.Text.Encoding]::UTF8, [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse("text/xml"))
         $stringContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
         $stringContent.Headers.ContentDisposition.Name = "request_payload"
         $multipartContent.Add($stringContent)
@@ -1252,15 +1255,18 @@ function Publish-TSWorkbook {
             $uri += "&uploadSessionId=$uploadSessionId"
             $response = Invoke-RestMethod -Uri $uri -Body $multipartContent -Method Post -Headers (Get-TSRequestHeaderDict)
         } else {
-            $fileStream = New-Object System.IO.FileStream($InFile, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read)
-            $fileContent = New-Object System.Net.Http.StreamContent($fileStream)
-            $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream")
-            $fileContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
-            $fileContent.Headers.ContentDisposition.Name = "tableau_workbook"
-            $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`""
-            $multipartContent.Add($fileContent)
-            $response = Invoke-RestMethod -Uri $uri -Body $multipartContent -Method Post -Headers (Get-TSRequestHeaderDict)
-            $fileStream.Close()
+            $fileStream = New-Object System.IO.FileStream($fileItem.FullName, [System.IO.FileMode]::Open)
+            try {
+                $fileContent = New-Object System.Net.Http.StreamContent($fileStream)
+                $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream")
+                $fileContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
+                $fileContent.Headers.ContentDisposition.Name = "tableau_workbook"
+                $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`""
+                $multipartContent.Add($fileContent)
+                $response = Invoke-RestMethod -Uri $uri -Body $multipartContent -Method Post -Headers (Get-TSRequestHeaderDict)
+            } finally {
+                $fileStream.Close()
+            }
         }
         return $response.tsResponse.workbook
     } catch {
@@ -1687,7 +1693,7 @@ function Publish-TSDatasource {
         $multipartContent = New-Object System.Net.Http.MultipartFormDataContent($boundaryString)
         [void]$multipartContent.Headers.Remove("Content-Type")
         [void]$multipartContent.Headers.TryAddWithoutValidation("Content-Type", "multipart/mixed; boundary=$boundaryString")
-        $stringContent = New-Object System.Net.Http.StringContent($xml.OuterXml, "text/xml")
+        $stringContent = New-Object System.Net.Http.StringContent($xml.OuterXml, [System.Text.Encoding]::UTF8, [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse("text/xml"))
         $stringContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
         $stringContent.Headers.ContentDisposition.Name = "request_payload"
         $multipartContent.Add($stringContent)
@@ -1696,15 +1702,18 @@ function Publish-TSDatasource {
             $uri += "&uploadSessionId=$uploadSessionId"
             $response = Invoke-RestMethod -Uri $uri -Body $multipartContent -Method Post -Headers (Get-TSRequestHeaderDict)
         } else {
-            $fileStream = New-Object System.IO.FileStream($InFile, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read)
-            $fileContent = New-Object System.Net.Http.StreamContent($fileStream)
-            $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream")
-            $fileContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
-            $fileContent.Headers.ContentDisposition.Name = "tableau_datasource"
-            $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`""
-            $multipartContent.Add($fileContent)
-            $response = Invoke-RestMethod -Uri $uri -Body $multipartContent -Method Post -Headers (Get-TSRequestHeaderDict)
-            $fileStream.Close()
+            $fileStream = New-Object System.IO.FileStream($fileItem.FullName, [System.IO.FileMode]::Open)
+            try {
+                $fileContent = New-Object System.Net.Http.StreamContent($fileStream)
+                $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream")
+                $fileContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
+                $fileContent.Headers.ContentDisposition.Name = "tableau_datasource"
+                $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`""
+                $multipartContent.Add($fileContent)
+                $response = Invoke-RestMethod -Uri $uri -Body $multipartContent -Method Post -Headers (Get-TSRequestHeaderDict)
+            } finally {
+                $fileStream.Close()
+            }
 
             # alternative approach, to be tested for binary files
             # https://stackoverflow.com/questions/25075010/upload-multiple-files-from-powershell-script
@@ -1726,6 +1735,12 @@ function Publish-TSDatasource {
             #     "--$boundaryString--"
             # ) -join "`r`n"
             # Invoke-RestMethod -Uri $uri -Body $requestBody -Method Post -Headers (Get-TSRequestHeaderDict) -ContentType "multipart/mixed; boundary=$boundaryString"
+            # debugging for multipartContent: issue with response code 406 on PS 5.1
+            # Write-Warning $multipartContent.GetType()
+            # $rs = $multipartContent.ReadAsStream()
+            # $buf = New-Object System.Byte[](10000)
+            # $rs.ReadAtLeast($buf, 10000, $false)
+            # Set-Content "Tests/Output/$boundaryString.txt" -Value $buf -AsByteStream #-Encoding Byte
         }
         return $response.tsResponse.datasource
     } catch {
@@ -2480,7 +2495,7 @@ function Publish-TSFlow {
         $multipartContent = New-Object System.Net.Http.MultipartFormDataContent($boundaryString)
         [void]$multipartContent.Headers.Remove("Content-Type")
         [void]$multipartContent.Headers.TryAddWithoutValidation("Content-Type", "multipart/mixed; boundary=$boundaryString")
-        $stringContent = New-Object System.Net.Http.StringContent($xml.OuterXml, "text/xml")
+        $stringContent = New-Object System.Net.Http.StringContent($xml.OuterXml, [System.Text.Encoding]::UTF8, [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse("text/xml"))
         $stringContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
         $stringContent.Headers.ContentDisposition.Name = "request_payload"
         $multipartContent.Add($stringContent)
@@ -2489,15 +2504,18 @@ function Publish-TSFlow {
             $uri += "&uploadSessionId=$uploadSessionId"
             $response = Invoke-RestMethod -Uri $uri -Body $multipartContent -Method Post -Headers (Get-TSRequestHeaderDict)
         } else {
-            $fileStream = New-Object System.IO.FileStream($InFile, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read)
-            $fileContent = New-Object System.Net.Http.StreamContent($fileStream)
-            $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream")
-            $fileContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
-            $fileContent.Headers.ContentDisposition.Name = "tableau_flow"
-            $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`""
-            $multipartContent.Add($fileContent)
-            $response = Invoke-RestMethod -Uri $uri -Body $multipartContent -Method Post -Headers (Get-TSRequestHeaderDict)
-            $fileStream.Close()
+            $fileStream = New-Object System.IO.FileStream($fileItem.FullName, [System.IO.FileMode]::Open)
+            try {
+                $fileContent = New-Object System.Net.Http.StreamContent($fileStream)
+                $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream")
+                $fileContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
+                $fileContent.Headers.ContentDisposition.Name = "tableau_flow"
+                $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`""
+                $multipartContent.Add($fileContent)
+                $response = Invoke-RestMethod -Uri $uri -Body $multipartContent -Method Post -Headers (Get-TSRequestHeaderDict)
+            } finally {
+                $fileStream.Close()
+            }
         }
         return $response.tsResponse.flow
     } catch {
@@ -4408,8 +4426,6 @@ Export-ModuleMember -Function Remove-TSFlow
 Export-ModuleMember -Function Start-TSFlowNow
 Export-ModuleMember -Function Get-TSFlowRun
 Export-ModuleMember -Function Stop-TSFlowRun
-# Run Flow Task
-# Run Linked Task Now
 
 ### Permissions methods
 Export-ModuleMember -Function Get-TSContentPermission
