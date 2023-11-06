@@ -4,20 +4,40 @@ $TSRestApiMinVersion = [version]'2.4' # supported version for initial sign-in ca
 $TSRestApiFileSizeLimit = 64*1048576 # 64MB
 $TSRestApiChunkSize = 2*1048576 # 2MB or 5MB or 50MB
 
-# set up headers IDictionary with auth token (and optionally other headers)
-function Get-TSRequestHeaderDict {
-    [OutputType([System.Collections.Generic.Dictionary[string,string]])]
+# Proxy function to call Tableau Server REST API with Invoke-RestMethod
+function Invoke-TSRestApiMethod {
+    [OutputType()]
     Param(
-        [Parameter()][string] $ContentType
+        # proxy params
+        [Parameter(Mandatory)][Microsoft.PowerShell.Commands.WebRequestMethod] $Method,
+        [Parameter(Mandatory)][uri] $Uri,
+        [Parameter(ValueFromPipeline=$true)][System.Object] $Body,
+        [Parameter()][string] $InFile,
+        [Parameter()][string] $OutFile,
+        [Parameter()][ValidateRange(0, 2147483647)][int] $TimeoutSec,
+        [Parameter()][string] $ContentType,
+        [Parameter()][switch] $SkipCertificateCheck,
+        # own params
+        [Parameter()][switch] $NoTokenHeader
     )
-    $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-    if ($script:TSAuthToken) {
-        $headers.Add("X-Tableau-Auth", $script:TSAuthToken)
+    if ($NoTokenHeader) {
+        $PSBoundParameters.Remove('NoTokenHeader')
+    } else {
+        $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+        if ($script:TSAuthToken) {
+            $headers.Add('X-Tableau-Auth', $script:TSAuthToken)
+        }
+        # if ($ContentType) { # not needed, already considered via the param to Invoke-RestMethod
+        #     $headers.Add('Content-Type', $ContentType)
+        # }
+        $PSBoundParameters.Add('Headers', $headers)
     }
-    if ($ContentType) {
-        $headers.Add("Content-Type", $ContentType)
-    }
-    return $headers
+    # $requestInfo = "{0} {1} " -f $Method, $Uri
+    # $PSBoundParameters.GetEnumerator() | ForEach-Object {
+    #     if ($_.Key -notin 'Method','Uri') { $requestInfo += "<{0}>" -f $_.Key }
+    # }
+    # Write-Warning $requestInfo
+    Invoke-RestMethod @PSBoundParameters
 }
 
 function Get-TSRequestUri {
@@ -163,7 +183,7 @@ function Get-TSServerInfo {
         if ($script:TSRestApiVersion) {
             $apiVersion = $script:TSRestApiVersion
         }
-        $response = Invoke-RestMethod -Uri $ServerUrl/api/$apiVersion/serverinfo -Method Get
+        $response = Invoke-TSRestApiMethod -Uri $ServerUrl/api/$apiVersion/serverinfo -Method Get -NoTokenHeader
         return $response.tsResponse.serverInfo
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
@@ -218,7 +238,7 @@ function Open-TSSignIn {
         return $null
     }
     try {
-        $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Auth -Param signin) -Body $xml.OuterXml -Method Post
+        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Auth -Param signin) -Body $xml.OuterXml -Method Post -NoTokenHeader
         $script:TSAuthToken = $response.tsResponse.credentials.token
         $script:TSSiteId = $response.tsResponse.credentials.site.id
         $script:TSUserId = $response.tsResponse.credentials.user.id
@@ -239,7 +259,7 @@ function Switch-TSSite {
     $el_site = $tsRequest.AppendChild($xml.CreateElement("site"))
     $el_site.SetAttribute("contentUrl", $Site)
     try {
-        $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Auth -Param switchSite) -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Auth -Param switchSite) -Body $xml.OuterXml -Method Post
         $script:TSAuthToken = $response.tsResponse.credentials.token
         $script:TSSiteId = $response.tsResponse.credentials.site.id
         $script:TSUserId = $response.tsResponse.credentials.user.id
@@ -256,7 +276,7 @@ function Close-TSSignOut {
     try {
         $response = $Null
         if ($Null -ne $script:TSServerUrl -and $Null -ne $script:TSAuthToken) {
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Auth -Param signout) -Method Post -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Auth -Param signout) -Method Post
             $script:TSServerUrl = $Null
             $script:TSAuthToken = $Null
             $script:TSSiteId = $Null
@@ -277,7 +297,7 @@ function Revoke-TSServerAdminPAT {
     Assert-TSRestApiVersion -AtLeast 3.10
     try {
         if ($PSCmdlet.ShouldProcess()) {
-            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Auth -Param serverAdminAccessTokens) -Method Delete -Headers (Get-TSRequestHeaderDict)
+            Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Auth -Param serverAdminAccessTokens) -Method Delete
         }
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
@@ -308,7 +328,7 @@ function Get-TSSite {
             if ($IncludeUsageStatistics) {
                 $uri += "?includeUsageStatistics=true"
             }
-            $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
             return $response.tsResponse.site
         } else { # get all sites
             $pageNumber = 0
@@ -316,7 +336,7 @@ function Get-TSSite {
                 $pageNumber++
                 $uri = Get-TSRequestUri -Endpoint Site
                 $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-                $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+                $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.sites.site
             } until ($PageSize*$pageNumber -ge $totalAvailable)
@@ -358,7 +378,7 @@ function Add-TSSite {
     }
     try {
         if ($PSCmdlet.ShouldProcess($Name)) {
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Site) -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Site) -Body $xml.OuterXml -Method Post
             return $response.tsResponse.site
         }
     } catch {
@@ -386,7 +406,7 @@ function Update-TSSite {
     try {
         if ($PSCmdlet.ShouldProcess($SiteId)) {
             if ($SiteId -eq $script:TSSiteId) {
-                $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Site -Param $SiteId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Site -Param $SiteId) -Body $xml.OuterXml -Method Put
                 return $response.tsResponse.site
             } else {
                 Write-Error "You can only update the site for which you are currently authenticated."
@@ -414,7 +434,7 @@ function Remove-TSSite {
     if ($SiteId -eq $script:TSSiteId) {
         try {
             if ($PSCmdlet.ShouldProcess($SiteId)) {
-                Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
+                Invoke-TSRestApiMethod -Uri $uri -Method Delete
             }
         } catch {
             Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
@@ -453,7 +473,7 @@ function Get-TSProject {
             }
             $uriRequest = [System.UriBuilder]$uri
             $uriRequest.Query = $uriParam.ToString()
-            $response = Invoke-RestMethod -Uri $uriRequest.Uri.OriginalString -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri $uriRequest.Uri.OriginalString -Method Get
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.projects.project
         } until ($PageSize*$pageNumber -ge $totalAvailable)
@@ -494,7 +514,7 @@ function Add-TSProject {
     try {
         if ($PSCmdlet.ShouldProcess($Name)) {
             $uri = Get-TSRequestUri -Endpoint Project
-            $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Post
             return $response.tsResponse.project
         }
     } catch {
@@ -541,7 +561,7 @@ function Update-TSProject {
     }
     try {
         if ($PSCmdlet.ShouldProcess($ProjectId)) {
-            $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Put
             return $response.tsResponse.project
         }
     } catch {
@@ -558,7 +578,7 @@ function Remove-TSProject {
     # Assert-TSRestApiVersion -AtLeast 2.0
     try {
         if ($PSCmdlet.ShouldProcess($ProjectId)) {
-            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Project -Param $ProjectId) -Method Delete -Headers (Get-TSRequestHeaderDict)
+            Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Project -Param $ProjectId) -Method Delete
         }
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
@@ -584,7 +604,7 @@ function Get-TSUser {
     # Assert-TSRestApiVersion -AtLeast 2.0
     try {
         if ($UserId) { # Query User On Site
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint User -Param $UserId) -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint User -Param $UserId) -Method Get
             $response.tsResponse.user
         } else { # Get Users on Site
             $pageNumber = 0
@@ -605,7 +625,7 @@ function Get-TSUser {
                 }
                 $uriRequest = [System.UriBuilder]$uri
                 $uriRequest.Query = $uriParam.ToString()
-                $response = Invoke-RestMethod -Uri $uriRequest.Uri.OriginalString -Method Get -Headers (Get-TSRequestHeaderDict)
+                $response = Invoke-TSRestApiMethod -Uri $uriRequest.Uri.OriginalString -Method Get
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.users.user
             } until ($PageSize*$pageNumber -ge $totalAvailable)
@@ -634,7 +654,7 @@ function Add-TSUser {
     }
     try {
         if ($PSCmdlet.ShouldProcess($Name)) {
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint User) -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint User) -Body $xml.OuterXml -Method Post
             return $response.tsResponse.user
         }
     } catch {
@@ -675,7 +695,7 @@ function Update-TSUser {
     }
     try {
         if ($PSCmdlet.ShouldProcess($UserId)) {
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint User -Param $UserId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint User -Param $UserId) -Body $xml.OuterXml -Method Put
             return $response.tsResponse.user
         }
     } catch {
@@ -697,7 +717,7 @@ function Remove-TSUser {
     }
     try {
         if ($PSCmdlet.ShouldProcess($UserId)) {
-            Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
+            Invoke-TSRestApiMethod -Uri $uri -Method Delete
         }
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
@@ -732,7 +752,7 @@ function Get-TSGroup {
             }
             $uriRequest = [System.UriBuilder]$uri
             $uriRequest.Query = $uriParam.ToString()
-            $response = Invoke-RestMethod -Uri $uriRequest.Uri.OriginalString -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri $uriRequest.Uri.OriginalString -Method Get
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.groups.group
         } until ($PageSize*$pageNumber -ge $totalAvailable)
@@ -780,7 +800,7 @@ function Add-TSGroup {
     }
     try {
         if ($PSCmdlet.ShouldProcess($Name)) {
-            $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Post
             return $response.tsResponse.group
         }
     } catch {
@@ -828,7 +848,7 @@ function Update-TSGroup {
     }
     try {
         if ($PSCmdlet.ShouldProcess($GroupId)) {
-            $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Put
             return $response.tsResponse.group
         }
     } catch {
@@ -845,7 +865,7 @@ function Remove-TSGroup {
     # Assert-TSRestApiVersion -AtLeast 2.0
     try {
         if ($PSCmdlet.ShouldProcess($GroupId)) {
-            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Group -Param $GroupId) -Method Delete -Headers (Get-TSRequestHeaderDict)
+            Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Group -Param $GroupId) -Method Delete
         }
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
@@ -866,7 +886,7 @@ function Add-TSUserToGroup {
     $el_user.SetAttribute("id", $UserId)
     try {
         if ($PSCmdlet.ShouldProcess("user:$UserId, group:$GroupId")) {
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Group -Param $GroupId/users) -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Group -Param $GroupId/users) -Body $xml.OuterXml -Method Post
             return $response.tsResponse.user
         }
     } catch {
@@ -884,7 +904,7 @@ function Remove-TSUserFromGroup {
     # Assert-TSRestApiVersion -AtLeast 2.0
     try {
         if ($PSCmdlet.ShouldProcess("user:$UserId, group:$GroupId")) {
-            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Group -Param $GroupId/users/$UserId) -Method Delete -Headers (Get-TSRequestHeaderDict)
+            Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Group -Param $GroupId/users/$UserId) -Method Delete
         }
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
@@ -904,7 +924,7 @@ function Get-TSUsersInGroup {
             $pageNumber++
             $uri = Get-TSRequestUri -Endpoint Group -Param $GroupId/users
             $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-            $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.users.user
         } until ($PageSize*$pageNumber -ge $totalAvailable)
@@ -926,7 +946,7 @@ function Get-TSGroupsForUser {
             $pageNumber++
             $uri = Get-TSRequestUri -Endpoint User -Param $UserId/groups
             $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-            $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.groups.group
         } until ($PageSize*$pageNumber -ge $totalAvailable)
@@ -950,7 +970,7 @@ function Send-TSFileUpload {
     }
     try {
         $fileItem = Get-Item -LiteralPath $InFile
-        $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint FileUpload) -Method Post -Headers (Get-TSRequestHeaderDict)
+        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint FileUpload) -Method Post
         $uploadSessionId = $response.tsResponse.fileUpload.GetAttribute("uploadSessionId")
         $chunkNumber = 0
         $buffer = New-Object System.Byte[]($script:TSRestApiChunkSize)
@@ -979,7 +999,7 @@ function Send-TSFileUpload {
                 $fileContent.Headers.ContentDisposition.Name = "tableau_file"
                 $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`""
                 $multipartContent.Add($fileContent)
-                $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint FileUpload -Param $uploadSessionId) -Body $multipartContent -Method Put -Headers (Get-TSRequestHeaderDict)
+                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint FileUpload -Param $uploadSessionId) -Body $multipartContent -Method Put
                 $bytesUploaded += $bytesRead
                 $elapsedTime = $(Get-Date) - $startTime
                 $remainingTime = $elapsedTime * ($fileItem.Length / $bytesUploaded - 1)
@@ -1031,17 +1051,17 @@ function Get-TSWorkbook {
                 $pageNumber++
                 $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/revisions
                 $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-                $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+                $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.revisions.revision
             } until ($PageSize*$pageNumber -ge $totalAvailable)
         } elseif ($WorkbookId) { # Get Workbook by Id
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId) -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId) -Method Get
             $response.tsResponse.workbook
         } elseif ($ContentUrl) { # Get Workbook by ContentUrl
             $uri = Get-TSRequestUri -Endpoint Workbook -Param $ContentUrl
             $uri += "?key=contentUrl"
-            $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
             $response.tsResponse.workbook
         } else { # Query Workbooks on Site
             $pageNumber = 0
@@ -1062,7 +1082,7 @@ function Get-TSWorkbook {
                 }
                 $uriRequest = [System.UriBuilder]$uri
                 $uriRequest.Query = $uriParam.ToString()
-                $response = Invoke-RestMethod -Uri $uriRequest.Uri.OriginalString -Method Get -Headers (Get-TSRequestHeaderDict)
+                $response = Invoke-TSRestApiMethod -Uri $uriRequest.Uri.OriginalString -Method Get
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.workbooks.workbook
             } until ($PageSize*$pageNumber -ge $totalAvailable)
@@ -1087,7 +1107,7 @@ function Get-TSWorkbooksForUser {
             $uri = Get-TSRequestUri -Endpoint User -Param $UserId/workbooks
             $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
             if ($IsOwner) { $uri += "&ownedBy=true" }
-            $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.workbooks.workbook
         } until ($PageSize*$pageNumber -ge $totalAvailable)
@@ -1103,7 +1123,7 @@ function Get-TSWorkbookConnection {
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
     try {
-        $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/connections) -Method Get -Headers (Get-TSRequestHeaderDict)
+        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/connections) -Method Get
         $response.tsResponse.connections.connection
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
@@ -1145,7 +1165,7 @@ function Export-TSWorkbook {
         } else {
             $global:ProgressPreference = 'SilentlyContinue'
         }
-        Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict) -TimeoutSec 600 @OutFileParam
+        Invoke-TSRestApiMethod -Uri $uri -Method Get -TimeoutSec 600 @OutFileParam
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     } finally {
@@ -1254,7 +1274,7 @@ function Publish-TSWorkbook {
         if ($Chunked) {
             $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName -ShowProgress:$ShowProgress
             $uri += "&uploadSessionId=$uploadSessionId"
-            $response = Invoke-RestMethod -Uri $uri -Body $multipartContent -Method Post -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post
         } else {
             $fileStream = New-Object System.IO.FileStream($fileItem.FullName, [System.IO.FileMode]::Open)
             try {
@@ -1264,7 +1284,7 @@ function Publish-TSWorkbook {
                 $fileContent.Headers.ContentDisposition.Name = "tableau_workbook"
                 $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`""
                 $multipartContent.Add($fileContent)
-                $response = Invoke-RestMethod -Uri $uri -Body $multipartContent -Method Post -Headers (Get-TSRequestHeaderDict)
+                $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post
             } finally {
                 $fileStream.Close()
             }
@@ -1327,7 +1347,7 @@ function Update-TSWorkbook {
     $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId
     try {
         if ($PSCmdlet.ShouldProcess($WorkbookId)) {
-            $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Put
             return $response.tsResponse.workbook
         }
     } catch {
@@ -1375,7 +1395,7 @@ function Update-TSWorkbookConnection {
     $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/connections/$ConnectionId
     try {
         if ($PSCmdlet.ShouldProcess($ConnectionId)) {
-            $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Put
             return $response.tsResponse.connection
         }
     } catch {
@@ -1395,11 +1415,11 @@ function Remove-TSWorkbook {
         if ($Revision) { # Remove Workbook Revision
             # Assert-TSRestApiVersion -AtLeast 2.3
             if ($PSCmdlet.ShouldProcess("$WorkbookId, revision $Revision")) {
-                Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/revisions/$Revision) -Method Delete -Headers (Get-TSRequestHeaderDict)
+                Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/revisions/$Revision) -Method Delete
             }
         } else { # Remove Workbook
             if ($PSCmdlet.ShouldProcess($WorkbookId)) {
-                Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId) -Method Delete -Headers (Get-TSRequestHeaderDict)
+                Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId) -Method Delete
             }
         }
     } catch {
@@ -1415,7 +1435,7 @@ function Get-TSWorkbookDowngradeInfo {
     )
     Assert-TSRestApiVersion -AtLeast 3.5
     try {
-        $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/downGradeInfo?productVersion=$DowngradeVersion) -Method Get -Headers (Get-TSRequestHeaderDict)
+        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/downGradeInfo?productVersion=$DowngradeVersion) -Method Get
         $response.tsResponse.downgradeInfo
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
@@ -1464,7 +1484,7 @@ function Export-TSWorkbookToFormat {
         } else {
             $global:ProgressPreference = 'SilentlyContinue'
         }
-        Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict) -TimeoutSec 600 @OutFileParam
+        Invoke-TSRestApiMethod -Uri $uri -Method Get -TimeoutSec 600 @OutFileParam
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     } finally {
@@ -1484,7 +1504,7 @@ function Update-TSWorkbookNow {
     $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/refresh
     try {
         if ($PSCmdlet.ShouldProcess($WorkbookId)) {
-            $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Post
             return $response.tsResponse.job
         }
     } catch {
@@ -1516,12 +1536,12 @@ function Get-TSDatasource {
                 $pageNumber++
                 $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/revisions
                 $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-                $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+                $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.revisions.revision
             } until ($PageSize*$pageNumber -ge $totalAvailable)
         } elseif ($DatasourceId) { # Query Data Source
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId) -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId) -Method Get
             $response.tsResponse.datasource
         } else { # Query Data Sources
             $pageNumber = 0
@@ -1542,7 +1562,7 @@ function Get-TSDatasource {
                 }
                 $uriRequest = [System.UriBuilder]$uri
                 $uriRequest.Query = $uriParam.ToString()
-                $response = Invoke-RestMethod -Uri $uriRequest.Uri.OriginalString -Method Get -Headers (Get-TSRequestHeaderDict)
+                $response = Invoke-TSRestApiMethod -Uri $uriRequest.Uri.OriginalString -Method Get
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.datasources.datasource
             } until ($PageSize*$pageNumber -ge $totalAvailable)
@@ -1559,7 +1579,7 @@ function Get-TSDatasourceConnection {
     )
     # Assert-TSRestApiVersion -AtLeast 2.3
     try {
-        $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/connections) -Method Get -Headers (Get-TSRequestHeaderDict)
+        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/connections) -Method Get
         $response.tsResponse.connections.connection
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
@@ -1602,7 +1622,7 @@ function Export-TSDatasource {
         } else {
             $global:ProgressPreference = 'SilentlyContinue'
         }
-        Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict) -TimeoutSec 600 @OutFileParam
+        Invoke-TSRestApiMethod -Uri $uri -Method Get -TimeoutSec 600 @OutFileParam
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     } finally {
@@ -1701,7 +1721,7 @@ function Publish-TSDatasource {
         if ($Chunked) {
             $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName -ShowProgress:$ShowProgress
             $uri += "&uploadSessionId=$uploadSessionId"
-            $response = Invoke-RestMethod -Uri $uri -Body $multipartContent -Method Post -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post
         } else {
             $fileStream = New-Object System.IO.FileStream($fileItem.FullName, [System.IO.FileMode]::Open)
             try {
@@ -1711,7 +1731,7 @@ function Publish-TSDatasource {
                 $fileContent.Headers.ContentDisposition.Name = "tableau_datasource"
                 $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`""
                 $multipartContent.Add($fileContent)
-                $response = Invoke-RestMethod -Uri $uri -Body $multipartContent -Method Post -Headers (Get-TSRequestHeaderDict)
+                $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post
             } finally {
                 $fileStream.Close()
             }
@@ -1719,7 +1739,7 @@ function Publish-TSDatasource {
             # alternative approach, to be tested for binary files
             # https://stackoverflow.com/questions/25075010/upload-multiple-files-from-powershell-script
             # possible solution: saving the request body in a file and using -InFile parameter for Invoke-RestMethod
-            # https://hochwald.net/upload-file-powershell-invoke-restmethod/
+            # https://hochwald.net/upload-file-powershell-Invoke-RestMethod/
             # $requestBody = (
             #     "--$boundaryString",
             #     "Content-Type: text/xml",
@@ -1735,7 +1755,7 @@ function Publish-TSDatasource {
             # should be: $FilenameUrlEncoded = [System.Net.WebUtility]::UrlEncode($FileName)
             #     "--$boundaryString--"
             # ) -join "`r`n"
-            # Invoke-RestMethod -Uri $uri -Body $requestBody -Method Post -Headers (Get-TSRequestHeaderDict) -ContentType "multipart/mixed; boundary=$boundaryString"
+            # Invoke-TSRestApiMethod -Uri $uri -Body $requestBody -Method Post -ContentType "multipart/mixed; boundary=$boundaryString"
             # debugging for multipartContent: issue with response code 406 on PS 5.1
             # Write-Warning $multipartContent.GetType()
             # $rs = $multipartContent.ReadAsStream()
@@ -1794,7 +1814,7 @@ function Update-TSDatasource {
     $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId
     try {
         if ($PSCmdlet.ShouldProcess($DatasourceId)) {
-            $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Put
             return $response.tsResponse.datasource
         }
     } catch {
@@ -1842,7 +1862,7 @@ function Update-TSDatasourceConnection {
     $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/connections/$ConnectionId
     try {
         if ($PSCmdlet.ShouldProcess($ConnectionId)) {
-            $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Put
             return $response.tsResponse.connection
         }
     } catch {
@@ -1862,11 +1882,11 @@ function Remove-TSDatasource {
         if ($Revision) { # Remove Data Source Revision
             # Assert-TSRestApiVersion -AtLeast 2.3
             if ($PSCmdlet.ShouldProcess("$DatasourceId, revision $Revision")) {
-                Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/revisions/$Revision) -Method Delete -Headers (Get-TSRequestHeaderDict)
+                Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/revisions/$Revision) -Method Delete
             }
         } else { # Remove Data Source
             if ($PSCmdlet.ShouldProcess($DatasourceId)) {
-                Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId) -Method Delete -Headers (Get-TSRequestHeaderDict)
+                Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId) -Method Delete
             }
         }
     } catch {
@@ -1886,7 +1906,7 @@ function Update-TSDatasourceNow {
     $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/refresh
     try {
         if ($PSCmdlet.ShouldProcess($DatasourceId)) {
-            $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Post
             return $response.tsResponse.job
         }
     } catch {
@@ -1912,7 +1932,7 @@ function Get-TSView {
     }
     try {
         if ($ViewId) { # Get View
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint View -Param $ViewId) -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint View -Param $ViewId) -Method Get
             $response.tsResponse.view
         } elseif ($WorkbookId) { # Query Views for Workbook
             # Assert-TSRestApiVersion -AtLeast 2.0
@@ -1920,7 +1940,7 @@ function Get-TSView {
             if ($IncludeUsageStatistics) {
                 $uri += "?includeUsageStatistics=true"
             }
-            $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
             $response.tsResponse.views.view
         } else { # Query Views for Site
             # Assert-TSRestApiVersion -AtLeast 2.2
@@ -1945,7 +1965,7 @@ function Get-TSView {
                 }
                 $uriRequest = [System.UriBuilder]$uri
                 $uriRequest.Query = $uriParam.ToString()
-                $response = Invoke-RestMethod -Uri $uriRequest.Uri.OriginalString -Method Get -Headers (Get-TSRequestHeaderDict)
+                $response = Invoke-TSRestApiMethod -Uri $uriRequest.Uri.OriginalString -Method Get
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.views.view
             } until ($PageSize*$pageNumber -ge $totalAvailable)
@@ -1976,7 +1996,7 @@ function Export-TSViewPreviewImage {
         } else {
             $global:ProgressPreference = 'SilentlyContinue'
         }
-        Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict) -TimeoutSec 600 @OutFileParam
+        Invoke-TSRestApiMethod -Uri $uri -Method Get -TimeoutSec 600 @OutFileParam
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     } finally {
@@ -2052,7 +2072,7 @@ function Export-TSViewToFormat {
         } else {
             $global:ProgressPreference = 'SilentlyContinue'
         }
-        Invoke-RestMethod -Uri $uri -Body $uriParam -Method Get -Headers (Get-TSRequestHeaderDict) -TimeoutSec 600 @OutFileParam
+        Invoke-TSRestApiMethod -Uri $uri -Body $uriParam -Method Get -TimeoutSec 600 @OutFileParam
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     } finally {
@@ -2066,7 +2086,7 @@ function Get-TSViewRecommendation {
     Assert-TSRestApiVersion -AtLeast 3.7
     $uri = Get-TSRequestUri -Endpoint Recommendation -Param "?type=view"
     try {
-        $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+        $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
         $response.tsResponse.recommendations.recommendation
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
@@ -2086,7 +2106,7 @@ function Hide-TSViewRecommendation {
     $el_view.SetAttribute("id", $ViewId)
     $uri = Get-TSRequestUri -Endpoint Recommendation -Param dismissals
     try {
-        Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+        Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Put
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
@@ -2100,7 +2120,7 @@ function Show-TSViewRecommendation {
     Assert-TSRestApiVersion -AtLeast 3.7
     $uri = Get-TSRequestUri -Endpoint Recommendation -Param "dismissals/?type=view&id=$ViewId"
     try {
-        Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
+        Invoke-TSRestApiMethod -Uri $uri -Method Delete
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     }
@@ -2118,7 +2138,7 @@ function Get-TSCustomView {
     Assert-TSRestApiVersion -AtLeast 3.18
     try {
         if ($CustomViewId) { # Get Custom View
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint CustomView -Param $CustomViewId) -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint CustomView -Param $CustomViewId) -Method Get
             $response.tsResponse.customView
         } else { # List Custom Views
             $pageNumber = 0
@@ -2139,7 +2159,7 @@ function Get-TSCustomView {
                 }
                 $uriRequest = [System.UriBuilder]$uri
                 $uriRequest.Query = $uriParam.ToString()
-                $response = Invoke-RestMethod -Uri $uriRequest.Uri.OriginalString -Method Get -Headers (Get-TSRequestHeaderDict)
+                $response = Invoke-TSRestApiMethod -Uri $uriRequest.Uri.OriginalString -Method Get
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.customViews.customView
             } until ($PageSize*$pageNumber -ge $totalAvailable)
@@ -2157,7 +2177,7 @@ function Get-TSCustomViewAsUserDefault {
     Assert-TSRestApiVersion -AtLeast 3.21
     $uri = Get-TSRequestUri -Endpoint CustomView -Param "$CustomViewId/default/users"
     try {
-        $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+        $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
         $response.tsResponse.users.user
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
@@ -2180,7 +2200,7 @@ function Set-TSCustomViewAsUserDefault {
     }
     $uri = Get-TSRequestUri -Endpoint CustomView -Param "default/users"
     try {
-        $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+        $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Post
         $response.tsResponse.customViewAsUserDefaultResults.customViewAsUserDefaultViewResult
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
@@ -2223,7 +2243,7 @@ function Export-TSCustomViewImage {
         } else {
             $global:ProgressPreference = 'SilentlyContinue'
         }
-        Invoke-RestMethod -Uri $uri -Body $uriParam -Method Get -Headers (Get-TSRequestHeaderDict) -TimeoutSec 600 @OutFileParam
+        Invoke-TSRestApiMethod -Uri $uri -Body $uriParam -Method Get -TimeoutSec 600 @OutFileParam
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     } finally {
@@ -2252,7 +2272,7 @@ function Update-TSCustomView {
     }
     try {
         if ($PSCmdlet.ShouldProcess($CustomViewId)) {
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint CustomView -Param $CustomViewId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint CustomView -Param $CustomViewId) -Body $xml.OuterXml -Method Put
             return $response.tsResponse.customView
         }
     } catch {
@@ -2269,7 +2289,7 @@ function Remove-TSCustomView {
     Assert-TSRestApiVersion -AtLeast 3.18
     try {
         if ($PSCmdlet.ShouldProcess($CustomViewId)) {
-            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint CustomView -Param $CustomViewId) -Method Delete -Headers (Get-TSRequestHeaderDict)
+            Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint CustomView -Param $CustomViewId) -Method Delete
         }
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
@@ -2319,12 +2339,12 @@ function Get-TSFlow {
                 $pageNumber++
                 $uri = Get-TSRequestUri -Endpoint Flow -Param $FlowId/revisions
                 $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-                $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+                $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.revisions.revision
             } until ($PageSize*$pageNumber -ge $totalAvailable)
         } elseif ($FlowId) { # Get Flow
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param $FlowId) -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param $FlowId) -Method Get
             if ($OutputSteps) { # Get Flow, return output steps
                 $response.tsResponse.flowOutputSteps.flowOutputStep
             } else { # Get Flow
@@ -2349,7 +2369,7 @@ function Get-TSFlow {
                 }
                 $uriRequest = [System.UriBuilder]$uri
                 $uriRequest.Query = $uriParam.ToString()
-                $response = Invoke-RestMethod -Uri $uriRequest.Uri.OriginalString -Method Get -Headers (Get-TSRequestHeaderDict)
+                $response = Invoke-TSRestApiMethod -Uri $uriRequest.Uri.OriginalString -Method Get
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.flows.flow
             } until ($PageSize*$pageNumber -ge $totalAvailable)
@@ -2374,7 +2394,7 @@ function Get-TSFlowsForUser {
             $uri = Get-TSRequestUri -Endpoint User -Param $UserId/flows
             $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
             if ($IsOwner) { $uri += "&ownedBy=true" }
-            $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.flows.flow
         } until ($PageSize*$pageNumber -ge $totalAvailable)
@@ -2390,7 +2410,7 @@ function Get-TSFlowConnection {
     )
     Assert-TSRestApiVersion -AtLeast 3.3
     try {
-        $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param $FlowId/connections) -Method Get -Headers (Get-TSRequestHeaderDict)
+        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param $FlowId/connections) -Method Get
         $response.tsResponse.connections.connection
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
@@ -2426,7 +2446,7 @@ function Export-TSFlow {
         } else {
             $global:ProgressPreference = 'SilentlyContinue'
         }
-        Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict) -TimeoutSec 600 @OutFileParam
+        Invoke-TSRestApiMethod -Uri $uri -Method Get -TimeoutSec 600 @OutFileParam
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
     } finally {
@@ -2504,7 +2524,7 @@ function Publish-TSFlow {
         if ($Chunked) {
             $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName -ShowProgress:$ShowProgress
             $uri += "&uploadSessionId=$uploadSessionId"
-            $response = Invoke-RestMethod -Uri $uri -Body $multipartContent -Method Post -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post
         } else {
             $fileStream = New-Object System.IO.FileStream($fileItem.FullName, [System.IO.FileMode]::Open)
             try {
@@ -2514,7 +2534,7 @@ function Publish-TSFlow {
                 $fileContent.Headers.ContentDisposition.Name = "tableau_flow"
                 $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`""
                 $multipartContent.Add($fileContent)
-                $response = Invoke-RestMethod -Uri $uri -Body $multipartContent -Method Post -Headers (Get-TSRequestHeaderDict)
+                $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post
             } finally {
                 $fileStream.Close()
             }
@@ -2547,7 +2567,7 @@ function Update-TSFlow {
     }
     try {
         if ($PSCmdlet.ShouldProcess($FlowId)) {
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param $FlowId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param $FlowId) -Body $xml.OuterXml -Method Put
             return $response.tsResponse.flow
         }
     } catch {
@@ -2590,7 +2610,7 @@ function Update-TSFlowConnection {
     $uri = Get-TSRequestUri -Endpoint Flow -Param $FlowId/connections/$ConnectionId
     try {
         if ($PSCmdlet.ShouldProcess($ConnectionId)) {
-            $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Put
             return $response.tsResponse.connection
         }
     } catch {
@@ -2609,11 +2629,11 @@ function Remove-TSFlow {
     try {
         if ($Revision) { # Remove Flow Revision
             if ($PSCmdlet.ShouldProcess("$FlowId, revision $Revision")) {
-                Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $FlowId/revisions/$Revision) -Method Delete -Headers (Get-TSRequestHeaderDict)
+                Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $FlowId/revisions/$Revision) -Method Delete
             }
         } else { # Remove Flow
             if ($PSCmdlet.ShouldProcess($FlowId)) {
-                Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param $FlowId) -Method Delete -Headers (Get-TSRequestHeaderDict)
+                Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param $FlowId) -Method Delete
             }
         }
     } catch {
@@ -2653,7 +2673,7 @@ function Start-TSFlowNow {
     $uri = Get-TSRequestUri -Endpoint Flow -Param $FlowId/run
     try {
         if ($PSCmdlet.ShouldProcess($FlowId)) {
-            $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Post
             return $response.tsResponse.job
         }
     } catch {
@@ -2671,7 +2691,7 @@ function Get-TSFlowRun {
     Assert-TSRestApiVersion -AtLeast 3.10
     try {
         if ($FlowRunId) { # Get Flow Run
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param runs/$FlowRunId) -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param runs/$FlowRunId) -Method Get
             $response.tsResponse.flowRun
         } else { # Get Flow Runs
             $pageNumber = 0
@@ -2686,7 +2706,7 @@ function Get-TSFlowRun {
                 }
                 $uriRequest = [System.UriBuilder]$uri
                 $uriRequest.Query = $uriParam.ToString()
-                $response = Invoke-RestMethod -Uri $uriRequest.Uri.OriginalString -Method Get -Headers (Get-TSRequestHeaderDict)
+                $response = Invoke-TSRestApiMethod -Uri $uriRequest.Uri.OriginalString -Method Get
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.flowRuns.flowRuns
             } until ($PageSize*$pageNumber -ge $totalAvailable)
@@ -2705,7 +2725,7 @@ function Stop-TSFlowRun {
     Assert-TSRestApiVersion -AtLeast 3.10
     try {
         if ($PSCmdlet.ShouldProcess($FlowRunId)) {
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param runs/$FlowRunId) -Method Put -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param runs/$FlowRunId) -Method Put
             if ($response.tsResponse.error) {
                 return $response.tsResponse.error
             } else {
@@ -2745,7 +2765,7 @@ function Get-TSContentPermission {
     }
     $uri += "/permissions"
     try {
-        $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+        $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
         $response.tsResponse.permissions
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
@@ -2808,7 +2828,7 @@ function Add-TSContentPermission {
     $shouldProcessItem += ", grantees:{0}, permissions:{1}" -f $PermissionTable.Length, $permissionsCount
     try {
         if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-            $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Put
             return $response.tsResponse.permissions
         }
     } catch {
@@ -3061,7 +3081,7 @@ function Remove-TSContentPermission {
             $shouldProcessItem += ", {0}:{1}, {2}:{3}" -f $GranteeType, $GranteeId, $CapabilityName, $CapabilityMode
             $uriAdd = "{0}s/{1}/{2}/{3}" -f $GranteeType.ToLower(), $GranteeId, $CapabilityName, $CapabilityMode
             if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-                $null = Invoke-RestMethod -Uri "$uri$uriAdd" -Method Delete -Headers (Get-TSRequestHeaderDict)
+                $null = Invoke-TSRestApiMethod -Uri $uri$uriAdd -Method Delete
             }
         } elseif ($GranteeType -and $GranteeId) { # Remove all permissions for one grantee
             $shouldProcessItem += ", all permissions for {0}:{1}" -f $GranteeType, $GranteeId
@@ -3072,7 +3092,7 @@ function Remove-TSContentPermission {
                         if (($GranteeType -eq 'Group' -and $_.group -and $_.group.id -eq $GranteeId) -or ($GranteeType -eq 'User' -and $_.user -and $_.user.id -eq $GranteeId)) {
                             $_.capabilities.capability | ForEach-Object {
                                 $uriAdd = "{0}s/{1}/{2}/{3}" -f $GranteeType.ToLower(), $GranteeId, $_.name, $_.mode
-                                $null = Invoke-RestMethod -Uri "$uri$uriAdd" -Method Delete -Headers (Get-TSRequestHeaderDict)
+                                $null = Invoke-TSRestApiMethod -Uri $uri$uriAdd -Method Delete
                             }
                         }
                     }
@@ -3093,7 +3113,7 @@ function Remove-TSContentPermission {
                         }
                         $_.capabilities.capability | ForEach-Object {
                             $uriAdd = "{0}s/{1}/{2}/{3}" -f $grtType, $grtId, $_.name, $_.mode
-                            $null = Invoke-RestMethod -Uri "$uri$uriAdd" -Method Delete -Headers (Get-TSRequestHeaderDict)
+                            $null = Invoke-TSRestApiMethod -Uri $uri$uriAdd -Method Delete
                         }
                     }
                 }
@@ -3154,7 +3174,7 @@ function Get-TSDefaultPermission {
                 continue
             }
             if ((-Not ($ContentType)) -or $ContentType -eq $ct) {
-                $response = Invoke-RestMethod -Uri $uri$ct -Method Get -Headers (Get-TSRequestHeaderDict)
+                $response = Invoke-TSRestApiMethod -Uri $uri$ct -Method Get
                 if ($response.tsResponse.permissions.granteeCapabilities) {
                     $response.tsResponse.permissions.granteeCapabilities | ForEach-Object {
                         if ($_.group -and $_.group.id) {
@@ -3328,7 +3348,7 @@ function Set-TSDefaultPermission {
                         Remove-TSDefaultPermission -ProjectId $ProjectId -ContentType $ct -GranteeType $_.granteeType -GranteeId $_.granteeId -CapabilityName $_.capabilityName -CapabilityMode $_.capabilityMode
                     }
                     if ($permissionsCount -gt 0) { # empty permissions element in xml is not allowed
-                        $response = Invoke-RestMethod -Uri $uri$ct -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+                        $response = Invoke-TSRestApiMethod -Uri $uri$ct -Body $xml.OuterXml -Method Put
                         if ($response.tsResponse.permissions.granteeCapabilities) {
                             $response.tsResponse.permissions.granteeCapabilities | ForEach-Object {
                                 if ($_.group -and $_.group.id) {
@@ -3393,7 +3413,7 @@ function Remove-TSDefaultPermission {
             $shouldProcessItem += ", default permission for {0}:{1}, {2}:{3}" -f $GranteeType, $GranteeId, $CapabilityName, $CapabilityMode
             $uriAdd = "{0}/{1}s/{2}/{3}/{4}" -f $ContentType, $GranteeType.ToLower(), $GranteeId, $CapabilityName, $CapabilityMode
             if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-                $null = Invoke-RestMethod -Uri "$uri$uriAdd" -Method Delete -Headers (Get-TSRequestHeaderDict)
+                $null = Invoke-TSRestApiMethod -Uri $uri$uriAdd -Method Delete
             }
         } elseif ($GranteeType -and $GranteeId) { # Remove all permissions for one grantee
             $shouldProcessItem += ", all default permissions for {0}:{1}" -f $GranteeTyp, $GranteeId
@@ -3416,7 +3436,7 @@ function Remove-TSDefaultPermission {
                             foreach ($permission in $permissions) {
                                 $permission.capabilities.GetEnumerator() | ForEach-Object {
                                     $uriAdd = "{0}/{1}s/{2}/{3}/{4}" -f $ct, $GranteeType.ToLower(), $GranteeId, $_.Key, $_.Value
-                                    $null = Invoke-RestMethod -Uri "$uri$uriAdd" -Method Delete -Headers (Get-TSRequestHeaderDict)
+                                    $null = Invoke-TSRestApiMethod -Uri $uri$uriAdd -Method Delete
                                 }
                             }
                         }
@@ -3440,7 +3460,7 @@ function Remove-TSDefaultPermission {
                         foreach ($permission in $contentTypePermissions) {
                             $permission.capabilities.GetEnumerator() | ForEach-Object {
                                 $uriAdd = "{0}/{1}s/{2}/{3}/{4}" -f $ct, $permission.granteeType.ToLower(), $permission.granteeId, $_.Key, $_.Value
-                                $null = Invoke-RestMethod -Uri "$uri$uriAdd" -Method Delete -Headers (Get-TSRequestHeaderDict)
+                                $null = Invoke-TSRestApiMethod -Uri $uri$uriAdd -Method Delete
                             }
                         }
                     }
@@ -3473,16 +3493,16 @@ function Add-TSTagsToContent {
     }
     try {
         if ($WorkbookId -and $PSCmdlet.ShouldProcess("workbook:$WorkbookId, tags:"+($Tags -join ' '))) {
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/tags) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/tags) -Body $xml.OuterXml -Method Put
             return $response.tsResponse.tags.tag
         } elseif ($DatasourceId -and $PSCmdlet.ShouldProcess("datasource:$DatasourceId, tags:"+($Tags -join ' '))) {
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/tags) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/tags) -Body $xml.OuterXml -Method Put
             return $response.tsResponse.tags.tag
         } elseif ($ViewId -and $PSCmdlet.ShouldProcess("view:$ViewId, tags:"+($Tags -join ' '))) {
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint View -Param $ViewId/tags) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint View -Param $ViewId/tags) -Body $xml.OuterXml -Method Put
             return $response.tsResponse.tags.tag
         } elseif ($FlowId -and $PSCmdlet.ShouldProcess("flow:$FlowId, tags:"+($Tags -join ' '))) {
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param $FlowId/tags) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param $FlowId/tags) -Body $xml.OuterXml -Method Put
             return $response.tsResponse.tags.tag
         }
     } catch {
@@ -3503,13 +3523,13 @@ function Remove-TSTagFromContent {
     # Assert-TSRestApiVersion -AtLeast 2.0
     try {
         if ($WorkbookId -and $PSCmdlet.ShouldProcess("workbook:$WorkbookId, tag:$Tag")) {
-            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/tags/$Tag) -Method Delete -Headers (Get-TSRequestHeaderDict)
+            Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/tags/$Tag) -Method Delete
         } elseif ($DatasourceId -and $PSCmdlet.ShouldProcess("datasource:$DatasourceId, tag:$Tag")) {
-            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/tags/$Tag) -Method Delete -Headers (Get-TSRequestHeaderDict)
+            Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/tags/$Tag) -Method Delete
         } elseif ($ViewId -and $PSCmdlet.ShouldProcess("view:$ViewId, tag:$Tag")) {
-            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint View -Param $ViewId/tags/$Tag) -Method Delete -Headers (Get-TSRequestHeaderDict)
+            Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint View -Param $ViewId/tags/$Tag) -Method Delete
         } elseif ($FlowId -and $PSCmdlet.ShouldProcess("flow:$FlowId, tag:$Tag")) {
-            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param $FlowId/tags/$Tag) -Method Delete -Headers (Get-TSRequestHeaderDict)
+            Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param $FlowId/tags/$Tag) -Method Delete
         }
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
@@ -3529,7 +3549,7 @@ function Get-TSSchedule {
     }
     try {
         if ($ScheduleId) { # Get Server Schedule
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint ServerSchedule -Param $ScheduleId) -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint ServerSchedule -Param $ScheduleId) -Method Get
             $response.tsResponse.schedule
         } else { # List Server Schedules
             $pageNumber = 0
@@ -3537,7 +3557,7 @@ function Get-TSSchedule {
                 $pageNumber++
                 $uri = Get-TSRequestUri -Endpoint ServerSchedule
                 $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-                $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+                $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.schedules.schedule
             } until ($PageSize*$pageNumber -ge $totalAvailable)
@@ -3624,7 +3644,7 @@ function Add-TSSchedule {
     }
     try {
         if ($PSCmdlet.ShouldProcess($Name)) {
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint ServerSchedule) -Body $xml.OuterXml -Method Post -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint ServerSchedule) -Body $xml.OuterXml -Method Post
             return $response.tsResponse.schedule
         }
     } catch {
@@ -3721,7 +3741,7 @@ function Update-TSSchedule {
     }
     try {
         if ($PSCmdlet.ShouldProcess($ScheduleId)) {
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint ServerSchedule -Param $ScheduleId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint ServerSchedule -Param $ScheduleId) -Body $xml.OuterXml -Method Put
             return $response.tsResponse.schedule
         }
     } catch {
@@ -3738,7 +3758,7 @@ function Remove-TSSchedule {
     # Assert-TSRestApiVersion -AtLeast 2.3
     try {
         if ($PSCmdlet.ShouldProcess($ScheduleId)) {
-            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint ServerSchedule -Param $ScheduleId) -Method Delete -Headers (Get-TSRequestHeaderDict)
+            Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint ServerSchedule -Param $ScheduleId) -Method Delete
         }
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
@@ -3805,7 +3825,7 @@ function Add-TSContentToSchedule {
     }
     try {
         if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-            $response = Invoke-RestMethod -Uri $uri -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Put
             return $response.tsResponse.task.extractRefresh
         }
     } catch {
@@ -3826,7 +3846,7 @@ function Get-TSJob {
     Assert-TSRestApiVersion -AtLeast 3.1
     try {
         if ($JobId) { # Query Job
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Job -Param $JobId) -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Job -Param $JobId) -Method Get
             $response.tsResponse.job
         } else { # Get Jobs
             $pageNumber = 0
@@ -3847,7 +3867,7 @@ function Get-TSJob {
                 }
                 $uriRequest = [System.UriBuilder]$uri
                 $uriRequest.Query = $uriParam.ToString()
-                $response = Invoke-RestMethod -Uri $uriRequest.Uri.OriginalString -Method Get -Headers (Get-TSRequestHeaderDict)
+                $response = Invoke-TSRestApiMethod -Uri $uriRequest.Uri.OriginalString -Method Get
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.backgroundJobs.backgroundJob
             } until ($PageSize*$pageNumber -ge $totalAvailable)
@@ -3866,7 +3886,7 @@ function Stop-TSJob {
     Assert-TSRestApiVersion -AtLeast 3.1
     try {
         if ($PSCmdlet.ShouldProcess($JobId)) {
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Job -Param $JobId) -Method Put -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Job -Param $JobId) -Method Put
             if ($response.tsResponse.error) {
                 return $response.tsResponse.error
             } else {
@@ -3887,7 +3907,7 @@ function Get-TSFlowRunTask {
     Assert-TSRestApiVersion -AtLeast 3.3
     try {
         if ($TaskId) { # Get Flow Run Task
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Task -Param runFlow/$TaskId) -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param runFlow/$TaskId) -Method Get
             $response.tsResponse.task.flowRun
         } else { # Get Flow Run Tasks
             $pageNumber = 0
@@ -3895,7 +3915,7 @@ function Get-TSFlowRunTask {
                 $pageNumber++
                 $uri = Get-TSRequestUri -Endpoint Task -Param runFlow
                 $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-                $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+                $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.tasks.task.flowRun
             } until ($PageSize*$pageNumber -ge $totalAvailable)
@@ -3914,7 +3934,7 @@ function Start-TSFlowRunTaskNow {
     Assert-TSRestApiVersion -AtLeast 3.3
     try {
         if ($PSCmdlet.ShouldProcess($TaskId)) {
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Task -Param runFlow/$TaskId/runNow) -Method Post -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param runFlow/$TaskId/runNow) -Method Post
             return $response.tsResponse.job
         }
     } catch {
@@ -3931,7 +3951,7 @@ function Get-TSLinkedTask {
     Assert-TSRestApiVersion -AtLeast 3.15
     try {
         if ($TaskId) { # Get Linked Task
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Task -Param linked/$TaskId) -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param linked/$TaskId) -Method Get
             $response.tsResponse.linkedTask
         } else { # Get Linked Tasks
             $pageNumber = 0
@@ -3939,7 +3959,7 @@ function Get-TSLinkedTask {
                 $pageNumber++
                 $uri = Get-TSRequestUri -Endpoint Task -Param linked
                 $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-                $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+                $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.linkedTasks.linkedTasks
             } until ($PageSize*$pageNumber -ge $totalAvailable)
@@ -3958,7 +3978,7 @@ function Start-TSLinkedTaskNow {
     Assert-TSRestApiVersion -AtLeast 3.15
     try {
         if ($PSCmdlet.ShouldProcess($TaskId)) {
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Task -Param linked/$TaskId/runNow) -Method Post -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param linked/$TaskId/runNow) -Method Post
             return $response.tsResponse.linkedTaskJob
         }
     } catch {
@@ -3972,7 +3992,7 @@ function Get-TSDataAccelerationTask {
     )
     Assert-TSRestApiVersion -AtLeast 3.8 -LessThan 3.16
     try {
-        $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Task -Param dataAcceleration) -Method Get -Headers (Get-TSRequestHeaderDict)
+        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param dataAcceleration) -Method Get
         $response.tsResponse.tasks.task
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
@@ -3988,7 +4008,7 @@ function Remove-TSDataAccelerationTask {
     Assert-TSRestApiVersion -AtLeast 3.8 -LessThan 3.16
     try {
         if ($PSCmdlet.ShouldProcess($TaskId)) {
-            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Task -Param dataAcceleration/$TaskId) -Method Delete -Headers (Get-TSRequestHeaderDict)
+            Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param dataAcceleration/$TaskId) -Method Delete
         }
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
@@ -4009,7 +4029,7 @@ function Get-TSExtractRefreshTasksInSchedule {
             $pageNumber++
             $uri = Get-TSRequestUri -Endpoint Schedule -Param $ScheduleId/extracts
             $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-            $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.extracts.extract
         } until ($PageSize*$pageNumber -ge $totalAvailable)
@@ -4032,7 +4052,7 @@ function Get-TSUserFavorite {
             $pageNumber++
             $uri = Get-TSRequestUri -Endpoint Favorite -Param $UserId
             $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-            $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.favorites.favorite
         } until ($PageSize*$pageNumber -ge $totalAvailable)
@@ -4104,7 +4124,7 @@ function Add-TSUserFavorite {
     }
     try {
         if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Favorite -Param $UserId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Favorite -Param $UserId) -Body $xml.OuterXml -Method Put
             return $response.tsResponse.favorites.favorite
         }
     } catch {
@@ -4146,7 +4166,7 @@ function Remove-TSUserFavorite {
     }
     try {
         if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-            Invoke-RestMethod -Uri $uri -Method Delete -Headers (Get-TSRequestHeaderDict)
+            Invoke-TSRestApiMethod -Uri $uri -Method Delete
         }
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
@@ -4174,7 +4194,7 @@ function Move-TSUserFavorite {
     $el_fo.SetAttribute("favoriteTypeMoveAfter", $AfterFavoriteType.ToLower()) # note: needs to be lowercase, otherwise TS will return error 400
     try {
         if ($PSCmdlet.ShouldProcess("user:$UserId, favorite($FavoriteType):$FavoriteId, after($AfterFavoriteType):$AfterFavoriteId")) {
-            Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint OrderFavorites -Param $UserId) -Body $xml.OuterXml -Method Put -Headers (Get-TSRequestHeaderDict)
+            Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint OrderFavorites -Param $UserId) -Body $xml.OuterXml -Method Put
         }
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
@@ -4191,7 +4211,7 @@ function Get-TSDatabase {
     Assert-TSRestApiVersion -AtLeast 3.5
     try {
         if ($DatabaseId) {
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Database -Param $DatabaseId) -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Database -Param $DatabaseId) -Method Get
             $response.tsResponse.database
         } else {
             $pageNumber = 0
@@ -4199,7 +4219,7 @@ function Get-TSDatabase {
                 $pageNumber++
                 $uri = Get-TSRequestUri -Endpoint Database
                 $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-                $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+                $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.databases.database
             } until ($PageSize*$pageNumber -ge $totalAvailable)
@@ -4218,7 +4238,7 @@ function Get-TSTable {
     Assert-TSRestApiVersion -AtLeast 3.5
     try {
         if ($TableId) {
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Table -Param $TableId) -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Table -Param $TableId) -Method Get
             $response.tsResponse.table
         } else {
             $pageNumber = 0
@@ -4226,7 +4246,7 @@ function Get-TSTable {
                 $pageNumber++
                 $uri = Get-TSRequestUri -Endpoint Table
                 $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-                $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+                $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.tables.table
             } until ($PageSize*$pageNumber -ge $totalAvailable)
@@ -4246,7 +4266,7 @@ function Get-TSTableColumn {
     Assert-TSRestApiVersion -AtLeast 3.5
     try {
         if ($ColumnId) {
-            $response = Invoke-RestMethod -Uri (Get-TSRequestUri -Endpoint Table -Param $TableId/columns/$ColumnId) -Method Get -Headers (Get-TSRequestHeaderDict)
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Table -Param $TableId/columns/$ColumnId) -Method Get
             $response.tsResponse.column
         } else {
             $pageNumber = 0
@@ -4254,7 +4274,7 @@ function Get-TSTableColumn {
                 $pageNumber++
                 $uri = Get-TSRequestUri -Endpoint Table -Param $TableId/columns
                 $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-                $response = Invoke-RestMethod -Uri $uri -Method Get -Headers (Get-TSRequestHeaderDict)
+                $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
                 $totalAvailable = $response.tsResponse.pagination.totalAvailable
                 $response.tsResponse.columns.column
             } until ($PageSize*$pageNumber -ge $totalAvailable)
@@ -4290,7 +4310,7 @@ function Get-TSMetadataGraphQL {
                     query = $queryPage
                     # TODO variables = $null
                 } | ConvertTo-Json
-                $response = Invoke-RestMethod -Uri $uri -Body $jsonQuery -Method Post -Headers (Get-TSRequestHeaderDict -ContentType 'application/json')
+                $response = Invoke-TSRestApiMethod -Uri $uri -Body $jsonQuery -Method Post -ContentType 'application/json'
                 $endCursor = $response.data.$PaginatedEntity.pageInfo.endCursor
                 $hasNextPage = $response.data.$PaginatedEntity.pageInfo.hasNextPage
                 $totalCount = $response.data.$PaginatedEntity.totalCount
@@ -4312,7 +4332,7 @@ function Get-TSMetadataGraphQL {
                 query = $Query
                 # TODO variables = $null
             } | ConvertTo-Json
-            $response = Invoke-RestMethod -Uri $uri -Body $jsonQuery -Method Post -Headers (Get-TSRequestHeaderDict -ContentType 'application/json')
+            $response = Invoke-TSRestApiMethod -Uri $uri -Body $jsonQuery -Method Post -ContentType 'application/json'
             $entity = $response.data.PSObject.Properties | Select-Object -First 1 -ExpandProperty Name
             $response.data.$entity
         }
