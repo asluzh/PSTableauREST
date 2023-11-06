@@ -2,7 +2,7 @@ BeforeAll {
     Import-Module ./PSTableauREST -Force
     Import-Module Assert
     . ./Tests/Test.Functions.ps1
-    # InModuleScope 'PSTableauREST' { $script:VerbosePreference = 'Continue' } # enable to display verbose output
+    InModuleScope 'PSTableauREST' { $script:VerbosePreference = 'Continue' } # enable to display verbose output
     InModuleScope 'PSTableauREST' { $script:DebugPreference = 'Continue' } # enable to display debug output
 }
 BeforeDiscovery {
@@ -57,9 +57,9 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
     Context "Content operations" -Tag Content {
         BeforeAll {
             if ($ConfigFile.pat_name) {
-                Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
+                $null = Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
             } else {
-                Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
+                $null = Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
             }
         }
         AfterAll {
@@ -141,10 +141,11 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $script:testSite = $null
                     # because we've just deleted the current site, we need to sign-in again
                     if ($ConfigFile.pat_name) {
-                        Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
+                        $credentials = Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
                     } else {
-                        Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
+                        $credentials = Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
                     }
+                    $credentials.user.id | Should -BeOfType String
                 } else {
                     Set-ItResult -Skipped
                 }
@@ -160,10 +161,11 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $response | Should -BeOfType String
                     # because we've just deleted the current site, we need to sign-in again
                     if ($ConfigFile.pat_name) {
-                        Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
+                        $credentials = Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
                     } else {
-                        Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
+                        $credentials = Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
                     }
+                    $credentials.user.id | Should -BeOfType String
                 } else {
                     Set-ItResult -Skipped
                 }
@@ -175,6 +177,8 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 $project = Add-TSProject -Name $projectName
                 $project.id | Should -BeOfType String
                 $script:testProjectId = $project.id
+                # adding another project with the same name - should throw an error
+                {Add-TSProject -Name $projectName} | Should -Throw
             }
             It "Update project <testProjectId> on <ConfigFile.server>" {
                 $projectNewName = New-Guid
@@ -782,7 +786,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 It "Publish workbook as background job on <ConfigFile.server>" -Skip {
                     Publish-TSWorkbook -Name "Workbook" -InFile "Tests/Assets/Misc/Workbook.txt" -ProjectId $samplesProjectId
                 }
-                Context "Publish / download sample workbooks on <ConfigFile.server>" -ForEach $WorkbookFiles {
+                Context "Publish / download sample workbooks on <ConfigFile.server>" -Tag WorkbookSamples -ForEach $WorkbookFiles {
                     BeforeAll {
                         $script:sampleWorkbookName = (Get-Item -LiteralPath $_).BaseName
                         $script:sampleWorkbookFileName = (Get-Item -LiteralPath $_).Name
@@ -1014,7 +1018,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 It "Publish datasource as background job on <ConfigFile.server>" -Skip {
                     Publish-TSDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/Datasource.txt" -ProjectId $samplesProjectId
                 }
-                Context "Publish / download sample datasources on <ConfigFile.server>" -ForEach $DatasourceFiles {
+                Context "Publish / download sample datasources on <ConfigFile.server>"  -Tag DatasourceSamples -ForEach $DatasourceFiles {
                     BeforeAll {
                         $script:sampleDatasourceName = (Get-Item -LiteralPath $_).BaseName
                         $script:sampleDatasourceFileName = (Get-Item -LiteralPath $_).Name
@@ -1451,7 +1455,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 It "Publish flow with credentials on <ConfigFile.server>" -Skip {
                     Publish-TSFlow -Name "Flow" -InFile "Tests/Assets/Misc/Flow.txt" -ProjectId $samplesProjectId
                 }
-                Context "Publish / download sample flows on <ConfigFile.server>" -ForEach $FlowFiles {
+                Context "Publish / download sample flows on <ConfigFile.server>" -Tag FlowSamples -ForEach $FlowFiles {
                     BeforeAll {
                         $script:sampleFlowName = (Get-Item -LiteralPath $_).BaseName
                         $script:sampleFlowFileName = (Get-Item -LiteralPath $_).Name
