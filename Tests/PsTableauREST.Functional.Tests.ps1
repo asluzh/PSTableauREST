@@ -2,6 +2,8 @@ BeforeAll {
     Import-Module ./PSTableauREST -Force
     Import-Module Assert
     . ./Tests/Test.Functions.ps1
+    # InModuleScope 'PSTableauREST' { $script:VerbosePreference = 'Continue' } # enable to display verbose output
+    InModuleScope 'PSTableauREST' { $script:DebugPreference = 'Continue' } # enable to display debug output
 }
 BeforeDiscovery {
     $script:ConfigFiles = Get-ChildItem -Path "./Tests/Config" -Filter "test_*.json" | Resolve-Path -Relative

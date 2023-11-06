@@ -18,10 +18,10 @@ function Invoke-TSRestApiMethod {
         [Parameter()][string] $ContentType,
         [Parameter()][switch] $SkipCertificateCheck,
         # own params
-        [Parameter()][switch] $NoTokenHeader
+        [Parameter()][switch] $NoStandardHeader
     )
-    if ($NoTokenHeader) {
-        $PSBoundParameters.Remove('NoTokenHeader')
+    if ($NoStandardHeader) {
+        $PSBoundParameters.Remove('NoStandardHeader')
     } else {
         $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
         if ($script:TSAuthToken) {
@@ -32,11 +32,13 @@ function Invoke-TSRestApiMethod {
         # }
         $PSBoundParameters.Add('Headers', $headers)
     }
-    # $requestInfo = "{0} {1} " -f $Method, $Uri
-    # $PSBoundParameters.GetEnumerator() | ForEach-Object {
-    #     if ($_.Key -notin 'Method','Uri') { $requestInfo += "<{0}>" -f $_.Key }
-    # }
-    # Write-Warning $requestInfo
+    if ($DebugPreference -eq 'Continue') {
+        $requestInfo = "{0} {1} " -f $Method.ToString().ToUpper(), $Uri
+        $PSBoundParameters.GetEnumerator() | ForEach-Object {
+            if ($_.Key -notin 'Method','Uri') { $requestInfo += "<{0}>" -f $_.Key }
+        }
+        Write-Debug $requestInfo
+    }
     Invoke-RestMethod @PSBoundParameters
 }
 
@@ -183,7 +185,7 @@ function Get-TSServerInfo {
         if ($script:TSRestApiVersion) {
             $apiVersion = $script:TSRestApiVersion
         }
-        $response = Invoke-TSRestApiMethod -Uri $ServerUrl/api/$apiVersion/serverinfo -Method Get -NoTokenHeader
+        $response = Invoke-TSRestApiMethod -Uri $ServerUrl/api/$apiVersion/serverinfo -Method Get -NoStandardHeader
         return $response.tsResponse.serverInfo
     } catch {
         Write-Error -Message ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Exception $_.Exception -Category InvalidResult -ErrorAction Stop
@@ -238,7 +240,7 @@ function Open-TSSignIn {
         return $null
     }
     try {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Auth -Param signin) -Body $xml.OuterXml -Method Post -NoTokenHeader
+        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Auth -Param signin) -Body $xml.OuterXml -Method Post -NoStandardHeader
         $script:TSAuthToken = $response.tsResponse.credentials.token
         $script:TSSiteId = $response.tsResponse.credentials.site.id
         $script:TSUserId = $response.tsResponse.credentials.user.id
