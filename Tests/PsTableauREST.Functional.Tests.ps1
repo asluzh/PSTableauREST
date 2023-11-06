@@ -2,8 +2,10 @@ BeforeAll {
     Import-Module ./PSTableauREST -Force
     Import-Module Assert
     . ./Tests/Test.Functions.ps1
-    InModuleScope 'PSTableauREST' { $script:VerbosePreference = 'Continue' } # enable to display verbose output
-    InModuleScope 'PSTableauREST' { $script:DebugPreference = 'Continue' } # enable to display debug output
+    InModuleScope 'PSTableauREST' { $script:VerbosePreference = 'Continue' } # display verbose output
+    InModuleScope 'PSTableauREST' { $script:DebugPreference = 'Continue' } # display debug output
+    InModuleScope 'PSTableauREST' { $script:ProgressPreference = 'Continue' } # display progress for upload/download operations (SilentlyContinue to suppress)
+    # see also: https://stackoverflow.com/questions/18770723/hide-progress-of-invoke-webrequest
 }
 BeforeDiscovery {
     $script:ConfigFiles = Get-ChildItem -Path "./Tests/Config" -Filter "test_*.json" | Resolve-Path -Relative
@@ -792,12 +794,12 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         $script:sampleWorkbookFileName = (Get-Item -LiteralPath $_).Name
                     }
                     It "Publish file ""<sampleWorkbookFileName>"" into workbook ""<sampleWorkbookName>"" on <ConfigFile.server>" {
-                        $workbook = Publish-TSWorkbook -Name $sampleWorkbookName -InFile $_ -ProjectId $samplesProjectId -Overwrite -ShowProgress -SkipConnectionCheck
+                        $workbook = Publish-TSWorkbook -Name $sampleWorkbookName -InFile $_ -ProjectId $samplesProjectId -Overwrite -SkipConnectionCheck
                         $workbook.id | Should -BeOfType String
                         $script:sampleWorkbookId = $workbook.id
                     }
                     It "Publish file ""<sampleWorkbookFileName>"" into workbook ""<sampleWorkbookName>"" on <ConfigFile.server> (Chunked)" {
-                        $workbook = Publish-TSWorkbook -Name $sampleWorkbookName -InFile $_ -ProjectId $samplesProjectId -Overwrite -ShowProgress -SkipConnectionCheck -Chunked
+                        $workbook = Publish-TSWorkbook -Name $sampleWorkbookName -InFile $_ -ProjectId $samplesProjectId -Overwrite -SkipConnectionCheck -Chunked
                         $workbook.id | Should -BeOfType String
                         $script:sampleWorkbookId = $workbook.id
                     }
@@ -1024,12 +1026,12 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         $script:sampleDatasourceFileName = (Get-Item -LiteralPath $_).Name
                     }
                     It "Publish file ""<sampleDatasourceFileName>"" into datasource ""<sampleDatasourceName>"" on <ConfigFile.server>" {
-                        $datasource = Publish-TSDatasource -Name $sampleDatasourceName -InFile $_ -ProjectId $samplesProjectId -Overwrite -ShowProgress
+                        $datasource = Publish-TSDatasource -Name $sampleDatasourceName -InFile $_ -ProjectId $samplesProjectId -Overwrite
                         $datasource.id | Should -BeOfType String
                         $script:sampleDatasourceId = $datasource.id
                     }
                     It "Publish file ""<sampleDatasourceFileName>"" into datasource ""<sampleDatasourceName>"" on <ConfigFile.server> (Chunked)" {
-                        $datasource = Publish-TSDatasource -Name $sampleDatasourceName -InFile $_ -ProjectId $samplesProjectId -Overwrite -ShowProgress -Chunked
+                        $datasource = Publish-TSDatasource -Name $sampleDatasourceName -InFile $_ -ProjectId $samplesProjectId -Overwrite -Chunked
                         $datasource.id | Should -BeOfType String
                         $script:sampleDatasourceId = $datasource.id
                     }
@@ -1461,12 +1463,12 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         $script:sampleFlowFileName = (Get-Item -LiteralPath $_).Name
                     }
                     It "Publish file ""<sampleFlowFileName>"" into flow ""<sampleFlowName>"" on <ConfigFile.server>" {
-                        $flow = Publish-TSFlow -Name $sampleFlowName -InFile $_ -ProjectId $samplesProjectId -Overwrite -ShowProgress
+                        $flow = Publish-TSFlow -Name $sampleFlowName -InFile $_ -ProjectId $samplesProjectId -Overwrite
                         $flow.id | Should -BeOfType String
                         $script:sampleflowId = $flow.id
                     }
                     It "Publish file ""<sampleFlowFileName>"" into flow ""<sampleFlowName>"" on <ConfigFile.server> (Chunked)" {
-                        $flow = Publish-TSFlow -Name $sampleFlowName -InFile $_ -ProjectId $samplesProjectId -Overwrite -ShowProgress -Chunked
+                        $flow = Publish-TSFlow -Name $sampleFlowName -InFile $_ -ProjectId $samplesProjectId -Overwrite -Chunked
                         $flow.id | Should -BeOfType String
                         $script:sampleflowId = $flow.id
                     }
@@ -1779,13 +1781,13 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             }
             It "Paginated GraphQL queries on <ConfigFile.server>" {
                 $query = Get-Content "Tests/Assets/GraphQL/fields-paginated.graphql" | Out-String
-                $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -ShowProgress
+                $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection"
                 ($results | Measure-Object).Count | Should -BeGreaterThan 100
-                $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -ShowProgress -PageSize 500
+                $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 500
                 ($results | Measure-Object).Count | Should -BeGreaterThan 100
-                $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -ShowProgress -PageSize 1000
+                $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 1000
                 ($results | Measure-Object).Count | Should -BeGreaterThan 100
-                $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -ShowProgress -PageSize 20000
+                $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 20000
                 ($results | Measure-Object).Count | Should -BeGreaterThan 100
             }
         }

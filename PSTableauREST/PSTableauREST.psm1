@@ -867,8 +867,7 @@ function Send-TSFileUpload {
     [OutputType([string])]
     Param(
         [Parameter(Mandatory)][string] $InFile,
-        [Parameter()][string] $FileName = "file",
-        [Parameter()][switch] $ShowProgress
+        [Parameter()][string] $FileName = "file"
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
     if ($FileName -match '[^\x20-\x7e]') { # special non-ASCII characters in the filename cause issues on some API versions
@@ -909,20 +908,18 @@ function Send-TSFileUpload {
             $bytesUploaded += $bytesRead
             $elapsedTime = $(Get-Date) - $startTime
             $remainingTime = $elapsedTime * ($fileItem.Length / $bytesUploaded - 1)
-            if ($ShowProgress) {
-                $uploadedSizeMb = [Math]::Round($bytesUploaded / 1048576)
-                $percentCompleted = [Math]::Round($bytesUploaded / $fileItem.Length * 100)
-                Write-Progress -Activity "Uploading file $FileName" -Status "$uploadedSizeMb / $totalSizeMb MB uploaded ($percentCompleted%)" -PercentComplete $percentCompleted -SecondsRemaining $remainingTime.TotalSeconds
-            }
+            # calculate uploaded size and percentage for Write-Progress
+            $uploadedSizeMb = [Math]::Round($bytesUploaded / 1048576)
+            $percentCompleted = [Math]::Round($bytesUploaded / $fileItem.Length * 100)
+            Write-Progress -Activity "Uploading file $FileName" -Status "$uploadedSizeMb / $totalSizeMb MB uploaded ($percentCompleted%)" -PercentComplete $percentCompleted -SecondsRemaining $remainingTime.TotalSeconds
         } until ($script:TSRestApiChunkSize*$chunkNumber -ge $fileItem.Length)
     } finally {
         $fileStream.Close()
     }
-    if ($ShowProgress) {
-        Write-Progress -Activity "Uploading file $FileName" -Status "$totalSizeMb / $totalSizeMb MB uploaded (100%)" -PercentComplete 100
-        Start-Sleep -m 100
-        Write-Progress -Activity "Uploading file $FileName" -Status "$totalSizeMb MB uploaded" -Completed
-    }
+    # final Write-Progress update
+    Write-Progress -Activity "Uploading file $FileName" -Status "$totalSizeMb / $totalSizeMb MB uploaded (100%)" -PercentComplete 100
+    Start-Sleep -m 100
+    Write-Progress -Activity "Uploading file $FileName" -Status "$totalSizeMb MB uploaded" -Completed
     return $uploadSessionId
 }
 
@@ -1027,8 +1024,7 @@ function Export-TSWorkbook {
         [Parameter(Mandatory)][string] $WorkbookId,
         [Parameter()][string] $OutFile,
         [Parameter()][switch] $ExcludeExtract,
-        [Parameter()][int] $Revision,
-        [Parameter()][switch] $ShowProgress
+        [Parameter()][int] $Revision
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
     $OutFileParam = @{}
@@ -1049,17 +1045,7 @@ function Export-TSWorkbook {
         Assert-TSRestApiVersion -AtLeast 2.5
         $uri += "?includeExtract=false"
     }
-    $prevProgressPreference = $global:ProgressPreference
-    try {
-        if ($ShowProgress) {
-            $global:ProgressPreference = 'Continue'
-        } else {
-            $global:ProgressPreference = 'SilentlyContinue'
-        }
-        Invoke-TSRestApiMethod -Uri $uri -Method Get -TimeoutSec 600 @OutFileParam
-    } finally {
-        $global:ProgressPreference = $prevProgressPreference
-    }
+    Invoke-TSRestApiMethod -Uri $uri -Method Get -TimeoutSec 600 @OutFileParam
 }
 
 function Publish-TSWorkbook {
@@ -1079,9 +1065,8 @@ function Publish-TSWorkbook {
         [Parameter()][switch] $BackgroundTask,
         [Parameter()][switch] $Chunked,
         [Parameter()][hashtable] $Credentials,
-        [Parameter()][hashtable[]] $Connections,
+        [Parameter()][hashtable[]] $Connections
         # [Parameter()][switch] $EncryptExtracts,
-        [Parameter()][switch] $ShowProgress
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
     $boundaryString = (New-Guid).ToString("N")
@@ -1160,7 +1145,7 @@ function Publish-TSWorkbook {
     $stringContent.Headers.ContentDisposition.Name = "request_payload"
     $multipartContent.Add($stringContent)
     if ($Chunked) {
-        $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName -ShowProgress:$ShowProgress
+        $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName
         $uri += "&uploadSessionId=$uploadSessionId"
         $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post
     } else {
@@ -1319,8 +1304,7 @@ function Export-TSWorkbookToFormat {
         [Parameter()][ValidateSet('A3','A4','A5','B4','B5','Executive','Folio','Ledger','Legal','Letter','Note','Quarto','Tabloid','Unspecified')][string] $PageType = "A4",
         [Parameter()][ValidateSet('Portrait','Landscape')][string] $PageOrientation = "Portrait",
         [Parameter()][int] $MaxAge, # The maximum number of minutes a workbook preview will be cached before being refreshed
-        [Parameter()][string] $OutFile,
-        [Parameter()][switch] $ShowProgress
+        [Parameter()][string] $OutFile
     )
     $OutFileParam = @{}
     if ($OutFile) {
@@ -1346,17 +1330,7 @@ function Export-TSWorkbookToFormat {
         $uri += "/previewImage"
         # $fileType = 'png'
     }
-    $prevProgressPreference = $global:ProgressPreference
-    try {
-        if ($ShowProgress) {
-            $global:ProgressPreference = 'Continue'
-        } else {
-            $global:ProgressPreference = 'SilentlyContinue'
-        }
-        Invoke-TSRestApiMethod -Uri $uri -Method Get -TimeoutSec 600 @OutFileParam
-    } finally {
-        $global:ProgressPreference = $prevProgressPreference
-    }
+    Invoke-TSRestApiMethod -Uri $uri -Method Get -TimeoutSec 600 @OutFileParam
 }
 
 function Update-TSWorkbookNow {
@@ -1447,8 +1421,7 @@ function Export-TSDatasource {
         [Parameter(Mandatory)][string] $DatasourceId,
         [Parameter()][string] $OutFile,
         [Parameter()][switch] $ExcludeExtract,
-        [Parameter()][int] $Revision,
-        [Parameter()][switch] $ShowProgress
+        [Parameter()][int] $Revision
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
     $OutFileParam = @{}
@@ -1469,18 +1442,7 @@ function Export-TSDatasource {
         Assert-TSRestApiVersion -AtLeast 2.5
         $uri += "?includeExtract=false"
     }
-    # see also: https://stackoverflow.com/questions/18770723/hide-progress-of-invoke-webrequest
-    $prevProgressPreference = $global:ProgressPreference
-    try {
-        if ($ShowProgress) {
-            $global:ProgressPreference = 'Continue'
-        } else {
-            $global:ProgressPreference = 'SilentlyContinue'
-        }
-        Invoke-TSRestApiMethod -Uri $uri -Method Get -TimeoutSec 600 @OutFileParam
-    } finally {
-        $global:ProgressPreference = $prevProgressPreference
-    }
+    Invoke-TSRestApiMethod -Uri $uri -Method Get -TimeoutSec 600 @OutFileParam
 }
 
 function Publish-TSDatasource {
@@ -1498,8 +1460,7 @@ function Publish-TSDatasource {
         [Parameter()][switch] $Chunked,
         [Parameter()][switch] $UseRemoteQueryAgent,
         [Parameter()][hashtable] $Credentials,
-        [Parameter()][hashtable[]] $Connections,
-        [Parameter()][switch] $ShowProgress
+        [Parameter()][hashtable[]] $Connections
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
     $boundaryString = (New-Guid).ToString("N")
@@ -1571,7 +1532,7 @@ function Publish-TSDatasource {
     $stringContent.Headers.ContentDisposition.Name = "request_payload"
     $multipartContent.Add($stringContent)
     if ($Chunked) {
-        $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName -ShowProgress:$ShowProgress
+        $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName
         $uri += "&uploadSessionId=$uploadSessionId"
         $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post
     } else {
@@ -1809,8 +1770,7 @@ function Export-TSViewPreviewImage {
     Param(
         [Parameter(Mandatory)][string] $ViewId,
         [Parameter(Mandatory)][string] $WorkbookId,
-        [Parameter()][string] $OutFile,
-        [Parameter()][switch] $ShowProgress
+        [Parameter()][string] $OutFile
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
     $OutFileParam = @{}
@@ -1818,17 +1778,7 @@ function Export-TSViewPreviewImage {
         $OutFileParam.Add("OutFile", $OutFile)
     }
     $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/views/$ViewId/previewImage
-    $prevProgressPreference = $global:ProgressPreference
-    try {
-        if ($ShowProgress) {
-            $global:ProgressPreference = 'Continue'
-        } else {
-            $global:ProgressPreference = 'SilentlyContinue'
-        }
-        Invoke-TSRestApiMethod -Uri $uri -Method Get -TimeoutSec 600 @OutFileParam
-    } finally {
-        $global:ProgressPreference = $prevProgressPreference
-    }
+    Invoke-TSRestApiMethod -Uri $uri -Method Get -TimeoutSec 600 @OutFileParam
 }
 
 function Export-TSViewToFormat {
@@ -1847,8 +1797,7 @@ function Export-TSViewToFormat {
         [Parameter()][ValidateSet('standard','high')][string] $Resolution = "high",
         [Parameter()][string] $OutFile,
         # https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#Filter-query-views
-        [Parameter()][hashtable] $ViewFilters,
-        [Parameter()][switch] $ShowProgress
+        [Parameter()][hashtable] $ViewFilters
     )
     $OutFileParam = @{}
     if ($OutFile) {
@@ -1892,17 +1841,7 @@ function Export-TSViewToFormat {
             $uriParam.Add("vf_"+$_.Key, $_.Value)
         }
     }
-    $prevProgressPreference = $global:ProgressPreference
-    try {
-        if ($ShowProgress) {
-            $global:ProgressPreference = 'Continue'
-        } else {
-            $global:ProgressPreference = 'SilentlyContinue'
-        }
-        Invoke-TSRestApiMethod -Uri $uri -Body $uriParam -Method Get -TimeoutSec 600 @OutFileParam
-    } finally {
-        $global:ProgressPreference = $prevProgressPreference
-    }
+    Invoke-TSRestApiMethod -Uri $uri -Body $uriParam -Method Get -TimeoutSec 600 @OutFileParam
 }
 
 function Get-TSViewRecommendation {
@@ -2015,8 +1954,7 @@ function Export-TSCustomViewImage {
         [Parameter()][int] $MaxAge,
         [Parameter()][ValidateSet('standard','high')][string] $Resolution = "high",
         [Parameter()][string] $OutFile,
-        [Parameter()][hashtable] $ViewFilters,
-        [Parameter()][switch] $ShowProgress
+        [Parameter()][hashtable] $ViewFilters
     )
     Assert-TSRestApiVersion -AtLeast 3.18
     $OutFileParam = @{}
@@ -2037,17 +1975,7 @@ function Export-TSCustomViewImage {
             $uriParam.Add("vf_"+$_.Key, $_.Value)
         }
     }
-    $prevProgressPreference = $global:ProgressPreference
-    try {
-        if ($ShowProgress) {
-            $global:ProgressPreference = 'Continue'
-        } else {
-            $global:ProgressPreference = 'SilentlyContinue'
-        }
-        Invoke-TSRestApiMethod -Uri $uri -Body $uriParam -Method Get -TimeoutSec 600 @OutFileParam
-    } finally {
-        $global:ProgressPreference = $prevProgressPreference
-    }
+    Invoke-TSRestApiMethod -Uri $uri -Body $uriParam -Method Get -TimeoutSec 600 @OutFileParam
 }
 
 function Update-TSCustomView {
@@ -2201,8 +2129,7 @@ function Export-TSFlow {
     Param(
         [Parameter(Mandatory)][string] $FlowId,
         [Parameter()][string] $OutFile,
-        [Parameter()][int] $Revision, # Note: flow revisions currently not supported via REST API
-        [Parameter()][switch] $ShowProgress
+        [Parameter()][int] $Revision # Note: flow revisions currently not supported via REST API
     )
     Assert-TSRestApiVersion -AtLeast 3.3
     $OutFileParam = @{}
@@ -2218,17 +2145,7 @@ function Export-TSFlow {
         }
     }
     $uri += "/content"
-    $prevProgressPreference = $global:ProgressPreference
-    try {
-        if ($ShowProgress) {
-            $global:ProgressPreference = 'Continue'
-        } else {
-            $global:ProgressPreference = 'SilentlyContinue'
-        }
-        Invoke-TSRestApiMethod -Uri $uri -Method Get -TimeoutSec 600 @OutFileParam
-    } finally {
-        $global:ProgressPreference = $prevProgressPreference
-    }
+    Invoke-TSRestApiMethod -Uri $uri -Method Get -TimeoutSec 600 @OutFileParam
 }
 
 function Publish-TSFlow {
@@ -2242,8 +2159,7 @@ function Publish-TSFlow {
         [Parameter()][switch] $Overwrite,
         [Parameter()][switch] $Chunked,
         [Parameter()][hashtable] $Credentials,
-        [Parameter()][hashtable[]] $Connections,
-        [Parameter()][switch] $ShowProgress
+        [Parameter()][hashtable[]] $Connections
     )
     Assert-TSRestApiVersion -AtLeast 3.3
     $boundaryString = (New-Guid).ToString("N")
@@ -2298,7 +2214,7 @@ function Publish-TSFlow {
     $stringContent.Headers.ContentDisposition.Name = "request_payload"
     $multipartContent.Add($stringContent)
     if ($Chunked) {
-        $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName -ShowProgress:$ShowProgress
+        $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName
         $uri += "&uploadSessionId=$uploadSessionId"
         $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post
     } else {
@@ -3918,8 +3834,7 @@ function Get-TSMetadataGraphQL {
     Param(
         [Parameter(Mandatory)][string] $Query,
         [Parameter()][string] $PaginatedEntity,
-        [Parameter()][ValidateRange(1,20000)][int] $PageSize = 100,
-        [Parameter()][switch] $ShowProgress
+        [Parameter()][ValidateRange(1,20000)][int] $PageSize = 100
     )
     Assert-TSRestApiVersion -AtLeast 3.5
     $uri = Get-TSRequestUri -Endpoint GraphQL
@@ -3944,14 +3859,10 @@ function Get-TSMetadataGraphQL {
             $totalCount = $response.data.$PaginatedEntity.totalCount
             $nodesCount += $response.data.$PaginatedEntity.nodes.length
             $response.data.$PaginatedEntity.nodes
-            if ($ShowProgress) {
-                $percentCompleted = [Math]::Round($nodesCount / $totalCount * 100)
-                Write-Progress -Activity "Fetching metadata" -Status "$nodesCount / $totalCount entities retrieved ($percentCompleted%)" -PercentComplete $percentCompleted
-            }
+            $percentCompleted = [Math]::Round($nodesCount / $totalCount * 100)
+            Write-Progress -Activity "Fetching metadata" -Status "$nodesCount / $totalCount entities retrieved ($percentCompleted%)" -PercentComplete $percentCompleted
         }
-        if ($ShowProgress) {
-            Write-Progress -Activity "Fetching metadata completed" -Completed
-        }
+        Write-Progress -Activity "Fetching metadata completed" -Completed
         if ($nodesCount -ne $totalCount) {
             throw "Nodes count ($nodesCount) is not equal to totalCount ($totalCount), fetched results are incomplete."
         }
