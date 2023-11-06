@@ -4,7 +4,7 @@ BeforeAll {
     . ./Tests/Test.Functions.ps1
     InModuleScope 'PSTableauREST' { $script:VerbosePreference = 'Continue' } # display verbose output
     InModuleScope 'PSTableauREST' { $script:DebugPreference = 'Continue' } # display debug output
-    InModuleScope 'PSTableauREST' { $script:ProgressPreference = 'Continue' } # display progress for upload/download operations (SilentlyContinue to suppress)
+    InModuleScope 'PSTableauREST' { $script:ProgressPreference = 'SilentlyContinue' } # suppress progress for upload/download operations
     # see also: https://stackoverflow.com/questions/18770723/hide-progress-of-invoke-webrequest
 }
 BeforeDiscovery {
@@ -632,7 +632,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         $workbook.description | Should -Be $description
                         $script:sampleWorkbookId = $workbook.id
                     } else {
-                        Set-ItResult -Skipped
+                        Set-ItResult -Skipped -Because "feature not available for this version"
                     }
                 }
                 It "Update sample workbook (showTabs) on <ConfigFile.server>" {
@@ -647,7 +647,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         $workbook = Update-TSWorkbook -WorkbookId $sampleWorkbookId -Description $description
                         $workbook.description | Should -Be $description
                     } else {
-                        Set-ItResult -Skipped
+                        Set-ItResult -Skipped -Because "feature not available for this version"
                     }
                 }
                 It "Download & remove previous workbook revision on <ConfigFile.server>" {
@@ -804,9 +804,13 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         $script:sampleWorkbookId = $workbook.id
                     }
                     It "Download workbook ""<sampleWorkbookName>"" from <ConfigFile.server>" {
-                        Export-TSWorkbook -WorkbookId $sampleWorkbookId -OutFile "Tests/Output/download.twbx"
-                        Test-Path -Path "Tests/Output/download.twbx" | Should -BeTrue
-                        Remove-Item -Path "Tests/Output/download.twbx"
+                        if ($sampleWorkbookId) {
+                            Export-TSWorkbook -WorkbookId $sampleWorkbookId -OutFile "Tests/Output/download.twbx"
+                            Test-Path -Path "Tests/Output/download.twbx" | Should -BeTrue
+                            Remove-Item -Path "Tests/Output/download.twbx"
+                        } else {
+                            Set-ItResult -Skipped -Because "previous test(s) failed"
+                        }
                     }
                 }
             }
