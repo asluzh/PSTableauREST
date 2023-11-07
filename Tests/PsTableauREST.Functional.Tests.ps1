@@ -2,9 +2,9 @@ BeforeAll {
     Import-Module ./PSTableauREST -Force
     Import-Module Assert
     . ./Tests/Test.Functions.ps1
-    InModuleScope 'PSTableauREST' { $script:VerbosePreference = 'Continue' } # display verbose output
-    InModuleScope 'PSTableauREST' { $script:DebugPreference = 'Continue' } # display debug output
-    InModuleScope 'PSTableauREST' { $script:ProgressPreference = 'SilentlyContinue' } # suppress progress for upload/download operations
+    # InModuleScope 'PSTableauREST' { $script:VerbosePreference = 'Continue' } # display verbose output
+    # InModuleScope 'PSTableauREST' { $script:DebugPreference = 'Continue' } # display debug output
+    # InModuleScope 'PSTableauREST' { $script:ProgressPreference = 'SilentlyContinue' } # suppress progress for upload/download operations
     # see also: https://stackoverflow.com/questions/18770723/hide-progress-of-invoke-webrequest
 }
 BeforeDiscovery {
@@ -555,7 +555,6 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             Context "Publish, download, revisions for sample workbook on <ConfigFile.server>" {
                 BeforeAll {
                     $project = Add-TSProject -Name (New-Guid)
-                    Update-TSProject -ProjectId $project.id -PublishSamples
                     $script:samplesProjectId = $project.id
                     $script:samplesProjectName = $project.name
                 }
@@ -564,6 +563,10 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         Remove-TSProject -ProjectId $samplesProjectId
                         $script:samplesProjectId = $null
                     }
+                }
+                It "Publish samples into project <samplesProjectName> on <ConfigFile.server>" {
+                    $project = Update-TSProject -ProjectId $samplesProjectId -PublishSamples
+                    $project.id | Should -Be $samplesProjectId
                 }
                 It "Get sample workbook id from <ConfigFile.server>" {
                     $workbook = Get-TSWorkbook -Filter "projectName:eq:$samplesProjectName","name:eq:Superstore" | Select-Object -First 1
@@ -846,7 +849,6 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             Context "Publish, download, revisions for sample datasource on <ConfigFile.server>" {
                 BeforeAll {
                     $project = Add-TSProject -Name (New-Guid)
-                    Update-TSProject -ProjectId $project.id -PublishSamples
                     $script:samplesProjectId = $project.id
                     $script:samplesProjectName = $project.name
                 }
@@ -855,6 +857,10 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         Remove-TSProject -ProjectId $samplesProjectId
                         $script:samplesProjectId = $null
                     }
+                }
+                It "Publish samples into project <samplesProjectName> on <ConfigFile.server>" {
+                    $project = Update-TSProject -ProjectId $samplesProjectId -PublishSamples
+                    $project.id | Should -Be $samplesProjectId
                 }
                 It "Get sample datasource id from <ConfigFile.server>" {
                     $datasource = Get-TSDatasource -Filter "projectName:eq:$samplesProjectName" | Select-Object -First 1
@@ -1261,7 +1267,6 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             Context "Get, publish, download sample flow on <ConfigFile.server>" {
                 BeforeAll {
                     $project = Add-TSProject -Name (New-Guid)
-                    Update-TSProject -ProjectId $project.id -PublishSamples
                     $script:samplesProjectId = $project.id
                     $script:samplesProjectName = $project.name
                 }
@@ -1270,6 +1275,10 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         Remove-TSProject -ProjectId $samplesProjectId
                         $script:samplesProjectId = $null
                     }
+                }
+                It "Publish samples into project <samplesProjectName> on <ConfigFile.server>" {
+                    $project = Update-TSProject -ProjectId $samplesProjectId -PublishSamples
+                    $project.id | Should -Be $samplesProjectId
                 }
                 It "Get sample flow id from <ConfigFile.server>" {
                     $flow = Get-TSFlow -Filter "projectName:eq:$samplesProjectName" | Select-Object -First 1
