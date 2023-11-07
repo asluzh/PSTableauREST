@@ -882,32 +882,53 @@ function Send-TSFileUpload {
     $fileStream = New-Object System.IO.FileStream($fileItem.FullName, [System.IO.FileMode]::Open)
     try {
         $byteReader = New-Object System.IO.BinaryReader($fileStream)
-        # $totalChunks = [Math]::Ceiling($fileItem.Length / $script:TSRestApiChunkSize)
+        # $totalChunks = [Math]::Ceiling($fileItem.Length / $script:TSRestApiChunkSize) # not required here
         $totalSizeMb = [Math]::Round($fileItem.Length / 1048576)
         $bytesUploaded = 0
         $startTime = Get-Date
         do {
             $chunkNumber++
             $boundaryString = (New-Guid).ToString("N")
-            $multipartContent = New-Object System.Net.Http.MultipartFormDataContent($boundaryString)
-            [void]$multipartContent.Headers.Remove("Content-Type")
-            [void]$multipartContent.Headers.TryAddWithoutValidation("Content-Type", "multipart/mixed; boundary=$boundaryString")
-            $stringContent = New-Object System.Net.Http.StringContent("", [System.Text.Encoding]::UTF8)
-            $stringContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
-            $stringContent.Headers.ContentDisposition.Name = "request_payload"
-            $multipartContent.Add($stringContent)
             $bytesRead = $byteReader.Read($buffer, 0, $buffer.Length)
-            $memoryStream = New-Object System.IO.MemoryStream($buffer, 0, $bytesRead)
-            $fileContent = New-Object System.Net.Http.StreamContent($memoryStream)
-            $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream")
-            $fileContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
-            $fileContent.Headers.ContentDisposition.Name = "tableau_file"
-            $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`""
-            $multipartContent.Add($fileContent)
-            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint FileUpload -Param $uploadSessionId) -Body $multipartContent -Method Put
+            if ($PSVersionTable.PSVersion.Major -ge 6) {
+                Write-Verbose "Using MultipartFormDataContent as -Body in Invoke-RestMethod (PS6.0+)"
+                $multipartContent = New-Object System.Net.Http.MultipartFormDataContent($boundaryString)
+                $null = $multipartContent.Headers.Remove("Content-Type")
+                $null = $multipartContent.Headers.TryAddWithoutValidation("Content-Type", "multipart/mixed; boundary=$boundaryString")
+                $stringContent = New-Object System.Net.Http.StringContent("", [System.Text.Encoding]::UTF8)
+                $stringContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
+                $stringContent.Headers.ContentDisposition.Name = "request_payload"
+                $multipartContent.Add($stringContent)
+                $memoryStream = New-Object System.IO.MemoryStream($buffer, 0, $bytesRead)
+                $fileContent = New-Object System.Net.Http.StreamContent($memoryStream)
+                $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream")
+                $fileContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
+                $fileContent.Headers.ContentDisposition.Name = "tableau_file"
+                $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`""
+                $multipartContent.Add($fileContent)
+                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint FileUpload -Param $uploadSessionId) -Body $multipartContent -Method Put
+            } else {
+                Write-Verbose "Using String as -Body in Invoke-RestMethod (PS5.x)"
+                $bodyLines = @(
+                    "--$boundaryString",
+                    "Content-Type: text/xml; charset=utf-8",
+                    "Content-Disposition: form-data; name=request_payload",
+                    "",
+                    "",
+                    "--$boundaryString",
+                    "Content-Type: application/octet-stream",
+                    "Content-Disposition: form-data; name=tableau_file; filename=`"$FileName`"",
+                    "",
+                    [System.Text.Encoding]::GetEncoding("ISO-8859-1").GetString($buffer[0..($bytesRead-1)]),
+                    "--$boundaryString--"
+                    )
+                $multipartContent = $bodyLines -join "`r`n"
+                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint FileUpload -Param $uploadSessionId) -Body $multipartContent -Method Put -ContentType "multipart/mixed; boundary=$boundaryString"
+            }
             $bytesUploaded += $bytesRead
             $elapsedTime = $(Get-Date) - $startTime
-            $remainingTime = $elapsedTime * ($fileItem.Length / $bytesUploaded - 1)
+            # $remainingTime = $elapsedTime * ($fileItem.Length / $bytesUploaded - 1) # note compatibility issue: op_Multiply for TimeSpan is not available in PS5.1
+            $remainingTime = New-Object TimeSpan($elapsedTime.Ticks * ($fileItem.Length / $bytesUploaded - 1)) # calculate via conversion to Ticks
             # calculate uploaded size and percentage for Write-Progress
             $uploadedSizeMb = [Math]::Round($bytesUploaded / 1048576)
             $percentCompleted = [Math]::Round($bytesUploaded / $fileItem.Length * 100)
@@ -1069,7 +1090,6 @@ function Publish-TSWorkbook {
         # [Parameter()][switch] $EncryptExtracts,
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
-    $boundaryString = (New-Guid).ToString("N")
     $fileItem = Get-Item -LiteralPath $InFile
     if (-Not $FileName) {
         $FileName = $fileItem.Name -replace '["`]','' # remove special chars
@@ -1137,30 +1157,65 @@ function Publish-TSWorkbook {
             $el_view.SetAttribute("hidden", $_.Value)
         }
     }
-    $multipartContent = New-Object System.Net.Http.MultipartFormDataContent($boundaryString)
-    [void]$multipartContent.Headers.Remove("Content-Type")
-    [void]$multipartContent.Headers.TryAddWithoutValidation("Content-Type", "multipart/mixed; boundary=$boundaryString")
-    $stringContent = New-Object System.Net.Http.StringContent($xml.OuterXml, [System.Text.Encoding]::UTF8, [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse("text/xml"))
-    $stringContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
-    $stringContent.Headers.ContentDisposition.Name = "request_payload"
-    $multipartContent.Add($stringContent)
-    if ($Chunked) {
-        $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName
-        $uri += "&uploadSessionId=$uploadSessionId"
-        $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post
-    } else {
-        $fileStream = New-Object System.IO.FileStream($fileItem.FullName, [System.IO.FileMode]::Open)
-        try {
-            $fileContent = New-Object System.Net.Http.StreamContent($fileStream)
-            $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream")
-            $fileContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
-            $fileContent.Headers.ContentDisposition.Name = "tableau_workbook"
-            $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`""
-            $multipartContent.Add($fileContent)
+    $boundaryString = (New-Guid).ToString("N")
+    if ($PSVersionTable.PSVersion.Major -ge 6) {
+        Write-Verbose "Using MultipartFormDataContent as -Body in Invoke-RestMethod (PS6.0+)"
+        # see also https://get-powershellblog.blogspot.com/2017/09/multipartform-data-support-for-invoke.html
+        $multipartContent = New-Object System.Net.Http.MultipartFormDataContent($boundaryString)
+        # first we need to replace the default content type, boundary quoting and multipart/form-data are not supported!
+        # see also https://github.com/PowerShell/PowerShell/issues/9241 - remove boundary quoting
+        $null = $multipartContent.Headers.Remove("Content-Type")
+        $null = $multipartContent.Headers.TryAddWithoutValidation("Content-Type", "multipart/mixed; boundary=$boundaryString")
+        $stringContent = New-Object System.Net.Http.StringContent($xml.OuterXml, [System.Text.Encoding]::UTF8, [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse("text/xml"))
+        $stringContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
+        $stringContent.Headers.ContentDisposition.Name = "request_payload"
+        $multipartContent.Add($stringContent)
+        if ($Chunked) {
+            $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName
+            $uri += "&uploadSessionId=$uploadSessionId"
             $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post
-        } finally {
-            $fileStream.Close()
+        } else {
+            $fileStream = New-Object System.IO.FileStream($fileItem.FullName, [System.IO.FileMode]::Open)
+            try {
+                $fileContent = New-Object System.Net.Http.StreamContent($fileStream)
+                $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream")
+                $fileContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
+                $fileContent.Headers.ContentDisposition.Name = "tableau_workbook"
+                $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`""
+                $multipartContent.Add($fileContent)
+                $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post
+            } finally {
+                $fileStream.Close()
+            }
         }
+    } else {
+        Write-Verbose "Using String as -Body in Invoke-RestMethod (PS5.x)"
+        # https://stackoverflow.com/questions/68677742/multipart-form-data-file-upload-with-powershell
+        # https://stackoverflow.com/questions/25075010/upload-multiple-files-from-powershell-script
+        # other solution: saving the request body in a file and using -InFile parameter for Invoke-RestMethod
+        # https://hochwald.net/upload-file-powershell-invoke-restmethod/
+        $bodyLines = @(
+            "--$boundaryString",
+            "Content-Type: text/xml; charset=utf-8",
+            "Content-Disposition: form-data; name=request_payload",
+            "",
+            $xml.OuterXml
+        )
+        if ($Chunked) {
+            $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName
+            $uri += "&uploadSessionId=$uploadSessionId"
+        } else {
+            $bodyLines += @(
+            "--$boundaryString",
+            "Content-Type: application/octet-stream",
+            "Content-Disposition: form-data; name=tableau_workbook; filename=`"$FileName`"",
+            "",
+            [System.Text.Encoding]::GetEncoding("ISO-8859-1").GetString([System.IO.File]::ReadAllBytes($fileItem.FullName)) # was: (Get-Content $InFile -Raw)
+            )
+        }
+        $bodyLines += "--$boundaryString--"
+        $multipartContent = $bodyLines -join "`r`n"
+        $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post -ContentType "multipart/mixed; boundary=$boundaryString"
     }
     return $response.tsResponse.workbook
 }
@@ -1463,7 +1518,6 @@ function Publish-TSDatasource {
         [Parameter()][hashtable[]] $Connections
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
-    $boundaryString = (New-Guid).ToString("N")
     $fileItem = Get-Item -LiteralPath $InFile
     if (-Not $FileName) {
         $FileName = $fileItem.Name -replace '["`]','' # remove special chars
@@ -1524,57 +1578,58 @@ function Publish-TSDatasource {
         $el_project = $el_datasource.AppendChild($xml.CreateElement("project"))
         $el_project.SetAttribute("id", $ProjectId)
     }
-    $multipartContent = New-Object System.Net.Http.MultipartFormDataContent($boundaryString)
-    [void]$multipartContent.Headers.Remove("Content-Type")
-    [void]$multipartContent.Headers.TryAddWithoutValidation("Content-Type", "multipart/mixed; boundary=$boundaryString")
-    $stringContent = New-Object System.Net.Http.StringContent($xml.OuterXml, [System.Text.Encoding]::UTF8, [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse("text/xml"))
-    $stringContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
-    $stringContent.Headers.ContentDisposition.Name = "request_payload"
-    $multipartContent.Add($stringContent)
-    if ($Chunked) {
-        $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName
-        $uri += "&uploadSessionId=$uploadSessionId"
-        $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post
-    } else {
-        $fileStream = New-Object System.IO.FileStream($fileItem.FullName, [System.IO.FileMode]::Open)
-        try {
-            $fileContent = New-Object System.Net.Http.StreamContent($fileStream)
-            $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream")
-            $fileContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
-            $fileContent.Headers.ContentDisposition.Name = "tableau_datasource"
-            $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`""
-            $multipartContent.Add($fileContent)
+    $boundaryString = (New-Guid).ToString("N")
+    if ($PSVersionTable.PSVersion.Major -ge 6) {
+        Write-Verbose "Using MultipartFormDataContent as -Body in Invoke-RestMethod (PS6.0+)"
+        $multipartContent = New-Object System.Net.Http.MultipartFormDataContent($boundaryString)
+        $null = $multipartContent.Headers.Remove("Content-Type")
+        $null = $multipartContent.Headers.TryAddWithoutValidation("Content-Type", "multipart/mixed; boundary=$boundaryString")
+        $stringContent = New-Object System.Net.Http.StringContent($xml.OuterXml, [System.Text.Encoding]::UTF8, [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse("text/xml"))
+        $stringContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
+        $stringContent.Headers.ContentDisposition.Name = "request_payload"
+        $multipartContent.Add($stringContent)
+        if ($Chunked) {
+            $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName
+            $uri += "&uploadSessionId=$uploadSessionId"
             $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post
-        } finally {
-            $fileStream.Close()
+        } else {
+            $fileStream = New-Object System.IO.FileStream($fileItem.FullName, [System.IO.FileMode]::Open)
+            try {
+                $fileContent = New-Object System.Net.Http.StreamContent($fileStream)
+                $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream")
+                $fileContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
+                $fileContent.Headers.ContentDisposition.Name = "tableau_datasource"
+                $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`""
+                $multipartContent.Add($fileContent)
+                $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post
+            } finally {
+                $fileStream.Close()
+            }
         }
-
-        # alternative approach, to be tested for binary files
-        # https://stackoverflow.com/questions/25075010/upload-multiple-files-from-powershell-script
-        # possible solution: saving the request body in a file and using -InFile parameter for Invoke-RestMethod
-        # https://hochwald.net/upload-file-powershell-Invoke-RestMethod/
-        # $requestBody = (
-        #     "--$boundaryString",
-        #     "Content-Type: text/xml",
-        #     "Content-Disposition: form-data; name=request_payload",
-        #     "",
-        #     $xml.OuterXml,
-        #     "--$boundaryString",
-        #     "Content-Type: application/octet-stream",
-        #     "Content-Disposition: form-data; name=tableau_datasource; filename=""$FileName""",
-        # should be: [System.Text.Encoding]::Default.GetString($buffer)
-        #     "",
-        #     (Get-Content $InFile -Raw),
-        # should be: $FilenameUrlEncoded = [System.Net.WebUtility]::UrlEncode($FileName)
-        #     "--$boundaryString--"
-        # ) -join "`r`n"
-        # Invoke-TSRestApiMethod -Uri $uri -Body $requestBody -Method Post -ContentType "multipart/mixed; boundary=$boundaryString"
-        # debugging for multipartContent: issue with response code 406 on PS 5.1
-        # Write-Warning $multipartContent.GetType()
-        # $rs = $multipartContent.ReadAsStream()
-        # $buf = New-Object System.Byte[](10000)
-        # $rs.ReadAtLeast($buf, 10000, $false)
-        # Set-Content "Tests/Output/$boundaryString.txt" -Value $buf -AsByteStream #-Encoding Byte
+    } else {
+        Write-Verbose "Using String as -Body in Invoke-RestMethod (PS5.x)"
+        $bodyLines = @(
+            "--$boundaryString",
+            "Content-Type: text/xml; charset=utf-8",
+            "Content-Disposition: form-data; name=request_payload",
+            "",
+            $xml.OuterXml
+        )
+        if ($Chunked) {
+            $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName
+            $uri += "&uploadSessionId=$uploadSessionId"
+        } else {
+            $bodyLines += @(
+            "--$boundaryString",
+            "Content-Type: application/octet-stream",
+            "Content-Disposition: form-data; name=tableau_datasource; filename=`"$FileName`"",
+            "",
+            [System.Text.Encoding]::GetEncoding("ISO-8859-1").GetString([System.IO.File]::ReadAllBytes($fileItem.FullName))
+            )
+        }
+        $bodyLines += "--$boundaryString--"
+        $multipartContent = $bodyLines -join "`r`n"
+        $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post -ContentType "multipart/mixed; boundary=$boundaryString"
     }
     return $response.tsResponse.datasource
 }
@@ -2162,7 +2217,6 @@ function Publish-TSFlow {
         [Parameter()][hashtable[]] $Connections
     )
     Assert-TSRestApiVersion -AtLeast 3.3
-    $boundaryString = (New-Guid).ToString("N")
     $fileItem = Get-Item -LiteralPath $InFile
     if (-Not $FileName) {
         $FileName = $fileItem.Name -replace '["`]','' # remove special chars
@@ -2206,30 +2260,58 @@ function Publish-TSFlow {
         $el_project = $el_flow.AppendChild($xml.CreateElement("project"))
         $el_project.SetAttribute("id", $ProjectId)
     }
-    $multipartContent = New-Object System.Net.Http.MultipartFormDataContent($boundaryString)
-    [void]$multipartContent.Headers.Remove("Content-Type")
-    [void]$multipartContent.Headers.TryAddWithoutValidation("Content-Type", "multipart/mixed; boundary=$boundaryString")
-    $stringContent = New-Object System.Net.Http.StringContent($xml.OuterXml, [System.Text.Encoding]::UTF8, [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse("text/xml"))
-    $stringContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
-    $stringContent.Headers.ContentDisposition.Name = "request_payload"
-    $multipartContent.Add($stringContent)
-    if ($Chunked) {
-        $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName
-        $uri += "&uploadSessionId=$uploadSessionId"
-        $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post
-    } else {
-        $fileStream = New-Object System.IO.FileStream($fileItem.FullName, [System.IO.FileMode]::Open)
-        try {
-            $fileContent = New-Object System.Net.Http.StreamContent($fileStream)
-            $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream")
-            $fileContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
-            $fileContent.Headers.ContentDisposition.Name = "tableau_flow"
-            $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`""
-            $multipartContent.Add($fileContent)
+    $boundaryString = (New-Guid).ToString("N")
+    if ($PSVersionTable.PSVersion.Major -ge 6) {
+        Write-Verbose "Using MultipartFormDataContent as -Body in Invoke-RestMethod (PS6.0+)"
+        $multipartContent = New-Object System.Net.Http.MultipartFormDataContent($boundaryString)
+        $null = $multipartContent.Headers.Remove("Content-Type")
+        $null = $multipartContent.Headers.TryAddWithoutValidation("Content-Type", "multipart/mixed; boundary=$boundaryString")
+        $stringContent = New-Object System.Net.Http.StringContent($xml.OuterXml, [System.Text.Encoding]::UTF8, [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse("text/xml"))
+        $stringContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
+        $stringContent.Headers.ContentDisposition.Name = "request_payload"
+        $multipartContent.Add($stringContent)
+        if ($Chunked) {
+            $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName
+            $uri += "&uploadSessionId=$uploadSessionId"
             $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post
-        } finally {
-            $fileStream.Close()
+        } else {
+            $fileStream = New-Object System.IO.FileStream($fileItem.FullName, [System.IO.FileMode]::Open)
+            try {
+                $fileContent = New-Object System.Net.Http.StreamContent($fileStream)
+                $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream")
+                $fileContent.Headers.ContentDisposition = New-Object System.Net.Http.Headers.ContentDispositionHeaderValue("form-data")
+                $fileContent.Headers.ContentDisposition.Name = "tableau_flow"
+                $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`""
+                $multipartContent.Add($fileContent)
+                $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post
+            } finally {
+                $fileStream.Close()
+            }
         }
+    } else {
+        Write-Verbose "Using String as -Body in Invoke-RestMethod (PS5.x)"
+        $bodyLines = @(
+            "--$boundaryString",
+            "Content-Type: text/xml; charset=utf-8",
+            "Content-Disposition: form-data; name=request_payload",
+            "",
+            $xml.OuterXml
+        )
+        if ($Chunked) {
+            $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName
+            $uri += "&uploadSessionId=$uploadSessionId"
+        } else {
+            $bodyLines += @(
+            "--$boundaryString",
+            "Content-Type: application/octet-stream",
+            "Content-Disposition: form-data; name=tableau_flow; filename=`"$FileName`"",
+            "",
+            [System.Text.Encoding]::GetEncoding("ISO-8859-1").GetString([System.IO.File]::ReadAllBytes($fileItem.FullName))
+            )
+        }
+        $bodyLines += "--$boundaryString--"
+        $multipartContent = $bodyLines -join "`r`n"
+        $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post -ContentType "multipart/mixed; boundary=$boundaryString"
     }
     return $response.tsResponse.flow
 }
