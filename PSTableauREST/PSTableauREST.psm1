@@ -735,7 +735,11 @@ function Add-TSGroup {
     }
     if ($PSCmdlet.ShouldProcess($Name)) {
         $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Post
-        return $response.tsResponse.group
+        if ($BackgroundTask) {
+            return $response.tsResponse.job
+        } else {
+            return $response.tsResponse.group
+        }
     }
 }
 
@@ -779,7 +783,11 @@ function Update-TSGroup {
     }
     if ($PSCmdlet.ShouldProcess($GroupId)) {
         $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Put
-        return $response.tsResponse.group
+        if ($BackgroundTask) {
+            return $response.tsResponse.job
+        } else {
+            return $response.tsResponse.group
+        }
     }
 }
 
@@ -1217,7 +1225,11 @@ function Publish-TSWorkbook {
         $multipartContent = $bodyLines -join "`r`n"
         $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post -ContentType "multipart/mixed; boundary=$boundaryString"
     }
-    return $response.tsResponse.workbook
+    if ($BackgroundTask) {
+        return $response.tsResponse.job
+    } else {
+        return $response.tsResponse.workbook
+    }
 }
 
 function Update-TSWorkbook {
@@ -1631,7 +1643,11 @@ function Publish-TSDatasource {
         $multipartContent = $bodyLines -join "`r`n"
         $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post -ContentType "multipart/mixed; boundary=$boundaryString"
     }
-    return $response.tsResponse.datasource
+    if ($BackgroundTask) {
+        return $response.tsResponse.job
+    } else {
+        return $response.tsResponse.datasource
+    }
 }
 
 function Update-TSDatasource {
