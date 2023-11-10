@@ -92,7 +92,7 @@ function Get-TSRequestUri {
 function Add-TSCredentialsElement {
     [OutputType()]
     Param(
-        [Parameter(Mandatory)][xml] $Element,
+        [Parameter(Mandatory)][System.Xml.XmlElement] $Element,
         [Parameter(Mandatory)][hashtable] $Credentials
     )
     if (-Not ($Credentials["username"] -and $Credentials["password"])) {
@@ -117,7 +117,7 @@ function Add-TSCredentialsElement {
 function Add-TSConnectionsElement {
     [OutputType()]
     Param(
-        [Parameter(Mandatory)][xml] $Element,
+        [Parameter(Mandatory)][System.Xml.XmlElement] $Element,
         [Parameter(Mandatory)][hashtable[]] $Connections
     )
     $el_connections = $Element.AppendChild($Element.OwnerDocument.CreateElement("connections"))
@@ -1411,7 +1411,7 @@ function Update-TSWorkbookNow {
     $xml.AppendChild($xml.CreateElement("tsRequest"))
     $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/refresh
     if ($PSCmdlet.ShouldProcess($WorkbookId)) {
-        $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Post
+        $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Post -ContentType "text/xml"
         return $response.tsResponse.job
     }
 }
@@ -1774,7 +1774,7 @@ function Update-TSDatasourceNow {
     $xml.AppendChild($xml.CreateElement("tsRequest"))
     $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/refresh
     if ($PSCmdlet.ShouldProcess($DatasourceId)) {
-        $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Post
+        $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Post -ContentType "text/xml"
         return $response.tsResponse.job
     }
 }
