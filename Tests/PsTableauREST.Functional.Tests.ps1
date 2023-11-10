@@ -783,17 +783,61 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 It "Publish workbook with invalid contents on <ConfigFile.server>" {
                     {Publish-TSWorkbook -Name "invalid" -InFile "Tests/Assets/Misc/invalid.twbx" -ProjectId $samplesProjectId} | Should -Throw
                 }
-                It "Publish workbook with connections on <ConfigFile.server>" -Skip {
-                    Publish-TSWorkbook -Name "Workbook" -InFile "Tests/Assets/Misc/Workbook.txt" -ProjectId $samplesProjectId
+                It "Publish workbook with credentials on <ConfigFile.server>" {
+                    $securePw = Test-GetSecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
+                    $credentials = @{username="sqladmin"; password=$securePw; embed="true" }
+                    $workbook = Publish-TSWorkbook -Name "AW Customer Address 1" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -Credentials $credentials -Overwrite
+                    $workbook | Should -Not -BeNullOrEmpty
+                    $job = Update-TSWorkbookNow -WorkbookId $workbook.id
+                    $job | Should -Not -BeNullOrEmpty
+                    # $job | Export-Clixml -Path "Tests/Assets/Misc/job.xml"
+                    $job.type[1] | Should -Be "RefreshExtract"
+                    $timeout = 60
+                    do {
+                        Start-Sleep -s 1
+                        $timeout--
+                        $jobStatus = Get-TSJob -JobId $job.id[1]
+                        $jobStatus | Should -Not -BeNullOrEmpty
+                        Write-Verbose ("Job progress: {0}%" -f $jobStatus.progress)
+                    } until ($jobStatus.progress -eq 100 -or $timeout -eq 0)
+                    $jobStatus.finishCode | Should -Be 0
+                    Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobStatus.completedAt, $jobStatus.finishCode)
+                    # Remove-TSWorkbook -WorkbookId $workbook.id
                 }
-                It "Publish workbook with credentials on <ConfigFile.server>" -Skip {
-                    Publish-TSWorkbook -Name "Workbook" -InFile "Tests/Assets/Misc/Workbook.txt" -ProjectId $samplesProjectId
+                It "Publish workbook with connections on <ConfigFile.server>" {
+                    $securePw = Test-GetSecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
+                    $connections = @( @{serverAddress="asl-tableau-testsql.database.windows.net"; serverPort="3389"; credentials=@{username="sqladmin"; password=$securePw; embed="true" }} )
+                    $workbook = Publish-TSWorkbook -Name "AW Customer Address 2" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -Connections $connections -Overwrite
+                    $workbook | Should -Not -BeNullOrEmpty
+                    $job = Update-TSWorkbookNow -WorkbookId $workbook.id
+                    $job | Should -Not -BeNullOrEmpty
+                    $job.type[1] | Should -Be "RefreshExtract"
+                    $timeout = 60
+                    do {
+                        Start-Sleep -s 1
+                        $timeout--
+                        $jobStatus = Get-TSJob -JobId $job.id[1]
+                        $jobStatus | Should -Not -BeNullOrEmpty
+                        Write-Verbose ("Job progress: {0}%" -f $jobStatus.progress)
+                    } until ($jobStatus.progress -eq 100 -or $timeout -eq 0)
+                    $jobStatus.finishCode | Should -Be 0
+                    Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobStatus.completedAt, $jobStatus.finishCode)
+                    # Remove-TSWorkbook -WorkbookId $workbook.id
                 }
-                It "Publish workbook with skip connection check on <ConfigFile.server>" -Skip {
-                    Publish-TSWorkbook -Name "Workbook" -InFile "Tests/Assets/Misc/Workbook.txt" -ProjectId $samplesProjectId
-                }
-                It "Publish workbook as background job on <ConfigFile.server>" -Skip {
-                    Publish-TSWorkbook -Name "Workbook" -InFile "Tests/Assets/Misc/Workbook.txt" -ProjectId $samplesProjectId
+                It "Publish workbook as background job on <ConfigFile.server>" {
+                    $job = Publish-TSWorkbook -Name "AW Customer Address 3" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -BackgroundTask -Overwrite
+                    $job | Should -Not -BeNullOrEmpty
+                    $timeout = 60
+                    do {
+                        Start-Sleep -s 1
+                        $timeout--
+                        $jobStatus = Get-TSJob -JobId $job.id
+                        $jobStatus | Should -Not -BeNullOrEmpty
+                        Write-Verbose ("Job progress: {0}%" -f $jobStatus.progress)
+                    } until ($jobStatus.progress -eq 100 -or $timeout -eq 0)
+                    $jobStatus.finishCode | Should -Be 0
+                    Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobStatus.completedAt, $jobStatus.finishCode)
+                    # Remove-TSWorkbook -WorkbookId $workbook.id
                 }
                 Context "Publish / download workbooks from test assets on <ConfigFile.server>" -Tag WorkbookSamples -ForEach $WorkbookFiles {
                     BeforeAll {
