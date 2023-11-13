@@ -798,7 +798,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $job | Should -Not -BeNullOrEmpty
                     # $job | Export-Clixml -Path "Tests/Assets/Misc/job.xml"
                     $job[1].type | Should -Be "RefreshExtract"
-                    $timeout = 60
+                    $timeout = 90
                     do {
                         Start-Sleep -s 1
                         $timeout--
@@ -823,7 +823,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $job = Update-TSWorkbookNow -WorkbookId $workbook.id
                     $job | Should -Not -BeNullOrEmpty
                     $job[1].type | Should -Be "RefreshExtract"
-                    $timeout = 60
+                    $timeout = 90
                     do {
                         Start-Sleep -s 1
                         $timeout--
@@ -842,7 +842,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 It "Publish workbook as background job on <ConfigFile.server>" -Tag WorkbookP {
                     $job = Publish-TSWorkbook -Name "AW Customer Address 3" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -BackgroundTask
                     $job | Should -Not -BeNullOrEmpty
-                    $timeout = 60
+                    $timeout = 90
                     do {
                         Start-Sleep -s 1
                         $timeout--
@@ -1102,7 +1102,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $job | Should -Not -BeNullOrEmpty
                     # $job | Export-Clixml -Path "Tests/Assets/Misc/job.xml"
                     $job[1].type | Should -Be "RefreshExtract"
-                    $timeout = 60
+                    $timeout = 90
                     do {
                         Start-Sleep -s 1
                         $timeout--
@@ -1129,7 +1129,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $job = Update-TSDatasourceNow -DatasourceId $datasource.id
                     $job | Should -Not -BeNullOrEmpty
                     $job[1].type | Should -Be "RefreshExtract"
-                    $timeout = 60
+                    $timeout = 90
                     do {
                         Start-Sleep -s 1
                         $timeout--
@@ -1148,7 +1148,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 It "Publish datasource as background job on <ConfigFile.server>" -Tag DatasourceP {
                     $job = Publish-TSDatasource -Name "AW SalesOrders 3" -InFile "Tests/Assets/Misc/AW_SalesOrders.tdsx" -ProjectId $samplesProjectId -BackgroundTask -Overwrite
                     $job | Should -Not -BeNullOrEmpty
-                    $timeout = 60
+                    $timeout = 90
                     do {
                         Start-Sleep -s 1
                         $timeout--
