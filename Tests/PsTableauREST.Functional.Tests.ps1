@@ -2,9 +2,10 @@ BeforeAll {
     Import-Module ./PSTableauREST -Force
     Import-Module Assert
     . ./Tests/Test.Functions.ps1
-    # InModuleScope 'PSTableauREST' { $script:VerbosePreference = 'Continue' } # display verbose output
+    # InModuleScope 'PSTableauREST' { $script:VerbosePreference = 'Continue' } # display verbose output of module functions
+    $script:VerbosePreference = 'Continue' # display verbose output of the tests
     # InModuleScope 'PSTableauREST' { $script:DebugPreference = 'Continue' } # display debug output
-    # InModuleScope 'PSTableauREST' { $script:ProgressPreference = 'SilentlyContinue' } # suppress progress for upload/download operations
+    InModuleScope 'PSTableauREST' { $script:ProgressPreference = 'SilentlyContinue' } # suppress progress for upload/download operations
     # see also: https://stackoverflow.com/questions/18770723/hide-progress-of-invoke-webrequest
 }
 BeforeDiscovery {
@@ -792,6 +793,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $credentials = @{username="sqladmin"; password=$securePw; embed="true" }
                     $workbook = Publish-TSWorkbook -Name "AW Customer Address 1" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -Credentials $credentials
                     $workbook | Should -Not -BeNullOrEmpty
+                    Write-Verbose "Queueing extract refresh job"
                     $job = Update-TSWorkbookNow -WorkbookId $workbook.id
                     $job | Should -Not -BeNullOrEmpty
                     # $job | Export-Clixml -Path "Tests/Assets/Misc/job.xml"
@@ -802,7 +804,11 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         $timeout--
                         $jobStatus = Get-TSJob -JobId $job[1].id
                         $jobStatus | Should -Not -BeNullOrEmpty
-                        Write-Verbose ("Job progress: {0}%" -f $jobStatus.progress)
+                        if ($jobStatus.progress) {
+                            Write-Verbose ("Job progress: {0}%" -f $jobStatus.progress)
+                        } else {
+                            Write-Verbose "Job not started yet"
+                        }
                     } until ($jobStatus.progress -eq 100 -or $timeout -eq 0)
                     $jobStatus.finishCode | Should -Be 0
                     Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobStatus.completedAt, $jobStatus.finishCode)
@@ -813,6 +819,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $connections = @( @{serverAddress="asl-tableau-testsql.database.windows.net"; serverPort="3389"; credentials=@{username="sqladmin"; password=$securePw; embed="true" }} )
                     $workbook = Publish-TSWorkbook -Name "AW Customer Address 2" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -Connections $connections
                     $workbook | Should -Not -BeNullOrEmpty
+                    Write-Verbose "Queueing extract refresh job"
                     $job = Update-TSWorkbookNow -WorkbookId $workbook.id
                     $job | Should -Not -BeNullOrEmpty
                     $job[1].type | Should -Be "RefreshExtract"
@@ -822,7 +829,11 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         $timeout--
                         $jobStatus = Get-TSJob -JobId $job[1].id
                         $jobStatus | Should -Not -BeNullOrEmpty
-                        Write-Verbose ("Job progress: {0}%" -f $jobStatus.progress)
+                        if ($jobStatus.progress) {
+                            Write-Verbose ("Job progress: {0}%" -f $jobStatus.progress)
+                        } else {
+                            Write-Verbose "Job not started yet"
+                        }
                     } until ($jobStatus.progress -eq 100 -or $timeout -eq 0)
                     $jobStatus.finishCode | Should -Be 0
                     Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobStatus.completedAt, $jobStatus.finishCode)
@@ -837,7 +848,11 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         $timeout--
                         $jobStatus = Get-TSJob -JobId $job.id
                         $jobStatus | Should -Not -BeNullOrEmpty
-                        Write-Verbose ("Job progress: {0}%" -f $jobStatus.progress)
+                        if ($jobStatus.progress) {
+                            Write-Verbose ("Job progress: {0}%" -f $jobStatus.progress)
+                        } else {
+                            Write-Verbose "Job not started yet"
+                        }
                     } until ($jobStatus.progress -eq 100 -or $timeout -eq 0)
                     $jobStatus.finishCode | Should -Be 0
                     Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobStatus.completedAt, $jobStatus.finishCode)
@@ -1082,6 +1097,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $credentials = @{username="sqladmin"; password=$securePw; embed="true" }
                     $datasource = Publish-TSDatasource -Name "AW SalesOrders 1" -InFile "Tests/Assets/Misc/AW_SalesOrders.tdsx" -ProjectId $samplesProjectId -Credentials $credentials
                     $datasource | Should -Not -BeNullOrEmpty
+                    Write-Verbose "Queueing extract refresh job"
                     $job = Update-TSDatasourceNow -DatasourceId $datasource.id
                     $job | Should -Not -BeNullOrEmpty
                     # $job | Export-Clixml -Path "Tests/Assets/Misc/job.xml"
@@ -1092,7 +1108,11 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         $timeout--
                         $jobStatus = Get-TSJob -JobId $job[1].id
                         $jobStatus | Should -Not -BeNullOrEmpty
-                        Write-Verbose ("Job progress: {0}%" -f $jobStatus.progress)
+                        if ($jobStatus.progress) {
+                            Write-Verbose ("Job progress: {0}%" -f $jobStatus.progress)
+                        } else {
+                            Write-Verbose "Job not started yet"
+                        }
                     } until ($jobStatus.progress -eq 100 -or $timeout -eq 0)
                     $jobStatus.finishCode | Should -Be 0
                     Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobStatus.completedAt, $jobStatus.finishCode)
@@ -1105,6 +1125,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $connections = @( @{serverAddress="asl-tableau-testsql.database.windows.net"; serverPort="3389"; credentials=@{username="sqladmin"; password=$securePw; embed="true" }} )
                     $datasource = Publish-TSDatasource -Name "AW SalesOrders 2" -InFile "Tests/Assets/Misc/AW_SalesOrders.tdsx" -ProjectId $samplesProjectId -Connections $connections
                     $datasource | Should -Not -BeNullOrEmpty
+                    Write-Verbose "Queueing extract refresh job"
                     $job = Update-TSDatasourceNow -DatasourceId $datasource.id
                     $job | Should -Not -BeNullOrEmpty
                     $job[1].type | Should -Be "RefreshExtract"
@@ -1114,7 +1135,11 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         $timeout--
                         $jobStatus = Get-TSJob -JobId $job[1].id
                         $jobStatus | Should -Not -BeNullOrEmpty
-                        Write-Verbose ("Job progress: {0}%" -f $jobStatus.progress)
+                        if ($jobStatus.progress) {
+                            Write-Verbose ("Job progress: {0}%" -f $jobStatus.progress)
+                        } else {
+                            Write-Verbose "Job not started yet"
+                        }
                     } until ($jobStatus.progress -eq 100 -or $timeout -eq 0)
                     $jobStatus.finishCode | Should -Be 0
                     Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobStatus.completedAt, $jobStatus.finishCode)
@@ -1129,7 +1154,11 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         $timeout--
                         $jobStatus = Get-TSJob -JobId $job.id
                         $jobStatus | Should -Not -BeNullOrEmpty
-                        Write-Verbose ("Job progress: {0}%" -f $jobStatus.progress)
+                        if ($jobStatus.progress) {
+                            Write-Verbose ("Job progress: {0}%" -f $jobStatus.progress)
+                        } else {
+                            Write-Verbose "Job not started yet"
+                        }
                     } until ($jobStatus.progress -eq 100 -or $timeout -eq 0)
                     $jobStatus.finishCode | Should -Be 0
                     Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobStatus.completedAt, $jobStatus.finishCode)
