@@ -20,32 +20,37 @@ function Invoke-TSRestApiMethod {
         # own params
         [Parameter()][switch] $NoStandardHeader
     )
-    if ($NoStandardHeader) {
-        $PSBoundParameters.Remove('NoStandardHeader')
-    } else {
-        $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-        if ($script:TSAuthToken) {
-            $headers.Add('X-Tableau-Auth', $script:TSAuthToken)
+    begin {
+        if ($NoStandardHeader) {
+            $PSBoundParameters.Remove('NoStandardHeader')
+        } else {
+            $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+            if ($script:TSAuthToken) {
+                $headers.Add('X-Tableau-Auth', $script:TSAuthToken)
+            }
+            # if ($ContentType) { # not needed, already considered via the param to Invoke-RestMethod
+            #     $headers.Add('Content-Type', $ContentType)
+            # }
+            $PSBoundParameters.Add('Headers', $headers)
         }
-        # if ($ContentType) { # not needed, already considered via the param to Invoke-RestMethod
-        #     $headers.Add('Content-Type', $ContentType)
-        # }
-        $PSBoundParameters.Add('Headers', $headers)
-    }
-    if ($DebugPreference -eq 'Continue') {
-        $requestInfo = "{0} {1} " -f $Method.ToString().ToUpper(), $Uri
-        $PSBoundParameters.GetEnumerator() | ForEach-Object {
-            if ($_.Key -notin 'Method','Uri') { $requestInfo += "<{0}>" -f $_.Key }
+        if ($DebugPreference -eq 'Continue') {
+            $requestInfo = "{0} {1} " -f $Method.ToString().ToUpper(), $Uri
+            $PSBoundParameters.GetEnumerator() | ForEach-Object {
+                if ($_.Key -notin 'Method','Uri') { $requestInfo += "<{0}>" -f $_.Key }
+            }
+            Write-Debug $requestInfo
         }
-        Write-Debug $requestInfo
     }
-    try {
-        Invoke-RestMethod @PSBoundParameters
-    } catch [System.Net.WebException],[System.Net.Http.HttpRequestException] { # WebException is generated on PS5, HttpRequestException on PS7
-        # note: if parameter -Exception $_.Exception is included, re-throws same exception, but doesn't show message in output (PS7)
-        # therefore we generate "WriteErrorException" instead
-        Write-Error ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Category InvalidResult -ErrorAction Stop #-Exception $_.Exception
+    process {
+        try {
+            Invoke-RestMethod @PSBoundParameters
+        } catch [System.Net.WebException],[System.Net.Http.HttpRequestException] { # WebException is generated on PS5, HttpRequestException on PS7
+            # note: if parameter -Exception $_.Exception is included, re-throws same exception, but doesn't show message in output (PS7)
+            # therefore we generate "WriteErrorException" instead
+            Write-Error ($_.Exception.Message + " " + $_.ErrorDetails.Message) -Category InvalidResult -ErrorAction Stop #-Exception $_.Exception
+        }
     }
+    end {}
 }
 
 function Get-TSRequestUri {
@@ -133,10 +138,11 @@ function Add-TSConnectionsElement {
         }
         if ($connection["credentials"] -and ($connection["credentials"] -is [hashtable])) {
             Add-TSCredentialsElement -Element $el_connection -Credentials $connection["credentials"]
-        } elseif ($connection["username"] -and $connection["password"]) {
+        } elseif ($connection["username"] -and $connection["password"] -and $connection["embed"]) {
             Add-TSCredentialsElement -Element $el_connection -Credentials @{
                 username = $connection["username"]
                 password = $connection["password"]
+                embed = $connection["embed"]
             }
         }
     }
@@ -2000,6 +2006,7 @@ function Get-TSCustomViewAsUserDefault {
 }
 
 function Set-TSCustomViewAsUserDefault {
+    [CmdletBinding(SupportsShouldProcess)]
     [OutputType([PSCustomObject[]])]
     Param(
         [Parameter(Mandatory)][string] $CustomViewId,
@@ -2013,9 +2020,11 @@ function Set-TSCustomViewAsUserDefault {
         $el_user = $el_users.AppendChild($xml.CreateElement("user"))
         $el_user.SetAttribute("id", $id)
     }
-    $uri = Get-TSRequestUri -Endpoint CustomView -Param "default/users"
-    $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Post
-    return $response.tsResponse.customViewAsUserDefaultResults.customViewAsUserDefaultViewResult
+    $uri = Get-TSRequestUri -Endpoint CustomView -Param "$CustomViewId/default/users"
+    if ($PSCmdlet.ShouldProcess("custom view: $CustomViewId, user: $UserId")) {
+        $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Post
+        return $response.tsResponse.customViewAsUserDefaultResults.customViewAsUserDefaultViewResult
+    }
 }
 
 function Export-TSCustomViewImage {
@@ -2032,7 +2041,7 @@ function Export-TSCustomViewImage {
     if ($OutFile) {
         $OutFileParam.Add("OutFile", $OutFile)
     }
-    $uri = Get-TSRequestUri -Endpoint CustomView -Param "$CustomViewId"
+    $uri = Get-TSRequestUri -Endpoint CustomView -Param $CustomViewId
     $uriParam = @{}
     $uri += "/image"
     if ($Resolution -eq "high") {
@@ -2876,30 +2885,36 @@ function ConvertTo-TSPermissionTable {
     Param(
         [Parameter(Mandatory,Position=0,ValueFromPipeline)][System.Xml.XmlElement] $Permissions
     )
-    $permissionTable = @()
-    if ($Permissions.granteeCapabilities) {
-        $Permissions.granteeCapabilities | ForEach-Object {
-            if ($_.group -and $_.group.id) {
-                $granteeType = 'group'
-                $granteeId = $_.group.id
-            } elseif ($_.user -and $_.user.id) {
-                $granteeType = 'user'
-                $granteeId = $_.user.id
-            } else {
-                Write-Error "Invalid grantee in the input object" -Category InvalidData -ErrorAction Continue
-            }
-            $capabilitiesHashtable = @{}
-            $_.capabilities.capability | ForEach-Object {
-                if ($_.name -and $_.mode) {
-                    $capabilitiesHashtable.Add($_.name, $_.mode)
+    begin {
+        $permissionTable = @()
+    }
+    process {
+        if ($Permissions.granteeCapabilities) {
+            $Permissions.granteeCapabilities | ForEach-Object {
+                if ($_.group -and $_.group.id) {
+                    $granteeType = 'group'
+                    $granteeId = $_.group.id
+                } elseif ($_.user -and $_.user.id) {
+                    $granteeType = 'user'
+                    $granteeId = $_.user.id
                 } else {
-                    Write-Error "Invalid permission capability in the input object" -Category InvalidData -ErrorAction Continue
+                    Write-Error "Invalid grantee in the input object" -Category InvalidData -ErrorAction Continue
                 }
+                $capabilitiesHashtable = @{}
+                $_.capabilities.capability | ForEach-Object {
+                    if ($_.name -and $_.mode) {
+                        $capabilitiesHashtable.Add($_.name, $_.mode)
+                    } else {
+                        Write-Error "Invalid permission capability in the input object" -Category InvalidData -ErrorAction Continue
+                    }
+                }
+                $permissionTable += @{granteeType=$granteeType; granteeId=$granteeId; capabilities=$capabilitiesHashtable}
             }
-            $permissionTable += @{granteeType=$granteeType; granteeId=$granteeId; capabilities=$capabilitiesHashtable}
         }
     }
-    return $permissionTable
+    end {
+        return $permissionTable
+    }
 }
 
 function Get-TSDefaultPermission {
