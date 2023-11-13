@@ -783,20 +783,24 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 It "Publish workbook with invalid contents on <ConfigFile.server>" {
                     {Publish-TSWorkbook -Name "invalid" -InFile "Tests/Assets/Misc/invalid.twbx" -ProjectId $samplesProjectId} | Should -Throw
                 }
-                It "Publish workbook with credentials on <ConfigFile.server>" {
+                It "Publish workbook without embed credentials on <ConfigFile.server>" -Tag WorkbookP {
+                    $workbook = Publish-TSWorkbook -Name "AW Customer Address 0" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId
+                    $workbook | Should -Not -BeNullOrEmpty
+                }
+                It "Publish workbook with embed credentials on <ConfigFile.server>" -Tag WorkbookP {
                     $securePw = Test-GetSecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
                     $credentials = @{username="sqladmin"; password=$securePw; embed="true" }
-                    $workbook = Publish-TSWorkbook -Name "AW Customer Address 1" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -Credentials $credentials -Overwrite
+                    $workbook = Publish-TSWorkbook -Name "AW Customer Address 1" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -Credentials $credentials
                     $workbook | Should -Not -BeNullOrEmpty
                     $job = Update-TSWorkbookNow -WorkbookId $workbook.id
                     $job | Should -Not -BeNullOrEmpty
                     # $job | Export-Clixml -Path "Tests/Assets/Misc/job.xml"
-                    $job.type[1] | Should -Be "RefreshExtract"
+                    $job[1].type | Should -Be "RefreshExtract"
                     $timeout = 60
                     do {
                         Start-Sleep -s 1
                         $timeout--
-                        $jobStatus = Get-TSJob -JobId $job.id[1]
+                        $jobStatus = Get-TSJob -JobId $job[1].id
                         $jobStatus | Should -Not -BeNullOrEmpty
                         Write-Verbose ("Job progress: {0}%" -f $jobStatus.progress)
                     } until ($jobStatus.progress -eq 100 -or $timeout -eq 0)
@@ -804,19 +808,19 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobStatus.completedAt, $jobStatus.finishCode)
                     # Remove-TSWorkbook -WorkbookId $workbook.id
                 }
-                It "Publish workbook with connections on <ConfigFile.server>" {
+                It "Publish workbook with connections on <ConfigFile.server>" -Tag WorkbookP {
                     $securePw = Test-GetSecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
                     $connections = @( @{serverAddress="asl-tableau-testsql.database.windows.net"; serverPort="3389"; credentials=@{username="sqladmin"; password=$securePw; embed="true" }} )
-                    $workbook = Publish-TSWorkbook -Name "AW Customer Address 2" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -Connections $connections -Overwrite
+                    $workbook = Publish-TSWorkbook -Name "AW Customer Address 2" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -Connections $connections
                     $workbook | Should -Not -BeNullOrEmpty
                     $job = Update-TSWorkbookNow -WorkbookId $workbook.id
                     $job | Should -Not -BeNullOrEmpty
-                    $job.type[1] | Should -Be "RefreshExtract"
+                    $job[1].type | Should -Be "RefreshExtract"
                     $timeout = 60
                     do {
                         Start-Sleep -s 1
                         $timeout--
-                        $jobStatus = Get-TSJob -JobId $job.id[1]
+                        $jobStatus = Get-TSJob -JobId $job[1].id
                         $jobStatus | Should -Not -BeNullOrEmpty
                         Write-Verbose ("Job progress: {0}%" -f $jobStatus.progress)
                     } until ($jobStatus.progress -eq 100 -or $timeout -eq 0)
@@ -824,8 +828,8 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobStatus.completedAt, $jobStatus.finishCode)
                     # Remove-TSWorkbook -WorkbookId $workbook.id
                 }
-                It "Publish workbook as background job on <ConfigFile.server>" {
-                    $job = Publish-TSWorkbook -Name "AW Customer Address 3" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -BackgroundTask -Overwrite
+                It "Publish workbook as background job on <ConfigFile.server>" -Tag WorkbookP {
+                    $job = Publish-TSWorkbook -Name "AW Customer Address 3" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -BackgroundTask
                     $job | Should -Not -BeNullOrEmpty
                     $timeout = 60
                     do {
@@ -1069,14 +1073,67 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         Assert-Equivalent -Actual $actualPermissionTable -Expected $expectedPermissionTable
                     }
                 }
-                It "Publish datasource with connections on <ConfigFile.server>" -Skip {
-                    Publish-TSDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/Datasource.txt" -ProjectId $samplesProjectId
+                It "Publish datasource without embed credentials on <ConfigFile.server>" -Tag DatasourceP {
+                    $datasource = Publish-TSDatasource -Name "AW SalesOrders 0" -InFile "Tests/Assets/Misc/AW_SalesOrders.tdsx" -ProjectId $samplesProjectId
+                    $datasource | Should -Not -BeNullOrEmpty
                 }
-                It "Publish datasource with credentials on <ConfigFile.server>" -Skip {
-                    Publish-TSDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/Datasource.txt" -ProjectId $samplesProjectId
+                It "Publish datasource with embed credentials on <ConfigFile.server>" -Tag DatasourceP {
+                    $securePw = Test-GetSecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
+                    $credentials = @{username="sqladmin"; password=$securePw; embed="true" }
+                    $datasource = Publish-TSDatasource -Name "AW SalesOrders 1" -InFile "Tests/Assets/Misc/AW_SalesOrders.tdsx" -ProjectId $samplesProjectId -Credentials $credentials
+                    $datasource | Should -Not -BeNullOrEmpty
+                    $job = Update-TSDatasourceNow -DatasourceId $datasource.id
+                    $job | Should -Not -BeNullOrEmpty
+                    # $job | Export-Clixml -Path "Tests/Assets/Misc/job.xml"
+                    $job[1].type | Should -Be "RefreshExtract"
+                    $timeout = 60
+                    do {
+                        Start-Sleep -s 1
+                        $timeout--
+                        $jobStatus = Get-TSJob -JobId $job[1].id
+                        $jobStatus | Should -Not -BeNullOrEmpty
+                        Write-Verbose ("Job progress: {0}%" -f $jobStatus.progress)
+                    } until ($jobStatus.progress -eq 100 -or $timeout -eq 0)
+                    $jobStatus.finishCode | Should -Be 0
+                    Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobStatus.completedAt, $jobStatus.finishCode)
+                    # Remove-TSDatasource -DatasourceId $datasource.id
                 }
-                It "Publish datasource as background job on <ConfigFile.server>" -Skip {
-                    Publish-TSDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/Datasource.txt" -ProjectId $samplesProjectId
+                It "Publish datasource with connections on <ConfigFile.server>" -Tag DatasourceP -Skip {
+                    # note: this option is still not supported by the API as of v2023.3
+                    # although it's coded the same way in the tsc python module
+                    $securePw = Test-GetSecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
+                    $connections = @( @{serverAddress="asl-tableau-testsql.database.windows.net"; serverPort="3389"; credentials=@{username="sqladmin"; password=$securePw; embed="true" }} )
+                    $datasource = Publish-TSDatasource -Name "AW SalesOrders 2" -InFile "Tests/Assets/Misc/AW_SalesOrders.tdsx" -ProjectId $samplesProjectId -Connections $connections
+                    $datasource | Should -Not -BeNullOrEmpty
+                    $job = Update-TSDatasourceNow -DatasourceId $datasource.id
+                    $job | Should -Not -BeNullOrEmpty
+                    $job[1].type | Should -Be "RefreshExtract"
+                    $timeout = 60
+                    do {
+                        Start-Sleep -s 1
+                        $timeout--
+                        $jobStatus = Get-TSJob -JobId $job[1].id
+                        $jobStatus | Should -Not -BeNullOrEmpty
+                        Write-Verbose ("Job progress: {0}%" -f $jobStatus.progress)
+                    } until ($jobStatus.progress -eq 100 -or $timeout -eq 0)
+                    $jobStatus.finishCode | Should -Be 0
+                    Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobStatus.completedAt, $jobStatus.finishCode)
+                    # Remove-TSDatasource -DatasourceId $datasource.id
+                }
+                It "Publish datasource as background job on <ConfigFile.server>" -Tag DatasourceP {
+                    $job = Publish-TSDatasource -Name "AW SalesOrders 3" -InFile "Tests/Assets/Misc/AW_SalesOrders.tdsx" -ProjectId $samplesProjectId -BackgroundTask -Overwrite
+                    $job | Should -Not -BeNullOrEmpty
+                    $timeout = 60
+                    do {
+                        Start-Sleep -s 1
+                        $timeout--
+                        $jobStatus = Get-TSJob -JobId $job.id
+                        $jobStatus | Should -Not -BeNullOrEmpty
+                        Write-Verbose ("Job progress: {0}%" -f $jobStatus.progress)
+                    } until ($jobStatus.progress -eq 100 -or $timeout -eq 0)
+                    $jobStatus.finishCode | Should -Be 0
+                    Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobStatus.completedAt, $jobStatus.finishCode)
+                    # Remove-TSDatasource -DatasourceId $datasource.id
                 }
                 Context "Publish / download datasources from test assets on <ConfigFile.server>"  -Tag DatasourceSamples -ForEach $DatasourceFiles {
                     BeforeAll {
