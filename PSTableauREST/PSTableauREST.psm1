@@ -3717,7 +3717,7 @@ function Start-TSTaskNow {
         switch ($Type) {
             'ExtractRefresh' { # Run Extract Refresh Task
                 Assert-TSRestApiVersion -AtLeast 2.6
-                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param extractRefreshes/$TaskId/runNow) -Method Post
+                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param extractRefreshes/$TaskId/runNow) -Body "<tsRequest />" -Method Post -ContentType "text/xml"
                 return $response.tsResponse.job
             }
             'FlowRun' { # Run Flow Task

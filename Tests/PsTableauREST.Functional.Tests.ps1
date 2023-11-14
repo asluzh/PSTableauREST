@@ -1986,11 +1986,15 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 }
             }
             It "Add run flow tasks into a schedule on <ConfigFile.server>" {
-                $runFlowScheduleId = Get-TSSchedule | Where-Object type -eq "Flow" | Select-Object -First 1 -ExpandProperty id
-                Write-Verbose "Flow schedule $runFlowScheduleId found"
-                $flows = Get-TSFlow -Filter "projectName:eq:$samplesProjectName"
-                $flows | ForEach-Object {
-                    Add-TSContentToSchedule -ScheduleId $runFlowScheduleId -FlowId $_.id
+                if ($ConfigFile.prep_conductor) {
+                    $runFlowScheduleId = Get-TSSchedule | Where-Object type -eq "Flow" | Select-Object -First 1 -ExpandProperty id
+                    Write-Verbose "Flow schedule $runFlowScheduleId found"
+                    $flows = Get-TSFlow -Filter "projectName:eq:$samplesProjectName"
+                    $flows | ForEach-Object {
+                        Add-TSContentToSchedule -ScheduleId $runFlowScheduleId -FlowId $_.id
+                    }
+                } else {
+                    Set-ItResult -Skipped -Because "Prep Conductor is not activated"
                 }
             }
         }
@@ -2010,8 +2014,6 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 }
             }
             It "Publish test content into project <samplesProjectName> on <ConfigFile.server>" {
-                #$project = Update-TSProject -ProjectId $samplesProjectId -PublishSamples
-                #$project.id | Should -Be $samplesProjectId
                 $securePw = Test-GetSecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
                 $credentials = @{username="sqladmin"; password=$securePw; embed="true" }
                 $script:workbookForTasks = Publish-TSWorkbook -Name "AW Customer Address" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -Credentials $credentials
@@ -2023,43 +2025,51 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 $flowForTasks | Should -Not -BeNullOrEmpty
                 # Start-Sleep -s 3
             }
-            It "Schedule and query extract refresh tasks on <ConfigFile.server>" {
+            It "Schedule and run extract refresh tasks on <ConfigFile.server>" {
                 if (-Not $ConfigFile.tableau_cloud) {
                     $extractScheduleId = Get-TSSchedule | Where-Object type -eq "Extract" | Select-Object -First 1 -ExpandProperty id
                     Write-Verbose "Extract schedule $extractScheduleId found"
+                    Write-Verbose ("Adding workbook {0}" -f $workbookForTasks.id)
                     $contentScheduleTask = Add-TSContentToSchedule -ScheduleId $extractScheduleId -WorkbookId $workbookForTasks.id
-                    $extractTaskId = Get-TSTask -Type ExtractRefresh | Select-Object -First 1 -ExpandProperty id
+                    Write-Verbose ("Task id: {0}" -f $contentScheduleTask.id)
+                    $extractTaskId = Get-TSTask -Type ExtractRefresh | Where-Object -FilterScript {$_.workbook.id -eq $workbookForTasks.id} | Select-Object -First 1 -ExpandProperty id
                     $extractTaskId | Should -Be $contentScheduleTask.id
                     Write-Verbose "Extract task id: $extractTaskId"
                     $job = Start-TSTaskNow -Type ExtractRefresh -TaskId $extractTaskId
                     $job | Should -Not -BeNullOrEmpty
                     Stop-TSJob -JobId $job.id
-                    $contentScheduleTask = Add-TSContentToSchedule -ScheduleId $extractScheduleId -WorkbookId $datasourceForTasks.id
-                    $extractTaskId = Get-TSTask -Type ExtractRefresh | Select-Object -First 1 -ExpandProperty id
+                    Remove-TSTask -Type ExtractRefresh -TaskId $extractTaskId
+                    Write-Verbose ("Adding datasource {0}" -f $datasourceForTasks.id)
+                    $contentScheduleTask = Add-TSContentToSchedule -ScheduleId $extractScheduleId -DatasourceId $datasourceForTasks.id
+                    $extractTaskId = Get-TSTask -Type ExtractRefresh | Where-Object -FilterScript {$_.datasource.id -eq $datasourceForTasks.id} | Select-Object -First 1 -ExpandProperty id
                     $extractTaskId | Should -Be $contentScheduleTask.id
                     Write-Verbose "Extract task id: $extractTaskId"
                     $job = Start-TSTaskNow -Type ExtractRefresh -TaskId $extractTaskId
                     $job | Should -Not -BeNullOrEmpty
                     Stop-TSJob -JobId $job.id
+                    Remove-TSTask -Type ExtractRefresh -TaskId $extractTaskId
                 } else {
                     # Set-ItResult -Skipped -Because "feature not available for Tableau Cloud"
                     $extractTaskResult = Add-TSExtractsRefreshTask -WorkbookId $workbookForTasks.id -Type FullRefresh -Frequency Daily -StartTime 12:00:00
                     $extractTaskResult | Should -Not -BeNullOrEmpty
                 }
             }
-            It "Schedule and query run flow task on <ConfigFile.server>" {
-                if (-Not $ConfigFile.tableau_cloud) {
+            It "Schedule and run flow task on <ConfigFile.server>" {
+                if ($ConfigFile.prep_conductor) {
+                # if (-Not $ConfigFile.tableau_cloud) {
                     $runFlowScheduleId = Get-TSSchedule | Where-Object type -eq "Flow" | Select-Object -First 1 -ExpandProperty id
                     Write-Verbose "Flow schedule $runFlowScheduleId found"
-                    Add-TSContentToSchedule -ScheduleId $runFlowScheduleId -FlowId $flowForTasks.id
-                    $flowTaskId = Get-TSTask -Type FlowRun | Select-Object -First 1 -ExpandProperty id
-                    $flowTaskId | Should -Not -BeNullOrEmpty
+                    $contentScheduleTask = Add-TSContentToSchedule -ScheduleId $runFlowScheduleId -FlowId $flowForTasks.id
+                    $flowTaskId = Get-TSTask -Type FlowRun | Where-Object -FilterScript {$_.flow.id -eq $flowForTasks.id} | Select-Object -First 1 -ExpandProperty id
+                    $flowTaskId | Should -Be $contentScheduleTask.id
                     Write-Verbose "Flow task id: $flowTaskId"
                     $job = Start-TSTaskNow -Type FlowRun -TaskId $flowTaskId
                     $job | Should -Not -BeNullOrEmpty
                     Stop-TSJob -JobId $job.id
+                    Remove-TSTask -Type FlowRun -TaskId $flowTaskId
                 } else {
-                    Set-ItResult -Skipped -Because "feature not available for Tableau Cloud"
+                    Set-ItResult -Skipped -Because "Prep Conductor is not activated"
+                    # Set-ItResult -Skipped -Because "feature not available for Tableau Cloud"
                 }
             }
         }
