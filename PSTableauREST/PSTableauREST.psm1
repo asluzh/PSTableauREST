@@ -3312,19 +3312,19 @@ function Add-TSSchedule {
         [Parameter(Mandatory)][string] $Name,
         [Parameter(Mandatory)][ValidateSet('Extract','Subscription','Flow','DataAcceleration')][string] $Type,
         [Parameter()][ValidateRange(1,100)][int] $Priority = 50,
-        [Parameter()][ValidateSet('Parallel','Serial')][string] $ExecutionOrder = "Parallel",
+        [Parameter()][ValidateSet('Parallel','Serial')][string] $ExecutionOrder = 'Parallel',
         [Parameter(Mandatory,ParameterSetName='HourlyHours')]
         [Parameter(Mandatory,ParameterSetName='HourlyMinutes')]
         [Parameter(Mandatory,ParameterSetName='Daily')]
         [Parameter(Mandatory,ParameterSetName='Weekly')]
         [Parameter(Mandatory,ParameterSetName='Monthly')]
-        [ValidateSet('Hourly','Daily','Weekly','Monthly')][string] $Frequency = "Daily",
+        [ValidateSet('Hourly','Daily','Weekly','Monthly')][string] $Frequency = 'Daily',
         [Parameter(Mandatory,ParameterSetName='HourlyHours')]
         [Parameter(Mandatory,ParameterSetName='HourlyMinutes')]
         [Parameter(Mandatory,ParameterSetName='Daily')]
         [Parameter(Mandatory,ParameterSetName='Weekly')]
         [Parameter(Mandatory,ParameterSetName='Monthly')]
-        [ValidatePattern('^[0-2][0-9]:[0-5][0-9]:[0-5][0-9]$')][string] $StartTime = "00:00:00",
+        [ValidatePattern('^[0-2][0-9]:[0-5][0-9]:[0-5][0-9]$')][string] $StartTime = '00:00:00',
         [Parameter(ParameterSetName='HourlyHours')]
         [Parameter(ParameterSetName='HourlyMinutes')]
         [ValidatePattern('^[0-2][0-9]:[0-5][0-9]:[0-5][0-9]$')][string] $EndTime,
@@ -3619,7 +3619,7 @@ function Get-TSTask {
         [Parameter(Mandatory,ParameterSetName='TaskById')][string] $TaskId,
         [Parameter(ParameterSetName='Tasks')][ValidateRange(1,100)][int] $PageSize = 100
     )
-    if ($TaskId) { # Get Flow Run Task / Get Extract Refresh Task / Get Linked Task
+    if ($TaskId) { # Get Flow Run Task / Get Extract Refresh Task / Get Linked Task / Get Data Acceleration Task
         switch ($Type) {
             'ExtractRefresh' {
                 Assert-TSRestApiVersion -AtLeast 2.6
@@ -3642,7 +3642,7 @@ function Get-TSTask {
                 $response.tsResponse.task.dataAcceleration
             }
         }
-    } else { # Get Flow Run Tasks / List Extract Refresh Tasks in Site / Get Linked Tasks
+    } else { # Get Flow Run Tasks / List Extract Refresh Tasks in Site / Get Linked Tasks / Get Data Acceleration Tasks in a Site
         $pageNumber = 0
         do {
             $pageNumber++
@@ -3753,10 +3753,6 @@ function Get-TSExtractRefreshTasksInSchedule {
         $response.tsResponse.extracts.extract
     } until ($PageSize*$pageNumber -ge $totalAvailable)
 }
-# Create an Extract for a Data Source
-# Delete the Extract from a Data Source
-# Create Extracts for Embedded Data Sources in a Workbook
-# Delete Extracts of Embedded Data Sources from a Workbook
 
 function Add-TSExtractsInContent {
     [CmdletBinding(SupportsShouldProcess)]
@@ -3767,10 +3763,12 @@ function Add-TSExtractsInContent {
         [Parameter()][switch] $EncryptExtracts
     )
     if ($WorkbookId) {
+        # Create Extracts for Embedded Data Sources in a Workbook
         Assert-TSRestApiVersion -AtLeast 3.5
         $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId
         $shouldProcessItem = "workbook:$WorkbookId"
     } elseif ($DatasourceId) {
+        # Create an Extract for a Data Source
         Assert-TSRestApiVersion -AtLeast 3.5
         $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId
         $shouldProcessItem = "datasource:$DatasourceId"
@@ -3792,12 +3790,13 @@ function Remove-TSExtractsInContent {
         [Parameter(Mandatory,ParameterSetName='Workbook')][string] $WorkbookId,
         [Parameter(Mandatory,ParameterSetName='Datasource')][string] $DatasourceId
     )
+    Assert-TSRestApiVersion -AtLeast 3.5
     if ($WorkbookId) {
-        Assert-TSRestApiVersion -AtLeast 3.5
+        # Delete Extracts of Embedded Data Sources from a Workbook
         $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId
         $shouldProcessItem = "workbook:$WorkbookId"
     } elseif ($DatasourceId) {
-        Assert-TSRestApiVersion -AtLeast 3.5
+        # Delete the Extract from a Data Source
         $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId
         $shouldProcessItem = "datasource:$DatasourceId"
     }
@@ -3807,6 +3806,206 @@ function Remove-TSExtractsInContent {
     }
 }
 
+function Add-TSExtractsRefreshTask {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory,ParameterSetName='Workbook')][string] $WorkbookId,
+        [Parameter(Mandatory,ParameterSetName='Datasource')][string] $DatasourceId,
+        [Parameter()][ValidateSet('FullRefresh','IncrementalRefresh')][string] $Type = 'FullRefresh',
+        [Parameter()][ValidateSet('Hourly','Daily','Weekly','Monthly')][string] $Frequency = 'Daily',
+        [Parameter()][ValidatePattern('^[0-2][0-9]:[0-5][0-9]:[0-5][0-9]$')][string] $StartTime = '00:00:00',
+        [Parameter()][ValidatePattern('^[0-2][0-9]:[0-5][0-9]:[0-5][0-9]$')][string] $EndTime,
+        [Parameter()][ValidateSet(1,2,4,6,8,12,24)][int] $IntervalHours,
+        [Parameter()][ValidateSet(15,30,60)][int] $IntervalMinutes,
+        [Parameter()][ValidateSet('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')][string[]] $IntervalWeekdays,
+        [Parameter()][ValidateRange(0,5)][int] $IntervalMonthdayNr, # 0 for last day
+        [Parameter()][ValidateSet('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')][string] $IntervalMonthdayWeekday,
+        [Parameter()][ValidateRange(1,31)][int[]] $IntervalMonthdays # specific month days
+    )
+    # Create Cloud Extract Refresh Task
+    Assert-TSRestApiVersion -AtLeast 3.20
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_extr = $tsRequest.AppendChild($xml.CreateElement("extractRefresh"))
+    $el_extr.SetAttribute("type", $Type)
+    if ($WorkbookId) {
+        $el_workbook = $el_extr.AppendChild($xml.CreateElement("workbook"))
+        $el_workbook.SetAttribute("id", $WorkbookId)
+        $shouldProcessItem = "workbook:$WorkbookId"
+    } elseif ($DatasourceId) {
+        $el_datasource = $el_extr.AppendChild($xml.CreateElement("datasource"))
+        $el_datasource.SetAttribute("id", $DatasourceId)
+        $shouldProcessItem = "datasource:$DatasourceId"
+    }
+    $el_sched = $tsRequest.AppendChild($xml.CreateElement("schedule"))
+    $el_sched.SetAttribute("frequency", $Frequency)
+    $el_freq = $el_sched.AppendChild($xml.CreateElement("frequencyDetails"))
+    $el_freq.SetAttribute("start", $StartTime)
+    if ($EndTime) {
+        $el_freq.SetAttribute("end", $EndTime)
+    }
+    $el_ints = $el_freq.AppendChild($xml.CreateElement("intervals"))
+    switch ($Frequency) {
+        'Hourly' {
+            if ($IntervalHours) {
+                $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("hours", $IntervalHours)
+            }
+            if ($IntervalMinutes) {
+                $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("minutes", $IntervalMinutes)
+            }
+            if ($IntervalWeekdays) {
+                foreach ($weekday in $IntervalWeekdays) {
+                    $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("weekDay", $weekday)
+                }
+            }
+        }
+        'Daily' {
+            if ($IntervalHours) {
+                $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("hours", $IntervalHours)
+            }
+            if ($IntervalWeekdays) {
+                foreach ($weekday in $IntervalWeekdays) {
+                    $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("weekDay", $weekday)
+                }
+            }
+        }
+        'Weekly' {
+            if ($IntervalWeekdays) {
+                foreach ($weekday in $IntervalWeekdays) {
+                    $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("weekDay", $weekday)
+                }
+            }
+        }
+        'Monthly' {
+            if ($IntervalMonthdayNr -ge 0 -and $IntervalMonthdayWeekday) {
+                $el_int = $el_ints.AppendChild($xml.CreateElement("interval"))
+                switch ($IntervalMonthdayNr) {
+                    0 { $el_int.SetAttribute("monthDay", "LastDay") }
+                    1 { $el_int.SetAttribute("monthDay", "First") }
+                    2 { $el_int.SetAttribute("monthDay", "Second") }
+                    3 { $el_int.SetAttribute("monthDay", "Third") }
+                    4 { $el_int.SetAttribute("monthDay", "Fourth") }
+                    5 { $el_int.SetAttribute("monthDay", "Fifth") }
+                }
+                $el_int.SetAttribute("weekDay", $IntervalMonthdayWeekday)
+            } elseif ($IntervalMonthdayNr -eq 0) { # last day of the month
+                $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("monthDay", "LastDay")
+            } elseif ($IntervalMonthdays) {
+                foreach ($monthday in $IntervalMonthdays) {
+                    $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("monthDay", $monthday)
+                }
+            }
+        }
+    }
+    if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
+        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param extractRefreshes) -Body $xml.OuterXml -Method Post
+        return $response.tsResponse
+    }
+}
+
+function Update-TSExtractsRefreshTask {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $TaskId,
+        [Parameter(Mandatory,ParameterSetName='Workbook')][string] $WorkbookId,
+        [Parameter(Mandatory,ParameterSetName='Datasource')][string] $DatasourceId,
+        [Parameter()][ValidateSet('FullRefresh','IncrementalRefresh')][string] $Type,
+        [Parameter()][ValidateSet('Hourly','Daily','Weekly','Monthly')][string] $Frequency,
+        [Parameter()][ValidatePattern('^[0-2][0-9]:[0-5][0-9]:[0-5][0-9]$')][string] $StartTime,
+        [Parameter()][ValidatePattern('^[0-2][0-9]:[0-5][0-9]:[0-5][0-9]$')][string] $EndTime,
+        [Parameter()][ValidateSet(1,2,4,6,8,12,24)][int] $IntervalHours,
+        [Parameter()][ValidateSet(15,30,60)][int] $IntervalMinutes,
+        [Parameter()][ValidateSet('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')][string[]] $IntervalWeekdays,
+        [Parameter()][ValidateRange(0,5)][int] $IntervalMonthdayNr, # 0 for last day
+        [Parameter()][ValidateSet('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')][string] $IntervalMonthdayWeekday,
+        [Parameter()][ValidateRange(1,31)][int[]] $IntervalMonthdays # specific month days
+    )
+    # Update Cloud extract refresh task
+    Assert-TSRestApiVersion -AtLeast 3.20
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_extr = $tsRequest.AppendChild($xml.CreateElement("extractRefresh"))
+    if ($Type) {
+        $el_extr.SetAttribute("type", $Type)
+    }
+    if ($WorkbookId) {
+        $el_workbook = $el_extr.AppendChild($xml.CreateElement("workbook"))
+        $el_workbook.SetAttribute("id", $WorkbookId)
+        $shouldProcessItem = "workbook:$WorkbookId"
+    } elseif ($DatasourceId) {
+        $el_datasource = $el_extr.AppendChild($xml.CreateElement("datasource"))
+        $el_datasource.SetAttribute("id", $DatasourceId)
+        $shouldProcessItem = "datasource:$DatasourceId"
+    }
+    if ($Frequency) {
+        $el_sched = $tsRequest.AppendChild($xml.CreateElement("schedule"))
+        $el_sched.SetAttribute("frequency", $Frequency)
+        $el_freq = $el_sched.AppendChild($xml.CreateElement("frequencyDetails"))
+        $el_freq.SetAttribute("start", $StartTime)
+        if ($EndTime) {
+            $el_freq.SetAttribute("end", $EndTime)
+        }
+        $el_ints = $el_freq.AppendChild($xml.CreateElement("intervals"))
+        switch ($Frequency) {
+            'Hourly' {
+                if ($IntervalHours) {
+                    $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("hours", $IntervalHours)
+                }
+                if ($IntervalMinutes) {
+                    $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("minutes", $IntervalMinutes)
+                }
+                if ($IntervalWeekdays) {
+                    foreach ($weekday in $IntervalWeekdays) {
+                        $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("weekDay", $weekday)
+                    }
+                }
+            }
+            'Daily' {
+                if ($IntervalHours) {
+                    $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("hours", $IntervalHours)
+                }
+                if ($IntervalWeekdays) {
+                    foreach ($weekday in $IntervalWeekdays) {
+                        $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("weekDay", $weekday)
+                    }
+                }
+            }
+            'Weekly' {
+                if ($IntervalWeekdays) {
+                    foreach ($weekday in $IntervalWeekdays) {
+                        $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("weekDay", $weekday)
+                    }
+                }
+            }
+            'Monthly' {
+                if ($IntervalMonthdayNr -ge 0 -and $IntervalMonthdayWeekday) {
+                    $el_int = $el_ints.AppendChild($xml.CreateElement("interval"))
+                    switch ($IntervalMonthdayNr) {
+                        0 { $el_int.SetAttribute("monthDay", "LastDay") }
+                        1 { $el_int.SetAttribute("monthDay", "First") }
+                        2 { $el_int.SetAttribute("monthDay", "Second") }
+                        3 { $el_int.SetAttribute("monthDay", "Third") }
+                        4 { $el_int.SetAttribute("monthDay", "Fourth") }
+                        5 { $el_int.SetAttribute("monthDay", "Fifth") }
+                    }
+                    $el_int.SetAttribute("weekDay", $IntervalMonthdayWeekday)
+                } elseif ($IntervalMonthdayNr -eq 0) { # last day of the month
+                    $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("monthDay", "LastDay")
+                } elseif ($IntervalMonthdays) {
+                    foreach ($monthday in $IntervalMonthdays) {
+                        $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("monthDay", $monthday)
+                    }
+                }
+            }
+        }
+    }
+    if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
+        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param extractRefreshes/$TaskId) -Body $xml.OuterXml -Method Put
+        return $response.tsResponse
+    }
+}
 
 ### Favorites methods
 function Get-TSUserFavorite {

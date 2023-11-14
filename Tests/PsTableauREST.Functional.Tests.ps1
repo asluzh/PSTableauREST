@@ -2023,7 +2023,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 $flowForTasks | Should -Not -BeNullOrEmpty
                 # Start-Sleep -s 3
             }
-            It "Schedule and query extract refresh tasks on <ConfigFile.server>" -Skip {
+            It "Schedule and query extract refresh tasks on <ConfigFile.server>" {
                 if (-Not $ConfigFile.tableau_cloud) {
                     $extractScheduleId = Get-TSSchedule | Where-Object type -eq "Extract" | Select-Object -First 1 -ExpandProperty id
                     Write-Verbose "Extract schedule $extractScheduleId found"
@@ -2042,7 +2042,9 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $job | Should -Not -BeNullOrEmpty
                     Stop-TSJob -JobId $job.id
                 } else {
-                    Set-ItResult -Skipped -Because "feature not available for Tableau Cloud"
+                    # Set-ItResult -Skipped -Because "feature not available for Tableau Cloud"
+                    $extractTaskResult = Add-TSExtractsRefreshTask -WorkbookId $workbookForTasks.id -Type FullRefresh -Frequency Daily -StartTime 12:00:00
+                    $extractTaskResult | Should -Not -BeNullOrEmpty
                 }
             }
             It "Schedule and query run flow task on <ConfigFile.server>" {

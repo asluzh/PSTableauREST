@@ -141,8 +141,7 @@ FunctionsToExport = @(
 ### Extract and Encryption methods - API 3.5
 'Get-TSExtractRefreshTasksInSchedule',
 'Add-TSExtractsInContent', 'Remove-TSExtractsInContent',
-# Create Cloud Extract Refresh Task
-# Update Cloud extract refresh task
+'Add-TSExtractsRefreshTask', 'Update-TSExtractsRefreshTask',
 # Encrypt Extracts in a Site
 # Reencrypt Extracts in a Site
 # Decrypt Extracts in a Site
