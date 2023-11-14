@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.1.25'
+ModuleVersion = '0.1.26'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -135,14 +135,11 @@ FunctionsToExport = @(
 ### Jobs, Tasks and Schedules methods
 'Get-TSSchedule', 'Add-TSSchedule', 'Update-TSSchedule', 'Remove-TSSchedule', 'Add-TSContentToSchedule',
 'Get-TSJob', 'Stop-TSJob',
-'Get-TSFlowRunTask', 'Start-TSFlowRunTaskNow', 'Get-TSLinkedTask', 'Start-TSLinkedTaskNow',
-'Get-TSDataAccelerationTask', 'Remove-TSDataAccelerationTask',
-# TODO unified tasks methods for extract refresh/run flow/data accel
+'Get-TSTask', 'Remove-TSTask', 'Start-TSTaskNow',
 # TODO Wait for job to finish (see tsc: wait_for_job)
 
 ### Extract and Encryption methods - API 3.5
 'Get-TSExtractRefreshTasksInSchedule',
-'Get-TSExtractRefreshTask', 'Start-TSExtractRefreshTaskNow', 'Remove-TSExtractRefreshTask',
 # Encrypt Extracts in a Site
 # Reencrypt Extracts in a Site
 # Decrypt Extracts in a Site

@@ -3612,96 +3612,125 @@ function Stop-TSJob {
     }
 }
 
-function Get-TSFlowRunTask {
+function Get-TSTask {
     [OutputType([PSCustomObject[]])]
     Param(
+        [Parameter(Mandatory)][ValidateSet('ExtractRefresh','FlowRun','Linked','DataAcceleration')][string] $Type,
         [Parameter(Mandatory,ParameterSetName='TaskById')][string] $TaskId,
         [Parameter(ParameterSetName='Tasks')][ValidateRange(1,100)][int] $PageSize = 100
     )
-    Assert-TSRestApiVersion -AtLeast 3.3
-    if ($TaskId) { # Get Flow Run Task
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param runFlow/$TaskId) -Method Get
-        $response.tsResponse.task.flowRun
-    } else { # Get Flow Run Tasks
+    if ($TaskId) { # Get Flow Run Task / Get Extract Refresh Task / Get Linked Task
+        switch ($Type) {
+            'ExtractRefresh' {
+                Assert-TSRestApiVersion -AtLeast 2.6
+                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param extractRefreshes/$TaskId) -Method Get
+                $response.tsResponse.task.extractRefresh
+            }
+            'FlowRun' {
+                Assert-TSRestApiVersion -AtLeast 3.3
+                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param runFlow/$TaskId) -Method Get
+                $response.tsResponse.task.flowRun
+            }
+            'Linked' {
+                Assert-TSRestApiVersion -AtLeast 3.15
+                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param linked/$TaskId) -Method Get
+                $response.tsResponse.linkedTask
+            }
+            'DataAcceleration' {
+                Assert-TSRestApiVersion -AtLeast 3.8 -LessThan 3.16
+                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param dataAcceleration/$TaskId) -Method Get
+                $response.tsResponse.task.dataAcceleration
+            }
+        }
+    } else { # Get Flow Run Tasks / List Extract Refresh Tasks in Site / Get Linked Tasks
         $pageNumber = 0
         do {
             $pageNumber++
-            $uri = Get-TSRequestUri -Endpoint Task -Param runFlow
+            switch ($Type) {
+                'ExtractRefresh' {
+                    # Assert-TSRestApiVersion -AtLeast 2.2
+                    $uri = Get-TSRequestUri -Endpoint Task -Param extractRefreshes
+                }
+                'FlowRun' {
+                    Assert-TSRestApiVersion -AtLeast 3.3
+                    $uri = Get-TSRequestUri -Endpoint Task -Param runFlow
+                }
+                'Linked' {
+                    Assert-TSRestApiVersion -AtLeast 3.15
+                    $uri = Get-TSRequestUri -Endpoint Task -Param linked
+                }
+                'DataAcceleration' {
+                    Assert-TSRestApiVersion -AtLeast 3.8 -LessThan 3.16
+                    $uri = Get-TSRequestUri -Endpoint Task -Param dataAcceleration
+                }
+            }
             $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
             $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
-            $response.tsResponse.tasks.task.flowRun
+            switch ($Type) {
+                'ExtractRefresh' {
+                    $response.tsResponse.tasks.task.extractRefresh
+                }
+                'FlowRun' {
+                    $response.tsResponse.tasks.task.flowRun
+                }
+                'Linked' {
+                    $response.tsResponse.linkedTasks.linkedTasks
+                }
+                'DataAcceleration' {
+                    $response.tsResponse.tasks.task.dataAcceleration
+                }
+            }
         } until ($PageSize*$pageNumber -ge $totalAvailable)
     }
 }
 
-function Start-TSFlowRunTaskNow {
+function Remove-TSTask {
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType([PSCustomObject])]
     Param(
+        [Parameter(Mandatory)][ValidateSet('ExtractRefresh','DataAcceleration')][string] $Type, # 'FlowRun' not supported
         [Parameter(Mandatory)][string] $TaskId
     )
-    Assert-TSRestApiVersion -AtLeast 3.3
-    if ($PSCmdlet.ShouldProcess($TaskId)) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param runFlow/$TaskId/runNow) -Method Post
-        return $response.tsResponse.job
+    if ($PSCmdlet.ShouldProcess("$Type $TaskId")) {
+        switch ($Type) {
+            'ExtractRefresh' {
+                Assert-TSRestApiVersion -AtLeast 3.6
+                Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param extractRefreshes/$TaskId) -Method Delete
+            }
+            'DataAcceleration' {
+                Assert-TSRestApiVersion -AtLeast 3.8 -LessThan 3.16
+                Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param dataAcceleration/$TaskId) -Method Delete
+            }
+        }
     }
 }
 
-function Get-TSLinkedTask {
-    [OutputType([PSCustomObject[]])]
-    Param(
-        [Parameter(Mandatory,ParameterSetName='TaskById')][string] $TaskId,
-        [Parameter(ParameterSetName='Tasks')][ValidateRange(1,100)][int] $PageSize = 100
-    )
-    Assert-TSRestApiVersion -AtLeast 3.15
-    if ($TaskId) { # Get Linked Task
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param linked/$TaskId) -Method Get
-        $response.tsResponse.linkedTask
-    } else { # Get Linked Tasks
-        $pageNumber = 0
-        do {
-            $pageNumber++
-            $uri = Get-TSRequestUri -Endpoint Task -Param linked
-            $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-            $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
-            $totalAvailable = $response.tsResponse.pagination.totalAvailable
-            $response.tsResponse.linkedTasks.linkedTasks
-        } until ($PageSize*$pageNumber -ge $totalAvailable)
-    }
-}
-
-function Start-TSLinkedTaskNow {
+function Start-TSTaskNow {
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType([PSCustomObject])]
     Param(
-        [Parameter(Mandatory)][string] $TaskId
+        [Parameter(Mandatory)][string] $TaskId,
+        [Parameter(Mandatory)][ValidateSet('ExtractRefresh','FlowRun','Linked')][string] $Type
     )
-    Assert-TSRestApiVersion -AtLeast 3.15
-    if ($PSCmdlet.ShouldProcess($TaskId)) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param linked/$TaskId/runNow) -Method Post
-        return $response.tsResponse.linkedTaskJob
-    }
-}
-
-function Get-TSDataAccelerationTask {
-    [OutputType([PSCustomObject[]])]
-    Param(
-    )
-    Assert-TSRestApiVersion -AtLeast 3.8 -LessThan 3.16
-    $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param dataAcceleration) -Method Get
-    return $response.tsResponse.tasks.task
-}
-
-function Remove-TSDataAccelerationTask {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $TaskId
-    )
-    Assert-TSRestApiVersion -AtLeast 3.8 -LessThan 3.16
-    if ($PSCmdlet.ShouldProcess($TaskId)) {
-        Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param dataAcceleration/$TaskId) -Method Delete
+    if ($PSCmdlet.ShouldProcess("$Type $TaskId")) {
+        switch ($Type) {
+            'ExtractRefresh' { # Run Extract Refresh Task
+                Assert-TSRestApiVersion -AtLeast 2.6
+                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param extractRefreshes/$TaskId/runNow) -Method Post
+                return $response.tsResponse.job
+            }
+            'FlowRun' { # Run Flow Task
+                Assert-TSRestApiVersion -AtLeast 3.3
+                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param flowRun/$TaskId/runNow) -Method Post
+                return $response.tsResponse.job
+            }
+            'Linked' { # Run Linked Task Now
+                Assert-TSRestApiVersion -AtLeast 3.15
+                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param linked/$TaskId/runNow) -Method Post
+                return $response.tsResponse.linkedTaskJob
+            }
+        }
     }
 }
 
@@ -3723,56 +3752,6 @@ function Get-TSExtractRefreshTasksInSchedule {
         $totalAvailable = $response.tsResponse.pagination.totalAvailable
         $response.tsResponse.extracts.extract
     } until ($PageSize*$pageNumber -ge $totalAvailable)
-}
-
-function Get-TSExtractRefreshTask {
-    [OutputType([PSCustomObject[]])]
-    Param(
-        [Parameter(Mandatory,ParameterSetName='TaskById')][string] $TaskId,
-        [Parameter(ParameterSetName='Tasks')][ValidateRange(1,100)][int] $PageSize = 100
-    )
-    if ($TaskId) { # Get Extract Refresh Task
-        Assert-TSRestApiVersion -AtLeast 2.6
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param extractRefreshes/$TaskId) -Method Get
-        $response.tsResponse.task.extractRefresh
-    } else { # List Extract Refresh Tasks in Site
-        # Assert-TSRestApiVersion -AtLeast 2.2
-        $pageNumber = 0
-        do {
-            $pageNumber++
-            $uri = Get-TSRequestUri -Endpoint Task -Param extractRefreshes
-            $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-            $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
-            $totalAvailable = $response.tsResponse.pagination.totalAvailable
-            $response.tsResponse.tasks.task.extractRefresh
-        } until ($PageSize*$pageNumber -ge $totalAvailable)
-    }
-}
-
-function Start-TSExtractRefreshTaskNow {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $TaskId
-    )
-    # Run Extract Refresh Task
-    Assert-TSRestApiVersion -AtLeast 2.6
-    if ($PSCmdlet.ShouldProcess($TaskId)) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param extractRefreshes/$TaskId/runNow) -Method Post
-        return $response.tsResponse.job
-    }
-}
-
-function Remove-TSExtractRefreshTask {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $TaskId
-    )
-    Assert-TSRestApiVersion -AtLeast 3.6
-    if ($PSCmdlet.ShouldProcess($TaskId)) {
-        Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param extractRefreshes/$TaskId) -Method Delete
-    }
 }
 
 ### Favorites methods
