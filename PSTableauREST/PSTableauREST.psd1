@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.1.26'
+ModuleVersion = '0.1.27'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -140,15 +140,12 @@ FunctionsToExport = @(
 
 ### Extract and Encryption methods - API 3.5
 'Get-TSExtractRefreshTasksInSchedule',
+'Add-TSExtractsInContent', 'Remove-TSExtractsInContent',
+# Create Cloud Extract Refresh Task
+# Update Cloud extract refresh task
 # Encrypt Extracts in a Site
 # Reencrypt Extracts in a Site
 # Decrypt Extracts in a Site
-# Create an Extract for a Data Source
-# Delete the Extract from a Data Source
-# Create Cloud Extract Refresh Task
-# Update Cloud extract refresh task
-# Create Extracts for Embedded Data Sources in a Workbook
-# Delete Extracts of Embedded Data Sources from a Workbook
 
 ### Favorites methods
 'Get-TSUserFavorite', 'Add-TSUserFavorite', 'Remove-TSUserFavorite', 'Move-TSUserFavorite',

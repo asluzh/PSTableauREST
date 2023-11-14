@@ -3753,6 +3753,60 @@ function Get-TSExtractRefreshTasksInSchedule {
         $response.tsResponse.extracts.extract
     } until ($PageSize*$pageNumber -ge $totalAvailable)
 }
+# Create an Extract for a Data Source
+# Delete the Extract from a Data Source
+# Create Extracts for Embedded Data Sources in a Workbook
+# Delete Extracts of Embedded Data Sources from a Workbook
+
+function Add-TSExtractsInContent {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory,ParameterSetName='Workbook')][string] $WorkbookId,
+        [Parameter(Mandatory,ParameterSetName='Datasource')][string] $DatasourceId,
+        [Parameter()][switch] $EncryptExtracts
+    )
+    if ($WorkbookId) {
+        Assert-TSRestApiVersion -AtLeast 3.5
+        $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId
+        $shouldProcessItem = "workbook:$WorkbookId"
+    } elseif ($DatasourceId) {
+        Assert-TSRestApiVersion -AtLeast 3.5
+        $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId
+        $shouldProcessItem = "datasource:$DatasourceId"
+    }
+    $uri += "/createExtract"
+    if ($EncryptExtracts) {
+        $uri += "?encrypt=true"
+    }
+    if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
+        $response = Invoke-TSRestApiMethod -Uri $uri -Method Post
+        return $response.tsResponse.job
+    }
+}
+
+function Remove-TSExtractsInContent {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory,ParameterSetName='Workbook')][string] $WorkbookId,
+        [Parameter(Mandatory,ParameterSetName='Datasource')][string] $DatasourceId
+    )
+    if ($WorkbookId) {
+        Assert-TSRestApiVersion -AtLeast 3.5
+        $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId
+        $shouldProcessItem = "workbook:$WorkbookId"
+    } elseif ($DatasourceId) {
+        Assert-TSRestApiVersion -AtLeast 3.5
+        $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId
+        $shouldProcessItem = "datasource:$DatasourceId"
+    }
+    $uri += "/deleteExtract"
+    if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
+        Invoke-TSRestApiMethod -Uri $uri -Method Post
+    }
+}
+
 
 ### Favorites methods
 function Get-TSUserFavorite {
