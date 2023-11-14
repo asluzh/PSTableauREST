@@ -2238,7 +2238,7 @@ function Publish-TSFlow {
         [Parameter()][string] $ProjectId,
         [Parameter()][switch] $Overwrite,
         [Parameter()][switch] $Chunked,
-        [Parameter()][hashtable] $Credentials,
+        # [Parameter()][hashtable] $Credentials, # connectionCredentials is not supported in this API method
         [Parameter()][hashtable[]] $Connections
     )
     Assert-TSRestApiVersion -AtLeast 3.3
@@ -2275,11 +2275,11 @@ function Publish-TSFlow {
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_flow = $tsRequest.AppendChild($xml.CreateElement("flow"))
     $el_flow.SetAttribute("name", $Name)
-    if ($Credentials) {
-        Add-TSCredentialsElement -Element $el_flow -Credentials $Credentials
-    }
+    # if ($Credentials) {
+    #     Add-TSCredentialsElement -Element $tsRequest -Credentials $Credentials
+    # }
     if ($Connections) {
-        Add-TSConnectionsElement -Element $el_flow -Connections $Connections
+        Add-TSConnectionsElement -Element $tsRequest -Connections $Connections
     }
     if ($ProjectId) {
         $el_project = $el_flow.AppendChild($xml.CreateElement("project"))

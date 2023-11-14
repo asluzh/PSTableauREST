@@ -1987,10 +1987,77 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
             }
             It "Add run flow tasks into a schedule on <ConfigFile.server>" {
                 $runFlowScheduleId = Get-TSSchedule | Where-Object type -eq "Flow" | Select-Object -First 1 -ExpandProperty id
-                Write-Warning $runFlowScheduleId
+                Write-Verbose "Flow schedule $runFlowScheduleId found"
                 $flows = Get-TSFlow -Filter "projectName:eq:$samplesProjectName"
                 $flows | ForEach-Object {
                     Add-TSContentToSchedule -ScheduleId $runFlowScheduleId -FlowId $_.id
+                }
+            }
+        }
+        Context "Tasks operations" -Tag Task {
+            BeforeAll {
+                $project = Add-TSProject -Name (New-Guid)
+                $script:samplesProjectId = $project.id
+                $script:samplesProjectName = $project.name
+            }
+            AfterAll {
+                if ($samplesProjectId) {
+                    Remove-TSProject -ProjectId $samplesProjectId
+                    $script:samplesProjectId = $null
+                    $script:workbookForTasks = $null
+                    $script:datasourceForTasks = $null
+                    $script:flowForTasks = $null
+                }
+            }
+            It "Publish test content into project <samplesProjectName> on <ConfigFile.server>" {
+                #$project = Update-TSProject -ProjectId $samplesProjectId -PublishSamples
+                #$project.id | Should -Be $samplesProjectId
+                $securePw = Test-GetSecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
+                $credentials = @{username="sqladmin"; password=$securePw; embed="true" }
+                $script:workbookForTasks = Publish-TSWorkbook -Name "AW Customer Address" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -Credentials $credentials
+                $workbookForTasks | Should -Not -BeNullOrEmpty
+                $script:datasourceForTasks = Publish-TSDatasource -Name "AW SalesOrders" -InFile "Tests/Assets/Misc/AW_SalesOrders.tdsx" -ProjectId $samplesProjectId -Credentials $credentials
+                $datasourceForTasks | Should -Not -BeNullOrEmpty
+                $connections = @( @{serverAddress="asl-tableau-testsql.database.windows.net"; serverPort="3389"; credentials=@{username="sqladmin"; password=$securePw; embed="true" }} )
+                $script:flowForTasks = Publish-TSFlow -Name "AW ProductDescription Flow" -InFile "Tests/Assets/Misc/AW_ProductDescription.tfl" -ProjectId $samplesProjectId -Connections $connections
+                $flowForTasks | Should -Not -BeNullOrEmpty
+                # Start-Sleep -s 3
+            }
+            It "Schedule and query extract refresh tasks on <ConfigFile.server>" -Skip {
+                if (-Not $ConfigFile.tableau_cloud) {
+                    $extractScheduleId = Get-TSSchedule | Where-Object type -eq "Extract" | Select-Object -First 1 -ExpandProperty id
+                    Write-Verbose "Extract schedule $extractScheduleId found"
+                    $contentScheduleTask = Add-TSContentToSchedule -ScheduleId $extractScheduleId -WorkbookId $workbookForTasks.id
+                    $extractTaskId = Get-TSTask -Type ExtractRefresh | Select-Object -First 1 -ExpandProperty id
+                    $extractTaskId | Should -Be $contentScheduleTask.id
+                    Write-Verbose "Extract task id: $extractTaskId"
+                    $job = Start-TSTaskNow -Type ExtractRefresh -TaskId $extractTaskId
+                    $job | Should -Not -BeNullOrEmpty
+                    Stop-TSJob -JobId $job.id
+                    $contentScheduleTask = Add-TSContentToSchedule -ScheduleId $extractScheduleId -WorkbookId $datasourceForTasks.id
+                    $extractTaskId = Get-TSTask -Type ExtractRefresh | Select-Object -First 1 -ExpandProperty id
+                    $extractTaskId | Should -Be $contentScheduleTask.id
+                    Write-Verbose "Extract task id: $extractTaskId"
+                    $job = Start-TSTaskNow -Type ExtractRefresh -TaskId $extractTaskId
+                    $job | Should -Not -BeNullOrEmpty
+                    Stop-TSJob -JobId $job.id
+                } else {
+                    Set-ItResult -Skipped -Because "feature not available for Tableau Cloud"
+                }
+            }
+            It "Schedule and query run flow task on <ConfigFile.server>" {
+                if (-Not $ConfigFile.tableau_cloud) {
+                    $runFlowScheduleId = Get-TSSchedule | Where-Object type -eq "Flow" | Select-Object -First 1 -ExpandProperty id
+                    Write-Verbose "Flow schedule $runFlowScheduleId found"
+                    Add-TSContentToSchedule -ScheduleId $runFlowScheduleId -FlowId $flowForTasks.id
+                    $flowTaskId = Get-TSTask -Type FlowRun | Select-Object -First 1 -ExpandProperty id
+                    $flowTaskId | Should -Not -BeNullOrEmpty
+                    Write-Verbose "Flow task id: $flowTaskId"
+                    $job = Start-TSTaskNow -Type FlowRun -TaskId $flowTaskId
+                    $job | Should -Not -BeNullOrEmpty
+                    Stop-TSJob -JobId $job.id
+                } else {
+                    Set-ItResult -Skipped -Because "feature not available for Tableau Cloud"
                 }
             }
         }
