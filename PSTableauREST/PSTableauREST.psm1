@@ -3705,13 +3705,14 @@ function Remove-TSDataAccelerationTask {
     }
 }
 
-### Extract and Encryption methods - API 3.5
+### Extract and Encryption methods
 function Get-TSExtractRefreshTasksInSchedule {
     [OutputType([PSCustomObject[]])]
     Param(
         [Parameter(Mandatory)][string] $ScheduleId,
         [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
     )
+    # List Extract Refresh Tasks in Server Schedule
     # Assert-TSRestApiVersion -AtLeast 2.3
     $pageNumber = 0
     do {
@@ -3722,6 +3723,56 @@ function Get-TSExtractRefreshTasksInSchedule {
         $totalAvailable = $response.tsResponse.pagination.totalAvailable
         $response.tsResponse.extracts.extract
     } until ($PageSize*$pageNumber -ge $totalAvailable)
+}
+
+function Get-TSExtractRefreshTask {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter(Mandatory,ParameterSetName='TaskById')][string] $TaskId,
+        [Parameter(ParameterSetName='Tasks')][ValidateRange(1,100)][int] $PageSize = 100
+    )
+    if ($TaskId) { # Get Extract Refresh Task
+        Assert-TSRestApiVersion -AtLeast 2.6
+        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param extractRefreshes/$TaskId) -Method Get
+        $response.tsResponse.task.extractRefresh
+    } else { # List Extract Refresh Tasks in Site
+        # Assert-TSRestApiVersion -AtLeast 2.2
+        $pageNumber = 0
+        do {
+            $pageNumber++
+            $uri = Get-TSRequestUri -Endpoint Task -Param extractRefreshes
+            $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+            $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
+            $totalAvailable = $response.tsResponse.pagination.totalAvailable
+            $response.tsResponse.tasks.task.extractRefresh
+        } until ($PageSize*$pageNumber -ge $totalAvailable)
+    }
+}
+
+function Start-TSExtractRefreshTaskNow {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $TaskId
+    )
+    # Run Extract Refresh Task
+    Assert-TSRestApiVersion -AtLeast 2.6
+    if ($PSCmdlet.ShouldProcess($TaskId)) {
+        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param extractRefreshes/$TaskId/runNow) -Method Post
+        return $response.tsResponse.job
+    }
+}
+
+function Remove-TSExtractRefreshTask {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $TaskId
+    )
+    Assert-TSRestApiVersion -AtLeast 3.6
+    if ($PSCmdlet.ShouldProcess($TaskId)) {
+        Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param extractRefreshes/$TaskId) -Method Delete
+    }
 }
 
 ### Favorites methods

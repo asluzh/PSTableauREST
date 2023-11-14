@@ -137,14 +137,12 @@ FunctionsToExport = @(
 'Get-TSJob', 'Stop-TSJob',
 'Get-TSFlowRunTask', 'Start-TSFlowRunTaskNow', 'Get-TSLinkedTask', 'Start-TSLinkedTaskNow',
 'Get-TSDataAccelerationTask', 'Remove-TSDataAccelerationTask',
+# TODO unified tasks methods for extract refresh/run flow/data accel
+# TODO Wait for job to finish (see tsc: wait_for_job)
 
 ### Extract and Encryption methods - API 3.5
 'Get-TSExtractRefreshTasksInSchedule',
-# List Extract Refresh Tasks in Site
-# List Extract Refresh Tasks in Server Schedule
-# Get Extract Refresh Task
-# Run Extract Refresh Task
-# Delete Extract Refresh Task
+'Get-TSExtractRefreshTask', 'Start-TSExtractRefreshTaskNow', 'Remove-TSExtractRefreshTask',
 # Encrypt Extracts in a Site
 # Reencrypt Extracts in a Site
 # Decrypt Extracts in a Site
@@ -157,7 +155,7 @@ FunctionsToExport = @(
 
 ### Favorites methods
 'Get-TSUserFavorite', 'Add-TSUserFavorite', 'Remove-TSUserFavorite', 'Move-TSUserFavorite',
-# Add Metric to Favorites - Retired in API 3.22
+# Add Metric to Favorites - will be retired in API 3.22
 
 ### Subscription methods
 # List Subscriptions
