@@ -4011,6 +4011,36 @@ function Update-TSExtractsRefreshTask {
     }
 }
 
+function Invoke-TSEncryption {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory,ParameterSetName='Encrypt')][switch] $EncryptExtracts,
+        [Parameter(Mandatory,ParameterSetName='Decrypt')][switch] $DecryptExtracts,
+        [Parameter(Mandatory,ParameterSetName='Reencrypt')][switch] $ReencryptExtracts,
+        [Parameter()][string] $SiteId
+    )
+    if (-Not $SiteId) {
+        $SiteId = $script:TSSiteId
+    }
+    if ($EncryptExtracts) {
+        # Encrypt Extracts in a Site
+        if ($PSCmdlet.ShouldProcess("encrypt extracts on site $SiteId")) {
+            Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Site -Param "$SiteId/encrypt-extracts") -Method Post
+        }
+    } elseif ($DecryptExtracts) {
+        # Decrypt Extracts in a Site
+        if ($PSCmdlet.ShouldProcess("decrypt extracts on site $SiteId")) {
+            Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Site -Param "$SiteId/decrypt-extracts") -Method Post
+        }
+    } elseif ($ReencryptExtracts) {
+        # Reencrypt Extracts in a Site
+        if ($PSCmdlet.ShouldProcess("reencrypt extracts on site $SiteId")) {
+            Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Site -Param "$SiteId/reencrypt-extracts") -Method Post
+        }
+    }
+}
+
 ### Favorites methods
 function Get-TSUserFavorite {
     [OutputType([PSCustomObject[]])]
