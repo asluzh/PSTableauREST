@@ -57,7 +57,7 @@ function Get-TSRequestUri {
     [OutputType([string])]
     Param(
         [Parameter(Mandatory)][ValidateSet('Auth','Site','Project','User','Group','Workbook','Datasource','View','Flow','FileUpload',
-            'Recommendation','CustomView','Favorite','OrderFavorites','Schedule','ServerSchedule','Job','Task',
+            'Recommendation','CustomView','Favorite','OrderFavorites','Schedule','ServerSchedule','Job','Task','Subscription',
             'Database','Table','GraphQL')][string] $Endpoint,
         [Parameter()][string] $Param
     )
@@ -1374,8 +1374,8 @@ function Export-TSWorkbookToFormat {
     Param(
         [Parameter(Mandatory)][string] $WorkbookId,
         [Parameter(Mandatory)][ValidateSet('pdf','powerpoint','image')][string] $Format,
-        [Parameter()][ValidateSet('A3','A4','A5','B4','B5','Executive','Folio','Ledger','Legal','Letter','Note','Quarto','Tabloid','Unspecified')][string] $PageType = "A4",
-        [Parameter()][ValidateSet('Portrait','Landscape')][string] $PageOrientation = "Portrait",
+        [Parameter()][ValidateSet('A3','A4','A5','B4','B5','Executive','Folio','Ledger','Legal','Letter','Note','Quarto','Tabloid','Unspecified')][string] $PageType = 'A4',
+        [Parameter()][ValidateSet('Portrait','Landscape')][string] $PageOrientation = 'Portrait',
         [Parameter()][int] $MaxAge, # The maximum number of minutes a workbook preview will be cached before being refreshed
         [Parameter()][string] $OutFile
     )
@@ -1863,15 +1863,15 @@ function Export-TSViewToFormat {
     Param(
         [Parameter(Mandatory)][string] $ViewId,
         [Parameter(Mandatory)][ValidateSet('pdf','image','csv','excel')][string] $Format,
-        [Parameter()][ValidateSet('A3','A4','A5','B4','B5','Executive','Folio','Ledger','Legal','Letter','Note','Quarto','Tabloid','Unspecified')][string] $PageType = "A4",
-        [Parameter()][ValidateSet('Portrait','Landscape')][string] $PageOrientation = "Portrait",
+        [Parameter()][ValidateSet('A3','A4','A5','B4','B5','Executive','Folio','Ledger','Legal','Letter','Note','Quarto','Tabloid','Unspecified')][string] $PageType = 'A4',
+        [Parameter()][ValidateSet('Portrait','Landscape')][string] $PageOrientation = 'Portrait',
         [Parameter()][int] $MaxAge, # The maximum number of minutes a view pdf/image/data/crosstab will be cached before being refreshed
         # The height/width of the rendered pdf image in pixels; these parameter determine its resolution and aspect ratio
         [Parameter()][int] $VizWidth,
         [Parameter()][int] $VizHeight,
         # The resolution of the image. Image width and actual pixel density are determined by the display context of the image.
         # Aspect ratio is always preserved. Set the value to high to ensure maximum pixel density.
-        [Parameter()][ValidateSet('standard','high')][string] $Resolution = "high",
+        [Parameter()][ValidateSet('standard','high')][string] $Resolution = 'high',
         [Parameter()][string] $OutFile,
         # https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#Filter-query-views
         [Parameter()][hashtable] $ViewFilters
@@ -3899,7 +3899,7 @@ function Add-TSExtractsRefreshTask {
         }
     }
     if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param extractRefreshes) -Body $xml.OuterXml -Method Post -ContentType "application/xml"
+        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param extractRefreshes) -Body $xml.OuterXml -Method Post #-ContentType "application/xml"
         return $response.tsResponse
     }
 }
@@ -4002,7 +4002,7 @@ function Update-TSExtractsRefreshTask {
         }
     }
     if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param extractRefreshes/$TaskId) -Body $xml.OuterXml -Method Put -ContentType "application/xml"
+        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param extractRefreshes/$TaskId) -Body $xml.OuterXml -Method Put #-ContentType "application/xml"
         return $response.tsResponse
     }
 }
@@ -4151,6 +4151,289 @@ function Move-TSUserFavorite {
     $el_fo.SetAttribute("favoriteTypeMoveAfter", $AfterFavoriteType.ToLower()) # note: needs to be lowercase, otherwise TS will return error 400
     if ($PSCmdlet.ShouldProcess("user:$UserId, favorite($FavoriteType):$FavoriteId, after($AfterFavoriteType):$AfterFavoriteId")) {
         Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint OrderFavorites -Param $UserId) -Body $xml.OuterXml -Method Put
+    }
+}
+
+### Subscription methods
+function Get-TSSubscription {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter(Mandatory,ParameterSetName='SubscriptionById')][string] $SubscriptionId,
+        [Parameter(ParameterSetName='Subscriptions')][ValidateRange(1,100)][int] $PageSize = 100
+    )
+    # Assert-TSRestApiVersion -AtLeast 2.3
+    if ($SubscriptionId) { # Get Subscription
+        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Subscription -Param $SubscriptionId) -Method Get
+        $response.tsResponse.subscription
+    } else { # List Subscriptions
+        $pageNumber = 0
+        do {
+            $pageNumber++
+            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Subscription) -Method Get
+            $totalAvailable = $response.tsResponse.pagination.totalAvailable
+            $response.tsResponse.subscriptions.subscription
+        } until ($PageSize*$pageNumber -ge $totalAvailable)
+    }
+}
+
+function Add-TSSubscription {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $Subject,
+        [Parameter(Mandatory)][string] $Message,
+        [Parameter(Mandatory)][string] $UserId,
+        [Parameter(Mandatory)][ValidateSet('Workbook','View')][string] $ContentType,
+        [Parameter(Mandatory)][string] $ContentId,
+        [Parameter()][switch] $SendIfViewEmpty,
+        [Parameter()][switch] $AttachImage,
+        [Parameter()][switch] $AttachPdf,
+        [Parameter()][ValidateSet('A3','A4','A5','B4','B5','Executive','Folio','Ledger','Legal','Letter','Note','Quarto','Tabloid')][string] $PageType = 'A4',
+        [Parameter()][ValidateSet('Portrait','Landscape')][string] $PageOrientation = 'Portrait',
+        [Parameter(Mandatory,ParameterSetName='ServerSchedule')][string] $ScheduleId,
+        [Parameter(Mandatory,ParameterSetName='CloudSchedule')][ValidateSet('Hourly','Daily','Weekly','Monthly')][string] $Frequency = 'Daily',
+        [Parameter(Mandatory,ParameterSetName='CloudSchedule')][ValidatePattern('^[0-2][0-9]:[0-5][0-9]:[0-5][0-9]$')][string] $StartTime = '00:00:00',
+        [Parameter(ParameterSetName='CloudSchedule')][ValidatePattern('^[0-2][0-9]:[0-5][0-9]:[0-5][0-9]$')][string] $EndTime,
+        [Parameter(ParameterSetName='CloudSchedule')][ValidateSet(1,2,4,6,8,12,24)][int] $IntervalHours,
+        [Parameter(ParameterSetName='CloudSchedule')][ValidateSet(15,30,60)][int] $IntervalMinutes,
+        [Parameter(ParameterSetName='CloudSchedule')][ValidateSet('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')][string[]] $IntervalWeekdays,
+        [Parameter(ParameterSetName='CloudSchedule')][ValidateRange(0,5)][int] $IntervalMonthdayNr, # 0 for last day
+        [Parameter(ParameterSetName='CloudSchedule')][ValidateSet('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')][string] $IntervalMonthdayWeekday,
+        [Parameter(ParameterSetName='CloudSchedule')][ValidateRange(1,31)][int[]] $IntervalMonthdays # specific month days
+    )
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_subs = $tsRequest.AppendChild($xml.CreateElement("subscription"))
+    $el_subs.SetAttribute("subject", $Subject)
+    $el_subs.SetAttribute("message", $Message)
+    $el_subs.SetAttribute("attachImage", $AttachImage)
+    $el_subs.SetAttribute("attachPdf", $AttachPdf)
+    if ($AttachPdf) {
+        $el_subs.SetAttribute("pageOrientation", $PageOrientation)
+        $el_subs.SetAttribute("pageSizeOption", $PageType)
+    }
+    $el_content = $el_subs.AppendChild($xml.CreateElement("content"))
+    $el_content.SetAttribute("id", $ContentId)
+    $el_content.SetAttribute("type", $ContentType)
+    if ($ContentType -eq 'View') {
+        $el_content.SetAttribute("sendIfViewEmpty", $SendIfViewEmpty)
+    }
+    if ($ScheduleId) { # Create Subscription on Tableau Server
+        # Assert-TSRestApiVersion -AtLeast 2.3
+        $el_sched = $el_subs.AppendChild($xml.CreateElement("schedule"))
+        $el_sched.SetAttribute("id", $ScheduleId)
+    } elseif ($Frequency) { # Create Subscription on Tableau Cloud
+        Assert-TSRestApiVersion -AtLeast 3.20
+        $el_sched = $tsRequest.AppendChild($xml.CreateElement("schedule"))
+        $el_sched.SetAttribute("frequency", $Frequency)
+        $el_freq = $el_sched.AppendChild($xml.CreateElement("frequencyDetails"))
+        $el_freq.SetAttribute("start", $StartTime)
+        if ($EndTime) {
+            $el_freq.SetAttribute("end", $EndTime)
+        }
+        $el_ints = $el_freq.AppendChild($xml.CreateElement("intervals"))
+        switch ($Frequency) {
+            'Hourly' {
+                if ($IntervalHours) {
+                    $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("hours", $IntervalHours)
+                }
+                if ($IntervalMinutes) {
+                    $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("minutes", $IntervalMinutes)
+                }
+                if ($IntervalWeekdays) {
+                    foreach ($weekday in $IntervalWeekdays) {
+                        $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("weekDay", $weekday)
+                    }
+                }
+            }
+            'Daily' {
+                if ($IntervalHours) {
+                    $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("hours", $IntervalHours)
+                }
+                if ($IntervalWeekdays) {
+                    foreach ($weekday in $IntervalWeekdays) {
+                        $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("weekDay", $weekday)
+                    }
+                }
+            }
+            'Weekly' {
+                if ($IntervalWeekdays) {
+                    foreach ($weekday in $IntervalWeekdays) {
+                        $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("weekDay", $weekday)
+                    }
+                }
+            }
+            'Monthly' {
+                if ($IntervalMonthdayNr -ge 0 -and $IntervalMonthdayWeekday) {
+                    $el_int = $el_ints.AppendChild($xml.CreateElement("interval"))
+                    switch ($IntervalMonthdayNr) {
+                        0 { $el_int.SetAttribute("monthDay", "LastDay") }
+                        1 { $el_int.SetAttribute("monthDay", "First") }
+                        2 { $el_int.SetAttribute("monthDay", "Second") }
+                        3 { $el_int.SetAttribute("monthDay", "Third") }
+                        4 { $el_int.SetAttribute("monthDay", "Fourth") }
+                        5 { $el_int.SetAttribute("monthDay", "Fifth") }
+                    }
+                    $el_int.SetAttribute("weekDay", $IntervalMonthdayWeekday)
+                } elseif ($IntervalMonthdayNr -eq 0) { # last day of the month
+                    $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("monthDay", "LastDay")
+                } elseif ($IntervalMonthdays) {
+                    foreach ($monthday in $IntervalMonthdays) {
+                        $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("monthDay", $monthday)
+                    }
+                }
+            }
+        }
+    }
+    if ($PSCmdlet.ShouldProcess($Subject)) {
+        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Subscription) -Body $xml.OuterXml -Method Post
+        return $response.tsResponse.subscription
+    }
+}
+
+function Update-TSSubscription {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $SubscriptionId,
+        [Parameter()][string] $Subject,
+        [Parameter()][string] $Message,
+        [Parameter()][string] $UserId,
+        [Parameter()][ValidateSet('Workbook','View')][string] $ContentType,
+        [Parameter()][string] $ContentId,
+        [Parameter()][nullable[bool]] $SendIfViewEmpty,
+        [Parameter()][nullable[bool]] $AttachImage,
+        [Parameter()][nullable[bool]] $AttachPdf,
+        [Parameter()][ValidateSet('A3','A4','A5','B4','B5','Executive','Folio','Ledger','Legal','Letter','Note','Quarto','Tabloid')][string] $PageType,
+        [Parameter()][ValidateSet('Portrait','Landscape')][string] $PageOrientation,
+        [Parameter()][nullable[bool]] $Suspended,
+        [Parameter(ParameterSetName='ServerSchedule')][string] $ScheduleId,
+        [Parameter(ParameterSetName='CloudSchedule')][ValidateSet('Hourly','Daily','Weekly','Monthly')][string] $Frequency,
+        [Parameter(ParameterSetName='CloudSchedule')][ValidatePattern('^[0-2][0-9]:[0-5][0-9]:[0-5][0-9]$')][string] $StartTime,
+        [Parameter(ParameterSetName='CloudSchedule')][ValidatePattern('^[0-2][0-9]:[0-5][0-9]:[0-5][0-9]$')][string] $EndTime,
+        [Parameter(ParameterSetName='CloudSchedule')][ValidateSet(1,2,4,6,8,12,24)][int] $IntervalHours,
+        [Parameter(ParameterSetName='CloudSchedule')][ValidateSet(15,30,60)][int] $IntervalMinutes,
+        [Parameter(ParameterSetName='CloudSchedule')][ValidateSet('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')][string[]] $IntervalWeekdays,
+        [Parameter(ParameterSetName='CloudSchedule')][ValidateRange(0,5)][int] $IntervalMonthdayNr, # 0 for last day
+        [Parameter(ParameterSetName='CloudSchedule')][ValidateSet('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')][string] $IntervalMonthdayWeekday,
+        [Parameter(ParameterSetName='CloudSchedule')][ValidateRange(1,31)][int[]] $IntervalMonthdays # specific month days
+    )
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_subs = $tsRequest.AppendChild($xml.CreateElement("subscription"))
+    if ($Subject) {
+        $el_subs.SetAttribute("subject", $Subject)
+    }
+    if ($Message) {
+        $el_subs.SetAttribute("message", $Message)
+    }
+    if ($null -ne $AttachImage) {
+        $el_subs.SetAttribute("attachImage", $AttachImage)
+    }
+    if ($null -ne $AttachPdf) {
+        $el_subs.SetAttribute("attachPdf", $AttachPdf)
+    }
+    if ($AttachPdf -eq $true -and $PageOrientation) {
+        $el_subs.SetAttribute("pageOrientation", $PageOrientation)
+    }
+    if ($AttachPdf -eq $true -and $PageType) {
+        $el_subs.SetAttribute("pageSizeOption", $PageType)
+    }
+    if ($ContentId -or $null -ne $SendIfViewEmpty) {
+        $el_content = $el_subs.AppendChild($xml.CreateElement("content"))
+        if ($ContentId) {
+            $el_content.SetAttribute("id", $ContentId)
+        }
+        if ($ContentType) {
+            $el_content.SetAttribute("type", $ContentType)
+        }
+        if ($null -ne $SendIfViewEmpty) {
+            $el_content.SetAttribute("sendIfViewEmpty", $SendIfViewEmpty)
+        }
+    }
+    if ($ScheduleId) { # Update Subscription on Tableau Server
+        # Assert-TSRestApiVersion -AtLeast 2.3
+        $el_sched = $el_subs.AppendChild($xml.CreateElement("schedule"))
+        $el_sched.SetAttribute("id", $ScheduleId)
+    } elseif ($Frequency) { # Update Subscription on Tableau Cloud
+        Assert-TSRestApiVersion -AtLeast 3.20
+        $el_sched = $tsRequest.AppendChild($xml.CreateElement("schedule"))
+        $el_sched.SetAttribute("frequency", $Frequency)
+        $el_freq = $el_sched.AppendChild($xml.CreateElement("frequencyDetails"))
+        $el_freq.SetAttribute("start", $StartTime)
+        if ($EndTime) {
+            $el_freq.SetAttribute("end", $EndTime)
+        }
+        $el_ints = $el_freq.AppendChild($xml.CreateElement("intervals"))
+        switch ($Frequency) {
+            'Hourly' {
+                if ($IntervalHours) {
+                    $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("hours", $IntervalHours)
+                }
+                if ($IntervalMinutes) {
+                    $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("minutes", $IntervalMinutes)
+                }
+                if ($IntervalWeekdays) {
+                    foreach ($weekday in $IntervalWeekdays) {
+                        $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("weekDay", $weekday)
+                    }
+                }
+            }
+            'Daily' {
+                if ($IntervalHours) {
+                    $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("hours", $IntervalHours)
+                }
+                if ($IntervalWeekdays) {
+                    foreach ($weekday in $IntervalWeekdays) {
+                        $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("weekDay", $weekday)
+                    }
+                }
+            }
+            'Weekly' {
+                if ($IntervalWeekdays) {
+                    foreach ($weekday in $IntervalWeekdays) {
+                        $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("weekDay", $weekday)
+                    }
+                }
+            }
+            'Monthly' {
+                if ($IntervalMonthdayNr -ge 0 -and $IntervalMonthdayWeekday) {
+                    $el_int = $el_ints.AppendChild($xml.CreateElement("interval"))
+                    switch ($IntervalMonthdayNr) {
+                        0 { $el_int.SetAttribute("monthDay", "LastDay") }
+                        1 { $el_int.SetAttribute("monthDay", "First") }
+                        2 { $el_int.SetAttribute("monthDay", "Second") }
+                        3 { $el_int.SetAttribute("monthDay", "Third") }
+                        4 { $el_int.SetAttribute("monthDay", "Fourth") }
+                        5 { $el_int.SetAttribute("monthDay", "Fifth") }
+                    }
+                    $el_int.SetAttribute("weekDay", $IntervalMonthdayWeekday)
+                } elseif ($IntervalMonthdayNr -eq 0) { # last day of the month
+                    $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("monthDay", "LastDay")
+                } elseif ($IntervalMonthdays) {
+                    foreach ($monthday in $IntervalMonthdays) {
+                        $el_ints.AppendChild($xml.CreateElement("interval")).SetAttribute("monthDay", $monthday)
+                    }
+                }
+            }
+        }
+    }
+    if ($PSCmdlet.ShouldProcess($SubscriptionId)) {
+        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Subscription -Param $SubscriptionId) -Body $xml.OuterXml -Method Put
+        return $response.tsResponse.subscription
+    }
+}
+
+function Remove-TSSubscription {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $SubscriptionId
+    )
+    # Delete Subscription
+    # Assert-TSRestApiVersion -AtLeast 2.3
+    if ($PSCmdlet.ShouldProcess($SubscriptionId)) {
+        Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Subscription -Param $SubscriptionId) -Method Delete
     }
 }
 

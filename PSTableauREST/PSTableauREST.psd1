@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.1.27'
+ModuleVersion = '0.1.28'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -151,11 +151,7 @@ FunctionsToExport = @(
 # Add Metric to Favorites - will be retired in API 3.22
 
 ### Subscription methods
-# List Subscriptions
-# Get Subscription
-# Create Subscription
-# Update Subscription
-# Delete Subscription
+'Get-TSSubscription', 'Add-TSSubscription', 'Update-TSSubscription', 'Remove-TSSubscription',
 
 ### Dashboard Extensions Settings methods - API 3.8
 # List settings for dashboard extensions on server
