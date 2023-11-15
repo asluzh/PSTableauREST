@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.1.30'
+ModuleVersion = '0.1.31'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -75,8 +75,7 @@ FunctionsToExport = @(
 
 ### Authentication / Server methods
 'Get-TSServerInfo', 'Open-TSSignIn', 'Switch-TSSite', 'Close-TSSignOut', 'Revoke-TSServerAdminPAT', 'Get-TSCurrentUserId',
-# Get Current Server Session
-# Delete Server Session
+'Get-TSCurrentSession', 'Remove-TSSession',
 # List Server Active Directory Domains
 # Update Server Active Directory Domain
 

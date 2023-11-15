@@ -56,7 +56,7 @@ function Invoke-TSRestApiMethod {
 function Get-TSRequestUri {
     [OutputType([string])]
     Param(
-        [Parameter(Mandatory)][ValidateSet('Auth','Site','Project','User','Group','Workbook','Datasource','View','Flow','FileUpload',
+        [Parameter(Mandatory)][ValidateSet('Auth','Site','Session','Project','User','Group','Workbook','Datasource','View','Flow','FileUpload',
             'Recommendation','CustomView','Favorite','OrderFavorites','Schedule','ServerSchedule','Job','Task','Subscription','DataAlert',
             'Database','Table','GraphQL')][string] $Endpoint,
         [Parameter()][string] $Param
@@ -68,6 +68,10 @@ function Get-TSRequestUri {
         }
         'Site' {
             $Uri += "sites"
+            if ($Param) { $Uri += "/$Param" }
+        }
+        'Session' {
+            $Uri += "sessions"
             if ($Param) { $Uri += "/$Param" }
         }
         'ServerSchedule' {
@@ -260,7 +264,7 @@ function Open-TSSignIn {
 function Switch-TSSite {
     [OutputType([PSCustomObject])]
     Param(
-        [Parameter()][string] $Site = ""
+        [Parameter()][string] $Site = ''
     )
     Assert-TSRestApiVersion -AtLeast 2.6
     $xml = New-Object System.Xml.XmlDocument
@@ -305,6 +309,25 @@ function Get-TSCurrentUserId {
     [OutputType([string])]
     Param()
     return $script:TSUserId
+}
+
+# Get Current Server Session
+function Get-TSCurrentSession {
+    [OutputType([PSCustomObject])]
+    Param()
+    Assert-TSRestApiVersion -AtLeast 3.1
+    $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Session -Param current) -Method Get
+    return $response.tsResponse.session
+}
+
+# Delete Server Session
+function Remove-TSSession {
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $SessionId
+    )
+    Assert-TSRestApiVersion -AtLeast 3.9
+    Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Session -Param $SessionId) -Method Delete
 }
 
 ### Sites methods
