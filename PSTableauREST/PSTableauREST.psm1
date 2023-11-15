@@ -4185,9 +4185,9 @@ function Add-TSSubscription {
         [Parameter(Mandatory)][string] $UserId,
         [Parameter(Mandatory)][ValidateSet('Workbook','View')][string] $ContentType,
         [Parameter(Mandatory)][string] $ContentId,
-        [Parameter()][switch] $SendIfViewEmpty,
-        [Parameter()][switch] $AttachImage,
-        [Parameter()][switch] $AttachPdf,
+        [Parameter()][ValidateSet('true','false')][string] $SendIfViewEmpty = 'true',
+        [Parameter()][ValidateSet('true','false')][string] $AttachImage = 'true',
+        [Parameter()][ValidateSet('true','false')][string] $AttachPdf = 'false',
         [Parameter()][ValidateSet('A3','A4','A5','B4','B5','Executive','Folio','Ledger','Legal','Letter','Note','Quarto','Tabloid')][string] $PageType = 'A4',
         [Parameter()][ValidateSet('Portrait','Landscape')][string] $PageOrientation = 'Portrait',
         [Parameter(Mandatory,ParameterSetName='ServerSchedule')][string] $ScheduleId,
@@ -4208,7 +4208,7 @@ function Add-TSSubscription {
     $el_subs.SetAttribute("message", $Message)
     $el_subs.SetAttribute("attachImage", $AttachImage)
     $el_subs.SetAttribute("attachPdf", $AttachPdf)
-    if ($AttachPdf) {
+    if ($AttachPd -eq 'true') {
         $el_subs.SetAttribute("pageOrientation", $PageOrientation)
         $el_subs.SetAttribute("pageSizeOption", $PageType)
     }
@@ -4301,12 +4301,12 @@ function Update-TSSubscription {
         [Parameter()][string] $UserId,
         [Parameter()][ValidateSet('Workbook','View')][string] $ContentType,
         [Parameter()][string] $ContentId,
-        [Parameter()][nullable[bool]] $SendIfViewEmpty,
-        [Parameter()][nullable[bool]] $AttachImage,
-        [Parameter()][nullable[bool]] $AttachPdf,
+        [Parameter()][ValidateSet('true','false')][string] $SendIfViewEmpty,
+        [Parameter()][ValidateSet('true','false')][string] $AttachImage,
+        [Parameter()][ValidateSet('true','false')][string] $AttachPdf,
         [Parameter()][ValidateSet('A3','A4','A5','B4','B5','Executive','Folio','Ledger','Legal','Letter','Note','Quarto','Tabloid')][string] $PageType,
         [Parameter()][ValidateSet('Portrait','Landscape')][string] $PageOrientation,
-        [Parameter()][nullable[bool]] $Suspended,
+        [Parameter()][ValidateSet('true','false')][string] $Suspended,
         [Parameter(ParameterSetName='ServerSchedule')][string] $ScheduleId,
         [Parameter(ParameterSetName='CloudSchedule')][ValidateSet('Hourly','Daily','Weekly','Monthly')][string] $Frequency,
         [Parameter(ParameterSetName='CloudSchedule')][ValidatePattern('^[0-2][0-9]:[0-5][0-9]:[0-5][0-9]$')][string] $StartTime,
@@ -4327,19 +4327,19 @@ function Update-TSSubscription {
     if ($Message) {
         $el_subs.SetAttribute("message", $Message)
     }
-    if ($null -ne $AttachImage) {
+    if ($AttachImage) {
         $el_subs.SetAttribute("attachImage", $AttachImage)
     }
-    if ($null -ne $AttachPdf) {
+    if ($AttachPdf) {
         $el_subs.SetAttribute("attachPdf", $AttachPdf)
     }
-    if ($AttachPdf -eq $true -and $PageOrientation) {
+    if ($AttachPdf -eq 'true' -and $PageOrientation) {
         $el_subs.SetAttribute("pageOrientation", $PageOrientation)
     }
-    if ($AttachPdf -eq $true -and $PageType) {
+    if ($AttachPdf -eq 'true' -and $PageType) {
         $el_subs.SetAttribute("pageSizeOption", $PageType)
     }
-    if ($ContentId -or $null -ne $SendIfViewEmpty) {
+    if ($ContentId -or $SendIfViewEmpty) {
         $el_content = $el_subs.AppendChild($xml.CreateElement("content"))
         if ($ContentId) {
             $el_content.SetAttribute("id", $ContentId)
@@ -4347,7 +4347,7 @@ function Update-TSSubscription {
         if ($ContentType) {
             $el_content.SetAttribute("type", $ContentType)
         }
-        if ($null -ne $SendIfViewEmpty) {
+        if ($SendIfViewEmpty) {
             $el_content.SetAttribute("sendIfViewEmpty", $SendIfViewEmpty)
         }
     }

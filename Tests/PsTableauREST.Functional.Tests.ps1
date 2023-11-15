@@ -1829,7 +1829,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 }
             }
         }
-        Context "Schedule operations" -Tag Schedule {
+        Context "Server schedule operations" -Tag ServerSchedule {
             It "Add new schedule on <ConfigFile.server>" {
                 if ($ConfigFile.server_admin) {
                     $scheduleName = New-Guid
@@ -1946,56 +1946,48 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     Set-ItResult -Skipped
                 }
             }
-            Context "Sample contents for schedule operations" {
-                BeforeAll {
-                    if (-Not $ConfigFile.tableau_cloud) {
-                        $project = Add-TSProject -Name (New-Guid)
-                        $script:samplesProjectId = $project.id
-                        $script:samplesProjectName = $project.name
-                    }
+        }
+        Context "Common schedule operations" -Tag Schedule {
+            BeforeAll {
+                if (-Not $ConfigFile.tableau_cloud) {
+                    $project = Add-TSProject -Name (New-Guid)
+                    $script:samplesProjectId = $project.id
+                    $script:samplesProjectName = $project.name
                 }
-                AfterAll {
-                    if ($samplesProjectId) {
-                        Remove-TSProject -ProjectId $samplesProjectId
-                        $script:samplesProjectId = $null
-                    }
+            }
+            AfterAll {
+                if ($samplesProjectId) {
+                    Remove-TSProject -ProjectId $samplesProjectId
+                    $script:samplesProjectId = $null
                 }
-                It "Publish samples into project <samplesProjectName> on <ConfigFile.server>" {
+            }
+            It "Publish samples into project <samplesProjectName> on <ConfigFile.server>" {
+                if ($samplesProjectId) {
                     $project = Update-TSProject -ProjectId $samplesProjectId -PublishSamples
                     $project.id | Should -Be $samplesProjectId
                     # Start-Sleep -s 3
-                }
-                It "Add extract refresh tasks into a schedule on <ConfigFile.server>" {
-                    if (-Not $ConfigFile.tableau_cloud) {
-                        $extractScheduleId = Get-TSSchedule | Where-Object type -eq "Extract" | Select-Object -First 1 -ExpandProperty id
-                        $workbooks = Get-TSWorkbook -Filter "projectName:eq:$samplesProjectName"
-                        $workbooks | ForEach-Object {
-                            $null = Add-TSContentToSchedule -ScheduleId $extractScheduleId -WorkbookId $_.id
-                        }
-                        $datasources = Get-TSDatasource -Filter "projectName:eq:$samplesProjectName"
-                        if (-not $datasources) { # fallback: perform filter in PS
-                            $datasources = Get-TSDatasource | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
-                        }
-                        $datasources | ForEach-Object {
-                            $null = Add-TSContentToSchedule -ScheduleId $extractScheduleId -DatasourceId $_.id
-                        }
-                    } else {
-                        Set-ItResult -Skipped -Because "feature not available for Tableau Cloud"
-                    }
-                    (Get-TSExtractRefreshTasksInSchedule -ScheduleId $extractScheduleId | Measure-Object).Count | Should -BeGreaterThan 0
+                } else {
+                    Set-ItResult -Skipped
                 }
             }
-            It "Add run flow tasks into a schedule on <ConfigFile.server>" {
-                if ($ConfigFile.prep_conductor) {
-                    $runFlowScheduleId = Get-TSSchedule | Where-Object type -eq "Flow" | Select-Object -First 1 -ExpandProperty id
-                    Write-Verbose "Flow schedule $runFlowScheduleId found"
-                    $flows = Get-TSFlow -Filter "projectName:eq:$samplesProjectName"
-                    $flows | ForEach-Object {
-                        $null = Add-TSContentToSchedule -ScheduleId $runFlowScheduleId -FlowId $_.id
+            It "Add extract refresh tasks into a schedule on <ConfigFile.server>" {
+                if (-Not $ConfigFile.tableau_cloud) {
+                    $extractScheduleId = Get-TSSchedule | Where-Object type -eq "Extract" | Select-Object -First 1 -ExpandProperty id
+                    $workbooks = Get-TSWorkbook -Filter "projectName:eq:$samplesProjectName"
+                    $workbooks | ForEach-Object {
+                        $null = Add-TSContentToSchedule -ScheduleId $extractScheduleId -WorkbookId $_.id
+                    }
+                    $datasources = Get-TSDatasource -Filter "projectName:eq:$samplesProjectName"
+                    if (-not $datasources) { # fallback: perform filter in PS
+                        $datasources = Get-TSDatasource | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
+                    }
+                    $datasources | ForEach-Object {
+                        $null = Add-TSContentToSchedule -ScheduleId $extractScheduleId -DatasourceId $_.id
                     }
                 } else {
-                    Set-ItResult -Skipped -Because "Prep Conductor is not activated"
+                    Set-ItResult -Skipped -Because "feature not available for Tableau Cloud"
                 }
+                (Get-TSExtractRefreshTasksInSchedule -ScheduleId $extractScheduleId | Measure-Object).Count | Should -BeGreaterThan 0
             }
         }
         Context "Tasks operations" -Tag Task {
@@ -2088,6 +2080,74 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 } else {
                     Set-ItResult -Skipped -Because "Prep Conductor is not activated"
                 }
+            }
+        }
+        Context "Subscription operations" -Tag Subscription {
+            BeforeAll {
+                $project = Add-TSProject -Name (New-Guid)
+                $script:samplesProjectId = $project.id
+                $script:samplesProjectName = $project.name
+            }
+            AfterAll {
+                if ($samplesProjectId) {
+                    Remove-TSProject -ProjectId $samplesProjectId
+                    $script:samplesProjectId = $null
+                }
+            }
+            It "Publish samples into project <samplesProjectName> on <ConfigFile.server>" {
+                $project = Update-TSProject -ProjectId $samplesProjectId -PublishSamples
+                $project.id | Should -Be $samplesProjectId
+                # Start-Sleep -s 3
+            }
+            It "Add/update subscriptions on <ConfigFile.server>" {
+                if ($ConfigFile.tableau_cloud) {
+                    $views = Get-TSView -Filter "projectName:eq:$samplesProjectName" | Select-Object -First 2
+                    $views | ForEach-Object {
+                        Write-Verbose ("Adding subscription for view '{0}'" -f $_.name)
+                        $subscription = Add-TSSubscription -ContentType View -ContentId $_.id -Subject "test" -Message "Test subscription" -UserId (Get-TSCurrentUserId) -Frequency Weekly -StartTime 12:00:00 -IntervalWeekdays 'Sunday'
+                        $subscription | Should -Not -BeNullOrEmpty
+                        $subscription = Update-TSSubscription -SubscriptionId $subscription.id -ContentType View -ContentId $_.id -Subject "test1" -Message "Test subscription1" -UserId (Get-TSCurrentUserId) -Frequency Monthly -StartTime 14:00:00 -IntervalMonthdays 5,10
+                        $subscription | Should -Not -BeNullOrEmpty
+                    }
+                    $workbooks = Get-TSWorkbook -Filter "projectName:eq:$samplesProjectName" | Select-Object -First 2
+                    $workbooks | ForEach-Object {
+                        Write-Verbose ("Adding subscription for workbook '{0}'" -f $_.name)
+                        $subscription = Add-TSSubscription -ContentType Workbook -ContentId $_.id -Subject "test" -Message "Test subscription" -UserId (Get-TSCurrentUserId) -Frequency Weekly -StartTime 12:00:00 -IntervalWeekdays 'Sunday'
+                        $subscription | Should -Not -BeNullOrEmpty
+                        $subscription = Update-TSSubscription -SubscriptionId $subscription.id -ContentType Workbook -ContentId $_.id -Subject "test1" -Message "Test subscription1" -UserId (Get-TSCurrentUserId) -Frequency Monthly -StartTime 14:00:00 -IntervalMonthdays 5,10
+                        $subscription | Should -Not -BeNullOrEmpty
+                    }
+                } else {
+                    $subscriptionScheduleId = Get-TSSchedule | Where-Object type -eq "Subscription" | Select-Object -First 1 -ExpandProperty id
+                    $views = Get-TSView -Filter "projectName:eq:$samplesProjectName" | Select-Object -First 2
+                    $views | ForEach-Object {
+                        Write-Verbose ("Adding view '{0}' to subscription schedule {1}" -f $_.name, $subscriptionScheduleId)
+                        $subscription = Add-TSSubscription -ScheduleId $subscriptionScheduleId -ContentType View -ContentId $_.id -Subject "test" -Message "Test subscription" -UserId (Get-TSCurrentUserId)
+                        $subscription | Should -Not -BeNullOrEmpty
+                        $subscription = Update-TSSubscription -SubscriptionId $subscription.id -ScheduleId $subscriptionScheduleId -ContentType View -ContentId $_.id -SendIfViewEmpty false -Subject "test1" -Message "Test subscription1"
+                        $subscription | Should -Not -BeNullOrEmpty
+                    }
+                    $workbooks = Get-TSWorkbook -Filter "projectName:eq:$samplesProjectName" | Select-Object -First 2
+                    $workbooks | ForEach-Object {
+                        Write-Verbose ("Adding workbook '{0}' to subscription schedule {1}" -f $_.name, $subscriptionScheduleId)
+                        $subscription = Add-TSSubscription -ScheduleId $subscriptionScheduleId -ContentType Workbook -ContentId $_.id -Subject "test" -Message "Test subscription" -UserId (Get-TSCurrentUserId)
+                        $subscription | Should -Not -BeNullOrEmpty
+                        $subscription = Update-TSSubscription -SubscriptionId $subscription.id -ScheduleId $subscriptionScheduleId -ContentType Workbook -ContentId $_.id -Subject "test1" -Message "Test subscription1"
+                        $subscription | Should -Not -BeNullOrEmpty
+                    }
+                }
+            }
+            It "Get subscriptions on <ConfigFile.server>" {
+                $subscriptions = Get-TSSubscription
+                $subscriptions | Should -Not -BeNullOrEmpty
+                $subscriptionId = $subscriptions | Select-Object -First 1 -ExpandProperty id
+                $subscription = Get-TSSubscription -SubscriptionId $subscriptionId
+                $subscription | Should -Not -BeNullOrEmpty
+            }
+            It "Remove subscription on <ConfigFile.server>" {
+                $subscriptionId = Get-TSSubscription | Select-Object -First 1 -ExpandProperty id
+                $subscriptionId | Should -Not -BeNullOrEmpty
+                Remove-TSSubscription -SubscriptionId $subscriptionId
             }
         }
         Context "Metadata operations" -Tag Metadata {
