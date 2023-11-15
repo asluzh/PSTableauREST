@@ -57,7 +57,7 @@ function Get-TSRequestUri {
     [OutputType([string])]
     Param(
         [Parameter(Mandatory)][ValidateSet('Auth','Site','Project','User','Group','Workbook','Datasource','View','Flow','FileUpload',
-            'Recommendation','CustomView','Favorite','OrderFavorites','Schedule','ServerSchedule','Job','Task','Subscription',
+            'Recommendation','CustomView','Favorite','OrderFavorites','Schedule','ServerSchedule','Job','Task','Subscription','DataAlert',
             'Database','Table','GraphQL')][string] $Endpoint,
         [Parameter()][string] $Param
     )
@@ -80,6 +80,10 @@ function Get-TSRequestUri {
         }
         'OrderFavorites' {
             $Uri += "sites/$script:TSSiteId/orderFavorites"
+            if ($Param) { $Uri += "/$Param" }
+        }
+        'DataAlert' {
+            $Uri += "sites/$script:TSSiteId/dataAlerts"
             if ($Param) { $Uri += "/$Param" }
         }
         'GraphQL' {
@@ -4434,6 +4438,164 @@ function Remove-TSSubscription {
     # Assert-TSRestApiVersion -AtLeast 2.3
     if ($PSCmdlet.ShouldProcess($SubscriptionId)) {
         Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Subscription -Param $SubscriptionId) -Method Delete
+    }
+}
+
+### Notifications methods
+function Get-TSDataAlert {
+    [OutputType([PSCustomObject[]])]
+    Param(
+        [Parameter(Mandatory,ParameterSetName='DataAlertById')][string] $DataAlertId,
+        [Parameter(ParameterSetName='DataAlerts')][string[]] $Filter,
+        [Parameter(ParameterSetName='DataAlerts')][string[]] $Sort,
+        [Parameter(ParameterSetName='DataAlerts')][string[]] $Fields,
+        [Parameter(ParameterSetName='DataAlerts')][ValidateRange(1,100)][int] $PageSize = 100
+    )
+    Assert-TSRestApiVersion -AtLeast 3.2
+    if ($DataAlertId) { # Get Data-Driven Alert
+        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint DataAlert -Param $DataAlertId) -Method Get
+        $response.tsResponse.dataAlert
+    } else { # List Data-Driven Alerts on Site
+        $pageNumber = 0
+        do {
+            $pageNumber++
+            $uri = Get-TSRequestUri -Endpoint DataAlert
+            $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
+            $uriParam.Add("pageSize", $PageSize)
+            $uriParam.Add("pageNumber", $pageNumber)
+            if ($Filter) {
+                $uriParam.Add("filter", $Filter -join ',')
+            }
+            if ($Sort) {
+                $uriParam.Add("sort", $Sort -join ',')
+            }
+            if ($Fields) {
+                $uriParam.Add("fields", $Fields -join ',')
+            }
+            $uriRequest = [System.UriBuilder]$uri
+            $uriRequest.Query = $uriParam.ToString()
+            $response = Invoke-TSRestApiMethod -Uri $uriRequest.Uri.OriginalString -Method Get
+            $totalAvailable = $response.tsResponse.pagination.totalAvailable
+            $response.tsResponse.dataAlerts.dataAlert
+        } until ($PageSize*$pageNumber -ge $totalAvailable)
+    }
+}
+
+function Add-TSDataAlert {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $Subject,
+        [Parameter(Mandatory)][ValidateSet('above','above-equal','below','below-equal','equal')][string] $Condition,
+        [Parameter(Mandatory)][int] $Threshold,
+        [Parameter()][ValidateSet('once','freguently','hourly','daily','weekly')][string] $Frequency = 'once',
+        [Parameter()][ValidateSet('private','public')][string] $Visibility = 'private',
+        [Parameter()][ValidateSet('desktop','phone','tablet')][string] $Device,
+        [Parameter(Mandatory)][string] $WorksheetName,
+        [Parameter(Mandatory,ParameterSetName='View')][string] $ViewId,
+        [Parameter(Mandatory,ParameterSetName='CustomView')][string] $CustomViewId
+    )
+    # Create Data Driven Alert
+    Assert-TSRestApiVersion -AtLeast 3.20
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_alert = $tsRequest.AppendChild($xml.CreateElement("dataAlertCreateAlert"))
+    $el_alert.SetAttribute("alertCondition", $Condition)
+    $el_alert.SetAttribute("alertThreshold", $Threshold)
+    $el_alert.SetAttribute("subject", $Subject)
+    $el_alert.SetAttribute("frequency", $Frequency)
+    $el_alert.SetAttribute("visibility", $Visibility)
+    if ($Device) {
+        $el_alert.SetAttribute("device", $Device)
+    }
+    $el_alert.SetAttribute("worksheetName", $WorksheetName)
+    if ($ViewId) {
+        $el_alert.SetAttribute("viewId", $ViewId)
+    } elseif ($CustomViewId) {
+        $el_alert.SetAttribute("customViewId", $CustomViewId)
+    }
+    if ($PSCmdlet.ShouldProcess($Name)) {
+        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint DataAlert) -Body $xml.OuterXml -Method Post
+        return $response.tsResponse.dataAlertCreateAlert
+    }
+}
+
+function Update-TSDataAlert {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter()][string] $OwnerUserId,
+        [Parameter()][string] $Subject,
+        [Parameter()][ValidateSet('once','freguently','hourly','daily','weekly')][string] $Frequency,
+        [Parameter()][ValidateSet('true','false')][string] $Public
+    )
+    # Update Data-Driven Alert
+    Assert-TSRestApiVersion -AtLeast 3.2
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_alert = $tsRequest.AppendChild($xml.CreateElement("dataAlert"))
+    if ($Subject) {
+        $el_alert.SetAttribute("subject", $Subject)
+    }
+    if ($Frequency) {
+        $el_alert.SetAttribute("frequency", $Frequency)
+    }
+    if ($Public) {
+        $el_alert.SetAttribute("public", $Public)
+    }
+    if ($OwnerUserId) {
+        $el_owner = $el_alert.AppendChild($xml.CreateElement("owner"))
+        $el_owner.SetAttribute("id", $OwnerUserId)
+    }
+    if ($PSCmdlet.ShouldProcess($DataAlertId)) {
+        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint DataAlert -Param $DataAlertId) -Body $xml.OuterXml -Method Put
+        return $response.tsResponse.dataAlert
+    }
+}
+
+function Remove-TSDataAlert {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $DataAlertId
+    )
+    # Delete Data-Driven Alert
+    Assert-TSRestApiVersion -AtLeast 3.2
+    if ($PSCmdlet.ShouldProcess($DataAlertId)) {
+        Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint DataAlert -Param $DataAlertId) -Method Delete
+    }
+}
+
+function Add-TSUserToDataAlert {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $DataAlertId,
+        [Parameter(Mandatory)][string] $UserId
+    )
+    # Add User to Data-Driven Alert
+    Assert-TSRestApiVersion -AtLeast 3.2
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_user = $tsRequest.AppendChild($xml.CreateElement("user"))
+    $el_user.SetAttribute("id", $UserId)
+    if ($PSCmdlet.ShouldProcess("user:$UserId, data alert:$DataAlertId")) {
+        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint DataAlert -Param $DataAlertId/users) -Body $xml.OuterXml -Method Post
+        return $response.tsResponse.user
+    }
+}
+
+function Remove-TSUserFromDataAlert {
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    Param(
+        [Parameter(Mandatory)][string] $DataAlertId,
+        [Parameter(Mandatory)][string] $UserId
+    )
+    # Delete User from Data-Driven Alert
+    Assert-TSRestApiVersion -AtLeast 3.2
+    if ($PSCmdlet.ShouldProcess("user:$UserId, data alert:$DataAlertId")) {
+        Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint DataAlert -Param $DataAlertId/users/$UserId) -Method Delete
     }
 }
 

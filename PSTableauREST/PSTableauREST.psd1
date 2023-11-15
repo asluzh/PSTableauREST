@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.1.28'
+ModuleVersion = '0.1.29'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -199,19 +199,14 @@ FunctionsToExport = @(
 # Delete EAS
 
 ### Notifications methods
+'Get-TSDataAlert', 'Add-TSDataAlert', 'Update-TSDataAlert', 'Remove-TSDataAlert',
+'Add-TSUserToDataAlert', 'Remove-TSUserFromDataAlert',
 # List Webhooks - API 3.6
 # Get a Webhook
 # Create a Webhook
 # Test a Webhook
 # Update a Webhook
 # Delete a Webhook
-# List Data-Driven Alerts on Site
-# Get Data-Driven Alert
-# Create Data Driven Alert
-# Update Data-Driven Alert
-# Delete Data-Driven Alert
-# Add User to Data-Driven Alert
-# Delete User from Data-Driven Alert
 # Get User Notification Preferences
 # Update User Notification Preferences
 
