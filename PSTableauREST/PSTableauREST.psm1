@@ -3551,7 +3551,7 @@ function Add-TSContentToSchedule {
     }
     if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
         $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Put
-        return $response.tsResponse.task.extractRefresh
+        return $response.tsResponse.task
     }
 }
 
@@ -3722,12 +3722,12 @@ function Start-TSTaskNow {
             }
             'FlowRun' { # Run Flow Task
                 Assert-TSRestApiVersion -AtLeast 3.3
-                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param flowRun/$TaskId/runNow) -Method Post
+                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param runFlow/$TaskId/runNow) -Body "<tsRequest />" -Method Post -ContentType "text/xml"
                 return $response.tsResponse.job
             }
             'Linked' { # Run Linked Task Now
                 Assert-TSRestApiVersion -AtLeast 3.15
-                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param linked/$TaskId/runNow) -Method Post
+                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param linked/$TaskId/runNow) -Body "<tsRequest />" -Method Post -ContentType "text/xml"
                 return $response.tsResponse.linkedTaskJob
             }
         }
@@ -3899,7 +3899,7 @@ function Add-TSExtractsRefreshTask {
         }
     }
     if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param extractRefreshes) -Body $xml.OuterXml -Method Post
+        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param extractRefreshes) -Body $xml.OuterXml -Method Post -ContentType "application/xml"
         return $response.tsResponse
     }
 }
@@ -4002,7 +4002,7 @@ function Update-TSExtractsRefreshTask {
         }
     }
     if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param extractRefreshes/$TaskId) -Body $xml.OuterXml -Method Put
+        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param extractRefreshes/$TaskId) -Body $xml.OuterXml -Method Put -ContentType "application/xml"
         return $response.tsResponse
     }
 }
