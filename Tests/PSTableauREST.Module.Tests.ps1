@@ -49,8 +49,11 @@ Describe "Module Structure and Validation Tests" -Tag Module -WarningAction Sile
     }
 
     Context "Module Manifest of <ModuleName>" {
-        It "should not throw an exception in import" {
+        It "Import module with module manifest file" {
             { Import-Module -Name $ModuleManifest -Force -ErrorAction Stop } | Should -Not -Throw
+        }
+        It "Test module manifest" {
+            { Test-ModuleManifest -Path $ModuleManifest -ErrorAction Stop } | Should -Not -Throw
         }
     }
 
@@ -59,8 +62,10 @@ Describe "Module Structure and Validation Tests" -Tag Module -WarningAction Sile
             Get-ScriptAnalyzerRule | Where-Object RuleName -eq $_ | Select-Object -ExpandProperty CommonName -OutVariable commonName
         }
         It "should pass rule '<_> (<commonName>)'" {
-            If ($ScriptAnalyzerResults.RuleName -contains $_) {
-                $ScriptAnalyzerResults | Where-Object RuleName -eq $_ | Select-Object Message -OutVariable err
+            if ($ScriptAnalyzerResults.RuleName -contains $_) {
+                $ScriptAnalyzerResults | Where-Object RuleName -eq $_ | Select-Object Severity,ScriptName,Line,Message -OutVariable err | ForEach-Object {
+                    Write-Error ("{0} {1}: {2}" -f $_.Severity,$_.ScriptName,$_.Line,$_.Message)
+                }
                 $err.Message | Should -BeNullOrEmpty
             }
         }

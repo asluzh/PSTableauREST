@@ -322,12 +322,15 @@ function Get-TSCurrentSession {
 
 # Delete Server Session
 function Remove-TSSession {
+    [CmdletBinding(SupportsShouldProcess)]
     [OutputType([PSCustomObject])]
     Param(
         [Parameter(Mandatory)][string] $SessionId
     )
     Assert-TSRestApiVersion -AtLeast 3.9
-    Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Session -Param $SessionId) -Method Delete
+    if ($PSCmdlet.ShouldProcess($SessionId)) {
+        Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Session -Param $SessionId) -Method Delete
+    }
 }
 
 ### Sites methods
@@ -2992,7 +2995,7 @@ function Get-TSDefaultPermission {
 
 function Set-TSDefaultPermission {
     [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
+    [OutputType([System.Object[]])]
     Param(
         [Parameter(Mandatory)][string] $ProjectId,
         [Parameter(Mandatory)][hashtable[]] $PermissionTable
@@ -4275,6 +4278,8 @@ function Add-TSSubscription {
     if ($ContentType -eq 'View') {
         $el_content.SetAttribute("sendIfViewEmpty", $SendIfViewEmpty)
     }
+    $el_user = $el_subs.AppendChild($xml.CreateElement("user"))
+    $el_user.SetAttribute("id", $UserId)
     if ($ScheduleId) { # Create Subscription on Tableau Server
         # Assert-TSRestApiVersion -AtLeast 2.3
         $el_sched = $el_subs.AppendChild($xml.CreateElement("schedule"))
@@ -4396,6 +4401,9 @@ function Update-TSSubscription {
     if ($AttachPdf -eq 'true' -and $PageType) {
         $el_subs.SetAttribute("pageSizeOption", $PageType)
     }
+    if ($Suspended) {
+        $el_subs.SetAttribute("suspended", $Suspended)
+    }
     if ($ContentId -or $SendIfViewEmpty) {
         $el_content = $el_subs.AppendChild($xml.CreateElement("content"))
         if ($ContentId) {
@@ -4407,6 +4415,10 @@ function Update-TSSubscription {
         if ($SendIfViewEmpty) {
             $el_content.SetAttribute("sendIfViewEmpty", $SendIfViewEmpty)
         }
+    }
+    if ($UserId) {
+        $el_user = $el_subs.AppendChild($xml.CreateElement("user"))
+        $el_user.SetAttribute("id", $UserId)
     }
     if ($ScheduleId) { # Update Subscription on Tableau Server
         # Assert-TSRestApiVersion -AtLeast 2.3

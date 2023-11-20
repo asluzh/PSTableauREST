@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.1.31'
+ModuleVersion = '0.1.32'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -24,7 +24,7 @@ GUID = '2b5cbae2-d2e6-418a-af90-f8c7ddf8a3e4'
 Author = 'Andrey Sluzhivoy'
 
 # Company or vendor of this module
-CompanyName = 'D ONE'
+# CompanyName = 'D ONE'
 
 # Copyright statement for this module
 Copyright = '(c) Andrey Sluzhivoy. All rights reserved.'
@@ -333,13 +333,13 @@ PrivateData = @{
     PSData = @{
 
         # Tags applied to this module. These help with module discovery in online galleries.
-        # Tags = @()
+        Tags = @('tableau','tableauserver','rest','restapi')
 
         # A URL to the license for this module.
-        # LicenseUri = ''
+        LicenseUri = 'https://github.com/asluzh/PSTableauREST/blob/main/LICENSE'
 
         # A URL to the main website for this project.
-        # ProjectUri = ''
+        ProjectUri = 'https://github.com/asluzh/PSTableauREST'
 
         # A URL to an icon representing this module.
         # IconUri = ''
