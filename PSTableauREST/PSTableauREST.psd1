@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.1.33'
+ModuleVersion = '0.1.34'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -27,7 +27,7 @@ Author = 'Andrey Sluzhivoy'
 # CompanyName = 'D ONE'
 
 # Copyright statement for this module
-Copyright = '(c) Andrey Sluzhivoy. All rights reserved.'
+# Copyright = '(c) Andrey Sluzhivoy. All rights reserved.'
 
 # Description of the functionality provided by this module
 Description = 'This PowerShell module facilitates working with Tableau REST API for automation tasks. Most functions are implemented as wrappers for the corresponding API calls.'

@@ -104,14 +104,11 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 if ($ConfigFile.server_admin -and $ConfigFile.test_site_name) {
                     Switch-TSSite -Site $testSite
                     $siteNewName = New-Guid
-                    $site = Update-TSSite -SiteId $testSiteId -SiteParams @{
-                        name = $siteNewName
-                        revisionLimit = 10
-                    }
+                    $site = Update-TSSite -SiteId $testSiteId -Name $siteNewName -SiteParams @{revisionLimit = 10}
                     $site.id | Should -Be $testSiteId
                     $site.contentUrl | Should -Be $testSite
                     $site.name | Should -Be $siteNewName
-                    Update-TSSite -SiteId $testSiteId -SiteParams @{name=$ConfigFile.test_site_name; adminMode="ContentAndUsers"; userQuota="1"}
+                    Update-TSSite -SiteId $testSiteId -Name $ConfigFile.test_site_name -SiteParams @{adminMode="ContentAndUsers"; userQuota="1"}
                 } else {
                     Set-ItResult -Skipped
                 }

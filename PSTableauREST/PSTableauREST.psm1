@@ -565,13 +565,45 @@ function Remove-TSSession {
 }
 
 ### Sites methods
+<#
+.SYNOPSIS
+Query Site or Query Sites
+
+.DESCRIPTION
+Option 1: $Current = $true
+Returns information about the specified site, with the option to return information about the storage space and user count for the site.
+Option 2: $Current = $false
+Returns a list of the sites on the server that the caller of this method has access to. This method is not available for Tableau Cloud.
+
+.PARAMETER Current
+Boolean switch, specifies if only the current site (where the user session is signed in) is returned (option 1), or all sites (option 2).
+
+.PARAMETER IncludeUsageStatistics
+(Optional for current site)
+Boolean switch, specifies if site usage statistics should be included in the response.
+
+.PARAMETER PageSize
+(Optional)
+Page size when paging is used for Query Sites.
+
+.EXAMPLE
+$site = Get-TSSite -Current
+
+.NOTES
+Notes on API query options: it's also possible to use ?key=contentUrl to get site, but also works only with current site.
+It's also possible to use ?key=name to get site, but also works only with current site.
+Thus it doesn't make much sense to implement these options
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_site.htm#query_site
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_site.htm#query_sites
+#>
 function Get-TSSite {
     [OutputType([PSCustomObject[]])]
     Param(
         [Parameter(Mandatory,ParameterSetName='CurrentSite')][switch] $Current,
-        # Note: it's also possible to use ?key=contentUrl to get site, but also works only with current site
-        # Note: it's also possible to use ?key=name to get site, but also works only with current site
-        # thus it doesn't make much sense to implement these options
         [Parameter(ParameterSetName='CurrentSite')][switch] $IncludeUsageStatistics,
         [Parameter(ParameterSetName='Sites')][ValidateRange(1,100)][int] $PageSize = 100
     )
@@ -596,6 +628,45 @@ function Get-TSSite {
     }
 }
 
+<#
+.SYNOPSIS
+Create Site
+
+.DESCRIPTION
+Creates a site on Tableau Server. To make changes to an existing site, call Update Site. This method is not available for Tableau Cloud.
+
+.PARAMETER Name
+The name of the site.
+
+.PARAMETER ContentUrl
+The subdomain name of the site's URL.
+This value can contain only characters that are upper or lower case alphabetic characters, numbers, hyphens (-), or underscores (_).
+
+.PARAMETER SiteParams
+(Optional)
+Hashtable with site options. Please check the linked help page for up-to-date supported options.
+Currently supported SiteParams:
+- adminMode, userQuota, storageQuota, disableSubscriptions, subscribeOthersEnabled
+- revisionLimit, dataAccelerationMode
+- set_versioned_flow_attributes(flows_all, flows_edit, flows_schedule, parent_srv, site_element, site_item)
+- allowSubscriptionAttachments, guestAccessEnabled, cacheWarmupEnabled, commentingEnabled, revisionHistoryEnabled
+- extractEncryptionMode, requestAccessEnabled, runNowEnabled, tierCreatorCapacity, tierExplorerCapacity, tierViewerCapacity
+- dataAlertsEnabled, commentingMentionsEnabled, catalogObfuscationEnabled, flowAutoSaveEnabled, webExtractionEnabled
+- metricsContentTypeEnabled, notifySiteAdminsOnThrottle, authoringEnabled, customSubscriptionEmailEnabled, customSubscriptionEmail
+- customSubscriptionFooterEnabled, customSubscriptionFooter, askDataMode, namedSharingEnabled, mobileBiometricsEnabled
+- sheetImageEnabled, catalogingEnabled, derivedPermissionsEnabled, userVisibilityMode, useDefaultTimeZone, timeZone
+- autoSuspendRefreshEnabled, autoSuspendRefreshInactivityWindow
+
+.EXAMPLE
+$site = Add-TSSite -Name "Test Site" -ContentUrl TestSite -SiteParams @{adminMode='ContentOnly'; revisionLimit=20}
+
+.NOTES
+This method can only be called by server administrators.
+No validation is done for SiteParams. If some invalid option is included in the request, an HTTP error will be returned by the request.
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_site.htm#create_site
+#>
 function Add-TSSite {
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType([PSCustomObject])]
@@ -603,16 +674,6 @@ function Add-TSSite {
         [Parameter(Mandatory)][string] $Name,
         [Parameter(Mandatory)][string] $ContentUrl,
         [Parameter()][hashtable] $SiteParams
-        # supported params: adminMode, userQuota, storageQuota, disableSubscriptions, subscribeOthersEnabled
-        # revisionLimit, dataAccelerationMode
-        # set_versioned_flow_attributes(flows_all, flows_edit, flows_schedule, parent_srv, site_element, site_item)
-        # allowSubscriptionAttachments, guestAccessEnabled, cacheWarmupEnabled, commentingEnabled, revisionHistoryEnabled
-        # extractEncryptionMode, requestAccessEnabled, runNowEnabled, tierCreatorCapacity, tierExplorerCapacity, tierViewerCapacity
-        # dataAlertsEnabled, commentingMentionsEnabled, catalogObfuscationEnabled, flowAutoSaveEnabled, webExtractionEnabled
-        # metricsContentTypeEnabled, notifySiteAdminsOnThrottle, authoringEnabled, customSubscriptionEmailEnabled, customSubscriptionEmail
-        # customSubscriptionFooterEnabled, customSubscriptionFooter, askDataMode, namedSharingEnabled, mobileBiometricsEnabled
-        # sheetImageEnabled, catalogingEnabled, derivedPermissionsEnabled, userVisibilityMode, useDefaultTimeZone, timeZone
-        # autoSuspendRefreshEnabled, autoSuspendRefreshInactivityWindow
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
     if ($SiteParams.Keys -contains 'adminMode' -and $SiteParams.Keys -contains 'userQuota' -and $SiteParams["adminMode"] -eq "ContentOnly") {
@@ -632,11 +693,44 @@ function Add-TSSite {
     }
 }
 
+<#
+.SYNOPSIS
+Update Site
+
+.DESCRIPTION
+Modifies settings for the specified site, including the content URL, administration mode, user quota, state (active or suspended),
+storage quota, whether flows are enabled, whether subscriptions are enabled, and whether revisions are enabled.
+
+.PARAMETER SiteId
+The LUID of the site to update.
+
+.PARAMETER Name
+(Optional)
+The new name of the site.
+
+.PARAMETER SiteParams
+(Optional)
+Hashtable with site options. Please check the linked help page for up-to-date supported options.
+
+.EXAMPLE
+$site = Update-TSSite -SiteId $siteId -Name "New Site" -SiteParams @{adminMode="ContentAndUsers"; userQuota="1"}
+
+.NOTES
+You must be signed in to a site in order to update it.
+No validation is done for SiteParams. If some invalid option is included in the request, an HTTP error will be returned by the request.
+
+.LINK
+Add-TSSite
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_site.htm#update_site
+#>
 function Update-TSSite {
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType([PSCustomObject])]
     Param(
         [Parameter(Mandatory)][string] $SiteId,
+        [Parameter()][string] $Name,
         [Parameter()][hashtable] $SiteParams
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
@@ -646,6 +740,9 @@ function Update-TSSite {
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_site = $tsRequest.AppendChild($xml.CreateElement("site"))
+    if ($Name) {
+        $el_site.SetAttribute("name", $Name)
+    }
     foreach ($param in $SiteParams.Keys) {
         $el_site.SetAttribute($param, $SiteParams[$param])
     }
@@ -659,6 +756,29 @@ function Update-TSSite {
     }
 }
 
+<#
+.SYNOPSIS
+Delete Site
+
+.DESCRIPTION
+Deletes the specified site.
+
+.PARAMETER SiteId
+The LUID of the site to be deleted. Should be the current site's ID.
+
+.PARAMETER BackgroundTask
+(Introduced in API 3.18) If you set this to true, the process runs asynchronously.
+
+.EXAMPLE
+$response = Remove-TSSite -SiteId $testSiteId
+
+.NOTES
+You must be signed in to a site in order to update it.
+This method can only be called by server administrators. Not supported on Tableau Cloud.
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_site.htm#delete_site
+#>
 function Remove-TSSite {
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType([PSCustomObject])]
