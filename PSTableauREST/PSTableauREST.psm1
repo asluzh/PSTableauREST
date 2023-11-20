@@ -1,10 +1,24 @@
 ### Module variables and helper functions
-$TSRestApiVersion = [version]'2.4' # minimum supported version
-$TSRestApiMinVersion = [version]'2.4' # supported version for initial sign-in calls
+$TSRestApiVersion = [version] 2.4 # initial/minimum supported version
+$TSRestApiMinVersion = [version] 2.4 # supported version for initial sign-in calls
 $TSRestApiFileSizeLimit = 64*1048576 # 64MB
 $TSRestApiChunkSize = 2*1048576 # 2MB or 5MB or 50MB
 
-# Proxy function to call Tableau Server REST API with Invoke-RestMethod
+<#
+.SYNOPSIS
+Proxy function to call Tableau Server REST API with Invoke-RestMethod
+
+.DESCRIPTION
+Internal function.
+Calls Tableau Server REST API with Invoke-RestMethod.
+See help for Invoke-RestMethod for common parameters description.
+
+.PARAMETER NoStandardHeader
+Switch parameter, indicates not to include the standard Tableau Server auth token in the headers
+
+.LINK
+Invoke-RestMethod
+#>
 function Invoke-TSRestApiMethod {
     [OutputType()]
     Param(
@@ -53,6 +67,23 @@ function Invoke-TSRestApiMethod {
     end {}
 }
 
+<#
+.SYNOPSIS
+Generates and returns specific Tableau Server REST API call URL
+
+.DESCRIPTION
+Internal function.
+Generates and returns specific Tableau Server REST API call URL.
+
+.PARAMETER Endpoint
+Endpoint entity. Usually the URL includes the entity in plural.
+
+.PARAMETER Param
+URL parameter to add upon the endpoint entity.
+
+.NOTES
+Expand ValidateSet to add support for more Endpoints.
+#>
 function Get-TSRequestUri {
     [OutputType([string])]
     Param(
@@ -101,7 +132,15 @@ function Get-TSRequestUri {
     return $Uri
 }
 
-# Helper function for generating XML element "connectionCredentials"
+<#
+.SYNOPSIS
+Helper function for generating XML element connectionCredentials
+
+.DESCRIPTION
+Internal function.
+Helper function for generating XML element "connectionCredentials".
+Modifies the XML object by appending into $Element.
+#>
 function Add-TSCredentialsElement {
     [OutputType()]
     Param(
@@ -126,7 +165,15 @@ function Add-TSCredentialsElement {
     }
 }
 
-# Helper function for generating XML element "connections"
+<#
+.SYNOPSIS
+Helper function for generating XML element connections
+
+.DESCRIPTION
+Internal function.
+Helper function for generating XML element "connections".
+Modifies the XML object by appending into $Element.
+#>
 function Add-TSConnectionsElement {
     [OutputType()]
     Param(
@@ -157,8 +204,29 @@ function Add-TSConnectionsElement {
 }
 
 ### API version methods
-# version mapping: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_versions.htm
-# what's new here: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_whats_new.htm
+<#
+.SYNOPSIS
+Assert check for Tableau Server REST API version
+
+.DESCRIPTION
+Assert check for Tableau Server REST API version.
+If the version is not compatible with the parameter inputs, an exception is generated through Write-Error call.
+
+.PARAMETER AtLeast
+Demands that the REST API version has to be at least this version number.
+This is useful when a specific functionality has been introduced with this version.
+
+.PARAMETER LessThan
+Demands that the REST API version has to be less than this version number.
+This is needed for compatibility when a specific functionality has been decommissioned.
+
+.EXAMPLE
+Assert-TSRestApiVersion -AtLeast 3.16
+
+.NOTES
+Version mapping: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_versions.htm
+What's new in REST API: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_whats_new.htm
+#>
 function Assert-TSRestApiVersion {
     [OutputType()]
     Param(
@@ -173,12 +241,26 @@ function Assert-TSRestApiVersion {
     }
 }
 
+<#
+.SYNOPSIS
+Returns currently selected Tableau Server REST API version
+
+.DESCRIPTION
+Returns currently selected Tableau Server REST API version (stored in module variable).
+#>
 function Get-TSRestApiVersion {
     [OutputType([version])]
     Param()
     return $script:TSRestApiVersion
 }
 
+<#
+.SYNOPSIS
+Selects Tableau Server REST API version for future calls
+
+.DESCRIPTION
+Selects Tableau Server REST API version for future calls (stored in module variable).
+#>
 function Set-TSRestApiVersion {
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType()]
@@ -191,6 +273,25 @@ function Set-TSRestApiVersion {
 }
 
 ### Authentication / Server methods
+<#
+.SYNOPSIS
+Retrieves the object with Tableau Server info
+
+.DESCRIPTION
+Retrieves the object with Tableau Server info, such as build number, product version, etc.
+
+.PARAMETER ServerUrl
+Optional parameter with Tableau Server URL. If not provided, the current Server URL (when signed-in) is used.
+
+.EXAMPLE
+$serverInfo = Get-TSServerInfo
+
+.NOTES
+This API can be called by anyone, even non-authenticated, so it doesn't require X-Tableau-Auth header.
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_server.htm#server_info
+#>
 function Get-TSServerInfo {
     [OutputType([PSCustomObject])]
     Param(
@@ -208,6 +309,59 @@ function Get-TSServerInfo {
     return $response.tsResponse.serverInfo
 }
 
+<#
+.SYNOPSIS
+Sign In (using username and password, or using PAT)
+
+.DESCRIPTION
+Signs you in as a user on the specified site on Tableau Server or Tableau Cloud.
+This function initiates the session and stores the auth token that's needed for almost other REST API calls.
+Authentication on Tableau Server (or Tableau Cloud) can be done with either
+- username and password
+- personal access token (PAT), using PAT name and PAT secret
+
+.PARAMETER ServerUrl
+The URL of the Tableau Server, including the protocol (usually https://) and the FQDN (not including the URL path).
+For Tableau Cloud, the server address in the URI must contain the pod name, such as 10az, 10ay, or us-east-1.
+
+.PARAMETER Username
+The name of the user when signing in with username and password.
+
+.PARAMETER SecurePassword
+SecureString, containing the password when signing in with username and password.
+
+.PARAMETER PersonalAccessTokenName
+The name of the personal access token when signing in with a personal access token.
+The token name is available on a user’s account page on Tableau server or online.
+
+.PARAMETER PersonalAccessTokenSecret
+SecureString, containing the secret value of the personal access token when signing in with a personal access token.
+
+.PARAMETER Site
+The permanent name of the site to sign in to (aka content URL).
+By default, the default site with content URL "" is selected.
+
+.PARAMETER ImpersonateUserId
+The user ID to impersonate upon sign-in. This can be only used by Server Administrators.
+
+.PARAMETER UseServerVersion
+Boolean, if true, sets current REST API version to the latest version supported by the Tableau Server. Default is true.
+If false, the minimum supported version 2.4 is retained.
+
+.EXAMPLE
+$credentials = Open-TSSignIn -Server https://tableau.myserver.com -Username $user -SecurePassword $securePw
+
+.EXAMPLE
+$credentials = Open-TSSignIn -Server https://10ay.online.tableau.com -Site sandboxXXXXXXNNNNNN -PersonalAccessTokenName $pat_name -PersonalAccessTokenSecret $pat_secret
+
+.NOTES
+This function has to be called prior to other REST API function calls.
+Typically, a credentials token is valid for 240 minutes.
+With administrator permissions on Tableau Server you can increase this idle timeout.
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_authentication.htm#sign_in
+#>
 function Open-TSSignIn {
     [OutputType([PSCustomObject])]
     Param(
@@ -216,9 +370,9 @@ function Open-TSSignIn {
         [Parameter()][securestring] $SecurePassword,
         [Parameter()][string] $PersonalAccessTokenName,
         [Parameter()][securestring] $PersonalAccessTokenSecret,
-        [Parameter()][string] $Site = "",
+        [Parameter()][string] $Site = '',
         [Parameter()][string] $ImpersonateUserId,
-        [Parameter()][boolean] $UseServerVersion = $True
+        [Parameter()][boolean] $UseServerVersion = $true
     )
     # Assert-TSRestApiVersion -AtLeast 2.0
     $script:TSServerUrl = $ServerUrl
@@ -261,6 +415,23 @@ function Open-TSSignIn {
     return $response.tsResponse.credentials
 }
 
+<#
+.SYNOPSIS
+Switch Site
+
+.DESCRIPTION
+Switches you onto another site of Tableau Server without having to provide a user name and password again.
+
+.PARAMETER Site
+The permanent name of the site to sign in to (aka content URL). E.g. mySite is the content URL in the following example:
+http://<server or cloud URL>/#/site/mySite/explore
+
+.EXAMPLE
+$credentials = Switch-TSSite -Site 'mySite'
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_authentication.htm#switch_site
+#>
 function Switch-TSSite {
     [OutputType([PSCustomObject])]
     Param(
@@ -278,6 +449,22 @@ function Switch-TSSite {
     return $response.tsResponse.credentials
 }
 
+<#
+.SYNOPSIS
+Sign Out
+
+.DESCRIPTION
+Signs you out of the current session. This call invalidates the authentication token that is created by a call to Open-TSSignIn.
+
+.EXAMPLE
+Close-TSSignOut
+
+.LINK
+Open-TSSignIn
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_authentication.htm#sign_out
+#>
 function Close-TSSignOut {
     [OutputType([PSCustomObject])]
     Param()
@@ -289,12 +476,24 @@ function Close-TSSignOut {
         $script:TSAuthToken = $null
         $script:TSSiteId = $null
         $script:TSUserId = $null
-        } else {
+        $script:TSRestApiVersion = $script:TSRestApiMinVersion # reset to minimum supported version
+    } else {
         Write-Warning "Currently not signed in."
     }
     return $response
 }
 
+<#
+.SYNOPSIS
+Revoke Administrator Personal Access Tokens
+
+.DESCRIPTION
+Revokes all personal access tokens created by server administrators.
+This method is not available for Tableau Cloud.
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_authentication.htm#revoke_administrator_personal_access_tokens
+#>
 function Revoke-TSServerAdminPAT {
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType([PSCustomObject])]
@@ -305,13 +504,32 @@ function Revoke-TSServerAdminPAT {
     }
 }
 
+<#
+.SYNOPSIS
+Returns the current user ID
+
+.DESCRIPTION
+Returns the user ID of the currently signed in user (stored in an internal module variable)
+
+.EXAMPLE
+$userId = Get-TSCurrentUserId
+#>
 function Get-TSCurrentUserId {
     [OutputType([string])]
     Param()
     return $script:TSUserId
 }
 
-# Get Current Server Session
+<#
+.SYNOPSIS
+Get Current Server Session
+
+.DESCRIPTION
+Returns details of the current session of Tableau Server.
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_server.htm#get-current-server-session
+#>
 function Get-TSCurrentSession {
     [OutputType([PSCustomObject])]
     Param()
@@ -320,7 +538,20 @@ function Get-TSCurrentSession {
     return $response.tsResponse.session
 }
 
-# Delete Server Session
+<#
+.SYNOPSIS
+Delete Server Session
+
+.DESCRIPTION
+Deletes a specified session.
+This method is not available for Tableau Cloud and is typically used in programmatic management of the life cycles of embedded Tableau sessions.
+
+.PARAMETER SessionId
+The session ID to be deleted.
+
+.NOTES
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_server.htm#delete_server_session
+#>
 function Remove-TSSession {
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType([PSCustomObject])]
