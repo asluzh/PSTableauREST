@@ -4,6 +4,7 @@ $TSRestApiMinVersion = [version] 2.4 # supported version for initial sign-in cal
 $TSRestApiFileSizeLimit = 64*1048576 # 64MB
 $TSRestApiChunkSize = 2*1048576 # 2MB or 5MB or 50MB
 
+function Invoke-TSRestApiMethod {
 <#
 .SYNOPSIS
 Proxy function to call Tableau Server REST API with Invoke-RestMethod
@@ -19,21 +20,20 @@ Switch parameter, indicates not to include the standard Tableau Server auth toke
 .LINK
 Invoke-RestMethod
 #>
-function Invoke-TSRestApiMethod {
-    [OutputType()]
-    Param(
-        # proxy params
-        [Parameter(Mandatory)][Microsoft.PowerShell.Commands.WebRequestMethod] $Method,
-        [Parameter(Mandatory)][uri] $Uri,
-        [Parameter(ValueFromPipeline=$true)][System.Object] $Body,
-        [Parameter()][string] $InFile,
-        [Parameter()][string] $OutFile,
-        [Parameter()][ValidateRange(0, 2147483647)][int] $TimeoutSec,
-        [Parameter()][string] $ContentType,
-        [Parameter()][switch] $SkipCertificateCheck,
-        # own params
-        [Parameter()][switch] $NoStandardHeader
-    )
+[OutputType()]
+Param(
+    # proxy params
+    [Parameter(Mandatory)][Microsoft.PowerShell.Commands.WebRequestMethod] $Method,
+    [Parameter(Mandatory)][uri] $Uri,
+    [Parameter(ValueFromPipeline=$true)][System.Object] $Body,
+    [Parameter()][string] $InFile,
+    [Parameter()][string] $OutFile,
+    [Parameter()][ValidateRange(0, 2147483647)][int] $TimeoutSec,
+    [Parameter()][string] $ContentType,
+    [Parameter()][switch] $SkipCertificateCheck,
+    # own params
+    [Parameter()][switch] $NoStandardHeader
+)
     begin {
         if ($NoStandardHeader) {
             $PSBoundParameters.Remove('NoStandardHeader')
@@ -67,6 +67,7 @@ function Invoke-TSRestApiMethod {
     end {}
 }
 
+function Get-TSRequestUri {
 <#
 .SYNOPSIS
 Generates and returns specific Tableau Server REST API call URL
@@ -84,14 +85,13 @@ URL parameter to add upon the endpoint entity.
 .NOTES
 Expand ValidateSet to add support for more Endpoints.
 #>
-function Get-TSRequestUri {
-    [OutputType([string])]
-    Param(
-        [Parameter(Mandatory)][ValidateSet('Auth','Site','Session','Project','User','Group','Workbook','Datasource','View','Flow','FileUpload',
-            'Recommendation','CustomView','Favorite','OrderFavorites','Schedule','ServerSchedule','Job','Task','Subscription','DataAlert',
-            'Database','Table','GraphQL')][string] $Endpoint,
-        [Parameter()][string] $Param
-    )
+[OutputType([string])]
+Param(
+    [Parameter(Mandatory)][ValidateSet('Auth','Site','Session','Project','User','Group','Workbook','Datasource','View','Flow','FileUpload',
+        'Recommendation','CustomView','Favorite','OrderFavorites','Schedule','ServerSchedule','Job','Task','Subscription','DataAlert',
+        'Database','Table','GraphQL')][string] $Endpoint,
+    [Parameter()][string] $Param
+)
     $Uri = "$script:TSServerUrl/api/$script:TSRestApiVersion/"
     switch ($Endpoint) {
         'Auth' {
@@ -132,6 +132,7 @@ function Get-TSRequestUri {
     return $Uri
 }
 
+function Add-TSCredentialsElement {
 <#
 .SYNOPSIS
 Helper function for generating XML element connectionCredentials
@@ -141,12 +142,11 @@ Internal function.
 Helper function for generating XML element "connectionCredentials".
 Modifies the XML object by appending into $Element.
 #>
-function Add-TSCredentialsElement {
-    [OutputType()]
-    Param(
-        [Parameter(Mandatory)][System.Xml.XmlElement] $Element,
-        [Parameter(Mandatory)][hashtable] $Credentials
-    )
+[OutputType()]
+Param(
+    [Parameter(Mandatory)][System.Xml.XmlElement] $Element,
+    [Parameter(Mandatory)][hashtable] $Credentials
+)
     if (-Not ($Credentials["username"] -and $Credentials["password"])) {
         Write-Error "Credentials must contain both username and password" -Category InvalidArgument -ErrorAction Stop
     }
@@ -165,6 +165,7 @@ function Add-TSCredentialsElement {
     }
 }
 
+function Add-TSConnectionsElement {
 <#
 .SYNOPSIS
 Helper function for generating XML element connections
@@ -174,12 +175,11 @@ Internal function.
 Helper function for generating XML element "connections".
 Modifies the XML object by appending into $Element.
 #>
-function Add-TSConnectionsElement {
-    [OutputType()]
-    Param(
-        [Parameter(Mandatory)][System.Xml.XmlElement] $Element,
-        [Parameter(Mandatory)][hashtable[]] $Connections
-    )
+[OutputType()]
+Param(
+    [Parameter(Mandatory)][System.Xml.XmlElement] $Element,
+    [Parameter(Mandatory)][hashtable[]] $Connections
+)
     $el_connections = $Element.AppendChild($Element.OwnerDocument.CreateElement("connections"))
     foreach ($connection in $Connections) {
         $el_connection = $el_connections.AppendChild($Element.OwnerDocument.CreateElement("connection"))
@@ -204,6 +204,7 @@ function Add-TSConnectionsElement {
 }
 
 ### API version methods
+function Assert-TSRestApiVersion {
 <#
 .SYNOPSIS
 Assert check for Tableau Server REST API version
@@ -227,12 +228,11 @@ Assert-TSRestApiVersion -AtLeast 3.16
 Version mapping: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_versions.htm
 What's new in REST API: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_whats_new.htm
 #>
-function Assert-TSRestApiVersion {
-    [OutputType()]
-    Param(
-        [Parameter()][version] $AtLeast,
-        [Parameter()][version] $LessThan
-    )
+[OutputType()]
+Param(
+    [Parameter()][version] $AtLeast,
+    [Parameter()][version] $LessThan
+)
     if ($AtLeast -and $script:TSRestApiVersion -lt $AtLeast) {
         Write-Error "Method or Parameter not supported, needs API version >= $AtLeast" -Category NotImplemented -ErrorAction Stop
     }
@@ -241,6 +241,7 @@ function Assert-TSRestApiVersion {
     }
 }
 
+function Get-TSRestApiVersion {
 <#
 .SYNOPSIS
 Returns currently selected Tableau Server REST API version
@@ -248,12 +249,12 @@ Returns currently selected Tableau Server REST API version
 .DESCRIPTION
 Returns currently selected Tableau Server REST API version (stored in module variable).
 #>
-function Get-TSRestApiVersion {
-    [OutputType([version])]
-    Param()
+[OutputType([version])]
+Param()
     return $script:TSRestApiVersion
 }
 
+function Set-TSRestApiVersion {
 <#
 .SYNOPSIS
 Selects Tableau Server REST API version for future calls
@@ -261,18 +262,18 @@ Selects Tableau Server REST API version for future calls
 .DESCRIPTION
 Selects Tableau Server REST API version for future calls (stored in module variable).
 #>
-function Set-TSRestApiVersion {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType()]
-    Param(
-        [Parameter()][version] $ApiVersion
-    )
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType()]
+Param(
+    [Parameter()][version] $ApiVersion
+)
     if ($PSCmdlet.ShouldProcess($ApiVersion)) {
         $script:TSRestApiVersion = $ApiVersion
     }
 }
 
 ### Authentication / Server methods
+function Get-TSServerInfo {
 <#
 .SYNOPSIS
 Retrieves the object with Tableau Server info
@@ -292,11 +293,10 @@ This API can be called by anyone, even non-authenticated, so it doesn't require 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_server.htm#server_info
 #>
-function Get-TSServerInfo {
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter()][string] $ServerUrl
-    )
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter()][string] $ServerUrl
+)
     # Assert-TSRestApiVersion -AtLeast 2.4
     if (-Not $ServerUrl) {
         $ServerUrl = $script:TSServerUrl
@@ -309,6 +309,7 @@ function Get-TSServerInfo {
     return $response.tsResponse.serverInfo
 }
 
+function Open-TSSignIn {
 <#
 .SYNOPSIS
 Sign In (using username and password, or using PAT)
@@ -362,18 +363,17 @@ With administrator permissions on Tableau Server you can increase this idle time
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_authentication.htm#sign_in
 #>
-function Open-TSSignIn {
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $ServerUrl,
-        [Parameter()][string] $Username,
-        [Parameter()][securestring] $SecurePassword,
-        [Parameter()][string] $PersonalAccessTokenName,
-        [Parameter()][securestring] $PersonalAccessTokenSecret,
-        [Parameter()][string] $Site = '',
-        [Parameter()][string] $ImpersonateUserId,
-        [Parameter()][boolean] $UseServerVersion = $true
-    )
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $ServerUrl,
+    [Parameter()][string] $Username,
+    [Parameter()][securestring] $SecurePassword,
+    [Parameter()][string] $PersonalAccessTokenName,
+    [Parameter()][securestring] $PersonalAccessTokenSecret,
+    [Parameter()][string] $Site = '',
+    [Parameter()][string] $ImpersonateUserId,
+    [Parameter()][boolean] $UseServerVersion = $true
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     $script:TSServerUrl = $ServerUrl
     $serverInfo = Get-TSServerInfo
@@ -415,6 +415,7 @@ function Open-TSSignIn {
     return $response.tsResponse.credentials
 }
 
+function Switch-TSSite {
 <#
 .SYNOPSIS
 Switch Site
@@ -432,11 +433,10 @@ $credentials = Switch-TSSite -Site 'mySite'
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_authentication.htm#switch_site
 #>
-function Switch-TSSite {
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter()][string] $Site = ''
-    )
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter()][string] $Site = ''
+)
     Assert-TSRestApiVersion -AtLeast 2.6
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -449,6 +449,7 @@ function Switch-TSSite {
     return $response.tsResponse.credentials
 }
 
+function Close-TSSignOut {
 <#
 .SYNOPSIS
 Sign Out
@@ -465,9 +466,8 @@ Open-TSSignIn
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_authentication.htm#sign_out
 #>
-function Close-TSSignOut {
-    [OutputType([PSCustomObject])]
-    Param()
+[OutputType([PSCustomObject])]
+Param()
     # Assert-TSRestApiVersion -AtLeast 2.0
     $response = $null
     if ($null -ne $script:TSServerUrl -and $null -ne $script:TSAuthToken) {
@@ -483,6 +483,7 @@ function Close-TSSignOut {
     return $response
 }
 
+function Revoke-TSServerAdminPAT {
 <#
 .SYNOPSIS
 Revoke Administrator Personal Access Tokens
@@ -494,16 +495,16 @@ This method is not available for Tableau Cloud.
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_authentication.htm#revoke_administrator_personal_access_tokens
 #>
-function Revoke-TSServerAdminPAT {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param()
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param()
     Assert-TSRestApiVersion -AtLeast 3.10
     if ($PSCmdlet.ShouldProcess()) {
         Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Auth -Param serverAdminAccessTokens) -Method Delete
     }
 }
 
+function Get-TSCurrentUserId {
 <#
 .SYNOPSIS
 Returns the current user ID
@@ -514,12 +515,12 @@ Returns the user ID of the currently signed in user (stored in an internal modul
 .EXAMPLE
 $userId = Get-TSCurrentUserId
 #>
-function Get-TSCurrentUserId {
-    [OutputType([string])]
-    Param()
+[OutputType([string])]
+Param()
     return $script:TSUserId
 }
 
+function Get-TSCurrentSession {
 <#
 .SYNOPSIS
 Get Current Server Session
@@ -530,14 +531,14 @@ Returns details of the current session of Tableau Server.
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_server.htm#get-current-server-session
 #>
-function Get-TSCurrentSession {
-    [OutputType([PSCustomObject])]
-    Param()
+[OutputType([PSCustomObject])]
+Param()
     Assert-TSRestApiVersion -AtLeast 3.1
     $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Session -Param current) -Method Get
     return $response.tsResponse.session
 }
 
+function Remove-TSSession {
 <#
 .SYNOPSIS
 Delete Server Session
@@ -552,12 +553,11 @@ The session ID to be deleted.
 .NOTES
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_server.htm#delete_server_session
 #>
-function Remove-TSSession {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $SessionId
-    )
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $SessionId
+)
     Assert-TSRestApiVersion -AtLeast 3.9
     if ($PSCmdlet.ShouldProcess($SessionId)) {
         Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Session -Param $SessionId) -Method Delete
@@ -565,6 +565,7 @@ function Remove-TSSession {
 }
 
 ### Sites methods
+function Get-TSSite {
 <#
 .SYNOPSIS
 Query Site or Query Sites
@@ -583,8 +584,7 @@ Boolean switch, specifies if only the current site (where the user session is si
 Boolean switch, specifies if site usage statistics should be included in the response.
 
 .PARAMETER PageSize
-(Optional)
-Page size when paging is used for Query Sites.
+(Optional) Page size when paging through results.
 
 .EXAMPLE
 $site = Get-TSSite -Current
@@ -600,13 +600,12 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_site.htm#q
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_site.htm#query_sites
 #>
-function Get-TSSite {
-    [OutputType([PSCustomObject[]])]
-    Param(
-        [Parameter(Mandatory,ParameterSetName='CurrentSite')][switch] $Current,
-        [Parameter(ParameterSetName='CurrentSite')][switch] $IncludeUsageStatistics,
-        [Parameter(ParameterSetName='Sites')][ValidateRange(1,100)][int] $PageSize = 100
-    )
+[OutputType([PSCustomObject[]])]
+Param(
+    [Parameter(Mandatory,ParameterSetName='CurrentSite')][switch] $Current,
+    [Parameter(ParameterSetName='CurrentSite')][switch] $IncludeUsageStatistics,
+    [Parameter(ParameterSetName='Sites')][ValidateRange(1,100)][int] $PageSize = 100
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     if ($Current) { # get single (current) site
         $uri = Get-TSRequestUri -Endpoint Site -Param $script:TSSiteId
@@ -628,6 +627,7 @@ function Get-TSSite {
     }
 }
 
+function Add-TSSite {
 <#
 .SYNOPSIS
 Create Site
@@ -667,14 +667,13 @@ No validation is done for SiteParams. If some invalid option is included in the 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_site.htm#create_site
 #>
-function Add-TSSite {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $Name,
-        [Parameter(Mandatory)][string] $ContentUrl,
-        [Parameter()][hashtable] $SiteParams
-    )
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $Name,
+    [Parameter(Mandatory)][string] $ContentUrl,
+    [Parameter()][hashtable] $SiteParams
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     if ($SiteParams.Keys -contains 'adminMode' -and $SiteParams.Keys -contains 'userQuota' -and $SiteParams["adminMode"] -eq "ContentOnly") {
         Write-Error "You cannot set admin_mode to ContentOnly and also set a user quota" -Category InvalidArgument -ErrorAction Stop
@@ -693,6 +692,7 @@ function Add-TSSite {
     }
 }
 
+function Update-TSSite {
 <#
 .SYNOPSIS
 Update Site
@@ -725,14 +725,13 @@ Add-TSSite
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_site.htm#update_site
 #>
-function Update-TSSite {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $SiteId,
-        [Parameter()][string] $Name,
-        [Parameter()][hashtable] $SiteParams
-    )
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $SiteId,
+    [Parameter()][string] $Name,
+    [Parameter()][hashtable] $SiteParams
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     if ($SiteParams.Keys -contains 'adminMode' -and $SiteParams.Keys -contains 'userQuota' -and $SiteParams["adminMode"] -eq "ContentOnly") {
         Write-Error "You cannot set admin_mode to ContentOnly and also set a user quota" -Category InvalidArgument -ErrorAction Stop
@@ -756,6 +755,7 @@ function Update-TSSite {
     }
 }
 
+function Remove-TSSite {
 <#
 .SYNOPSIS
 Delete Site
@@ -779,13 +779,12 @@ This method can only be called by server administrators. Not supported on Tablea
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_site.htm#delete_site
 #>
-function Remove-TSSite {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $SiteId,
-        [Parameter()][switch] $BackgroundTask
-    )
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $SiteId,
+    [Parameter()][switch] $BackgroundTask
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     $uri = Get-TSRequestUri -Endpoint Site -Param $SiteId
     if ($BackgroundTask) {
@@ -804,13 +803,41 @@ function Remove-TSSite {
 
 ### Projects methods
 function Get-TSProject {
-    [OutputType([PSCustomObject[]])]
-    Param(
-        [Parameter()][string[]] $Filter, # https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm
-        [Parameter()][string[]] $Sort,
-        [Parameter()][string[]] $Fields, # https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_fields.htm#query_projects
-        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
-    )
+<#
+.SYNOPSIS
+Query Projects
+
+.DESCRIPTION
+Returns a list of projects on the specified site, with optional parameters.
+
+.PARAMETER Filter
+(Optional) An expression that lets you specify a subset of data sources to return.
+Ref. https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#projects
+
+.PARAMETER Sort
+(Optional) An expression that lets you specify the order in which user information is returned.
+Ref. https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#projects
+
+.PARAMETER Fields
+(Optional) An expression that lets you specify which attributes are included in response.
+Ref. https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_fields.htm#query_projects
+
+.PARAMETER PageSize
+(Optional) Page size when paging through results.
+
+.EXAMPLE
+$defaultProject = Get-TSProject -Filter "name:eq:Default","topLevelProject:eq:true"
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_projects.htm#query_projects
+#>
+[OutputType([PSCustomObject[]])]
+Param(
+    [Parameter()][string[]] $Filter, # https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm
+    [Parameter()][string[]] $Sort,
+    [Parameter()][string[]] $Fields, # https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_fields.htm#query_projects
+    [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     $pageNumber = 0
     do {
@@ -837,15 +864,44 @@ function Get-TSProject {
 }
 
 function Add-TSProject {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $Name,
-        [Parameter()][string] $Description,
-        [Parameter()][ValidateSet('ManagedByOwner','LockedToProject','LockedToProjectWithoutNested')][string] $ContentPermissions,
-        [Parameter()][string] $OwnerId,
-        [Parameter()][string] $ParentProjectId
-    )
+<#
+.SYNOPSIS
+Create Project
+
+.DESCRIPTION
+Creates a project on the specified site.
+
+.PARAMETER Name
+The name for the project.
+
+.PARAMETER Description
+(Optional) The description for the project.
+
+.PARAMETER ContentPermissions
+(Optional) This option specifies content permissions inheritance in the project.
+
+.PARAMETER OwnerId
+(Optional) The LUID of the user that owns the project.
+
+.PARAMETER ParentProjectId
+(Optional) The project LUID of the parent project. Use this option to create or change project hierarchies.
+If omitted, the project is created at the top level.
+
+.EXAMPLE
+$project = Add-TSProject -Name $projectName
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_projects.htm#create_project
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $Name,
+    [Parameter()][string] $Description,
+    [Parameter()][ValidateSet('ManagedByOwner','LockedToProject','LockedToProjectWithoutNested')][string] $ContentPermissions,
+    [Parameter()][string] $OwnerId,
+    [Parameter()][string] $ParentProjectId
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -873,17 +929,51 @@ function Add-TSProject {
 }
 
 function Update-TSProject {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $ProjectId,
-        [Parameter()][string] $Name,
-        [Parameter()][string] $Description,
-        [Parameter()][ValidateSet('ManagedByOwner','LockedToProject','LockedToProjectWithoutNested')][string] $ContentPermissions,
-        [Parameter()][string] $ParentProjectId,
-        [Parameter()][string] $OwnerId,
-        [Parameter()][switch] $PublishSamples
-    )
+<#
+.SYNOPSIS
+Update Project
+
+.DESCRIPTION
+Updates the name, description, or project hierarchy of the specified project.
+
+.PARAMETER ProjectId
+The LUID of the project being updated.
+
+.PARAMETER Name
+(Optional) The new name for the project.
+
+.PARAMETER Description
+(Optional) The new description for the project.
+
+.PARAMETER ContentPermissions
+(Optional) This option specifies content permissions inheritance in the project.
+
+.PARAMETER ParentProjectId
+(Optional) The new identifier of the parent project. Use this option to create or change project hierarchies.
+
+.PARAMETER OwnerId
+(Optional) The LUID of the user that owns the project.
+
+.PARAMETER PublishSamples
+(Optional) Boolean switch value that specifies whether to publish the sample workbooks provided by Tableau to the project when you update the project.
+
+.EXAMPLE
+$project = Update-TSProject -ProjectId $testProjectId -Name $projectNewName -PublishSamples
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_projects.htm#update_project
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $ProjectId,
+    [Parameter()][string] $Name,
+    [Parameter()][string] $Description,
+    [Parameter()][ValidateSet('ManagedByOwner','LockedToProject','LockedToProjectWithoutNested')][string] $ContentPermissions,
+    [Parameter()][string] $ParentProjectId,
+    [Parameter()][string] $OwnerId,
+    [Parameter()][switch] $PublishSamples
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -916,11 +1006,28 @@ function Update-TSProject {
 }
 
 function Remove-TSProject {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $ProjectId
-    )
+<#
+.SYNOPSIS
+Delete Project
+
+.DESCRIPTION
+Deletes the specified project on a specific site.
+When a project is deleted, all Tableau assets inside of it are also deleted, including assets like associated workbooks, data sources, project view options, and rights.
+
+.PARAMETER ProjectId
+The LUID of the project to delete.
+
+.EXAMPLE
+$response = Remove-TSProject -ProjectId $testProjectId
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_projects.htm#delete_project
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $ProjectId
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     if ($PSCmdlet.ShouldProcess($ProjectId)) {
         Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Project -Param $ProjectId) -Method Delete
@@ -928,8 +1035,15 @@ function Remove-TSProject {
 }
 
 function Get-TSDefaultProject {
-    [OutputType([PSCustomObject[]])]
-    Param()
+<#
+.SYNOPSIS
+Get Default Project
+
+.DESCRIPTION
+Helper function that queries the projects with filter and returns the Default project.
+#>
+[OutputType([PSCustomObject[]])]
+Param()
     Get-TSProject -Filter "name:eq:Default","topLevelProject:eq:true"
 }
 
