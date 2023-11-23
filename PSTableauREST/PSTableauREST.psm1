@@ -811,15 +811,18 @@ Query Projects
 Returns a list of projects on the specified site, with optional parameters.
 
 .PARAMETER Filter
-(Optional) An expression that lets you specify a subset of data sources to return.
+(Optional)
+An expression that lets you specify a subset of data records to return.
 Ref. https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#projects
 
 .PARAMETER Sort
-(Optional) An expression that lets you specify the order in which user information is returned.
+(Optional)
+An expression that lets you specify the order in which data is returned.
 Ref. https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#projects
 
 .PARAMETER Fields
-(Optional) An expression that lets you specify which attributes are included in response.
+(Optional)
+An expression that lets you specify which data attributes are included in response.
 Ref. https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_fields.htm#query_projects
 
 .PARAMETER PageSize
@@ -1049,14 +1052,51 @@ Param()
 
 ### Users and Groups methods
 function Get-TSUser {
-    [OutputType([PSCustomObject[]])]
-    Param(
-        [Parameter(Mandatory,ParameterSetName='UserById')][string] $UserId,
-        [Parameter(ParameterSetName='Users')][string[]] $Filter,
-        [Parameter(ParameterSetName='Users')][string[]] $Sort,
-        [Parameter(ParameterSetName='Users')][string[]] $Fields,
-        [Parameter(ParameterSetName='Users')][ValidateRange(1,100)][int] $PageSize = 100
-    )
+<#
+.SYNOPSIS
+Query User On Site / Get Users on Site
+
+.DESCRIPTION
+Returns the users associated with the specified site, or information about the specified user.
+
+.PARAMETER UserId
+Query User On Site: the LUID of the user to get information for.
+
+.PARAMETER Filter
+(Optional, Get Users on Site)
+An expression that lets you specify a subset of data records to return.
+Ref. https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#users
+
+.PARAMETER Sort
+(Optional, Get Users on Site)
+An expression that lets you specify the order in which data is returned.
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#users
+
+.PARAMETER Fields
+(Optional, Get Users on Site)
+An expression that lets you specify which data attributes are included in response.
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_fields.htm#get-users_site
+
+.PARAMETER PageSize
+(Optional, Get Users on Site): Page size when paging through results.
+
+.EXAMPLE
+$user = Get-TSUser -Filter "name:eq:$userName"
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#query_user_on_site
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#get_users_on_site
+#>
+[OutputType([PSCustomObject[]])]
+Param(
+    [Parameter(Mandatory,ParameterSetName='UserById')][string] $UserId,
+    [Parameter(ParameterSetName='Users')][string[]] $Filter,
+    [Parameter(ParameterSetName='Users')][string[]] $Sort,
+    [Parameter(ParameterSetName='Users')][string[]] $Fields,
+    [Parameter(ParameterSetName='Users')][ValidateRange(1,100)][int] $PageSize = 100
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     if ($UserId) { # Query User On Site
         $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint User -Param $UserId) -Method Get
@@ -1088,13 +1128,39 @@ function Get-TSUser {
 }
 
 function Add-TSUser {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $Name,
-        [Parameter(Mandatory)][ValidateSet('Creator','Explorer','ExplorerCanPublish','SiteAdministratorExplorer','SiteAdministratorCreator','Viewer','Unlicensed')][string] $SiteRole,
-        [Parameter()][string] $AuthSetting
-    )
+<#
+.SYNOPSIS
+Add User to Site
+
+.DESCRIPTION
+Adds a user to Tableau Server or Tableau Cloud and assigns the user to the specified site.
+
+.PARAMETER Name
+The name of the user.
+For local authentication: any valid user name.
+For AD authentication: the name of an existing user in Active Directory.
+For Tableau Cloud: The user-name is the email address the user will use to sign in to Tableau Cloud.
+
+.PARAMETER SiteRole
+The site role to assign to the user.
+You can assign the following roles: Creator, Explorer, ExplorerCanPublish, SiteAdministratorExplorer, SiteAdministratorCreator, Unlicensed, or Viewer.
+
+.PARAMETER AuthSetting
+(Optional) The authentication type for the user, e.g. if site-specific SAML is enabled.
+
+.EXAMPLE
+$user = Add-TSUser -Name $userName -SiteRole Viewer
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#add_user_to_site
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $Name,
+    [Parameter(Mandatory)][ValidateSet('Creator','Explorer','ExplorerCanPublish','SiteAdministratorExplorer','SiteAdministratorCreator','Viewer','Unlicensed')][string] $SiteRole,
+    [Parameter()][string] $AuthSetting
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -1111,16 +1177,47 @@ function Add-TSUser {
 }
 
 function Update-TSUser {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $UserId,
-        [Parameter()][string] $FullName,
-        [Parameter()][string] $Email,
-        [Parameter()][securestring] $SecurePassword,
-        [Parameter()][ValidateSet('Creator','Explorer','ExplorerCanPublish','SiteAdministratorExplorer','SiteAdministratorCreator','Viewer','Unlicensed')][string] $SiteRole,
-        [Parameter()][string] $AuthSetting
-    )
+<#
+.SYNOPSIS
+Update User
+
+.DESCRIPTION
+Modifies information about the specified user.
+
+.PARAMETER UserId
+The LUID of the user to update.
+
+.PARAMETER FullName
+(Optional) The new display name for the user.
+
+.PARAMETER Email
+(Optional) The new email address for the user. Not supported in Tableau Cloud.
+
+.PARAMETER SecurePassword
+(Optional) The new password for the user, if local authentication is used. Should be provided via SecureString.
+
+.PARAMETER SiteRole
+(Optional) The new site role to assign to the user.
+
+.PARAMETER AuthSetting
+(Optional) The authentication type for the user (e.g. if site-specific SAML is enabled)
+
+.EXAMPLE
+$user = Update-TSUser -UserId $userId -SiteRole Explorer -FullName "John Doe"
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#update_user
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $UserId,
+    [Parameter()][string] $FullName,
+    [Parameter()][string] $Email,
+    [Parameter()][securestring] $SecurePassword,
+    [Parameter()][ValidateSet('Creator','Explorer','ExplorerCanPublish','SiteAdministratorExplorer','SiteAdministratorCreator','Viewer','Unlicensed')][string] $SiteRole,
+    [Parameter()][string] $AuthSetting
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -1148,12 +1245,31 @@ function Update-TSUser {
 }
 
 function Remove-TSUser {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $UserId,
-        [Parameter()][string] $MapAssetsToUserId
-    )
+<#
+.SYNOPSIS
+Remove User from Site
+
+.DESCRIPTION
+Removes a user from the specified site.
+
+.PARAMETER UserId
+The LUID of the user to remove.
+
+.PARAMETER MapAssetsToUserId
+(Optional) The LUID of a user that receives ownership of contents of the user being removed.
+
+.EXAMPLE
+Update-TSUser -UserId $userId
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#remove_user_from_site
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $UserId,
+    [Parameter()][string] $MapAssetsToUserId
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     $uri = Get-TSRequestUri -Endpoint User -Param $UserId
     if ($MapAssetsToUserId) {
@@ -1165,13 +1281,44 @@ function Remove-TSUser {
 }
 
 function Get-TSGroup {
-    [OutputType([PSCustomObject[]])]
-    Param(
-        [Parameter()][string[]] $Filter,
-        [Parameter()][string[]] $Sort,
-        [Parameter()][string[]] $Fields,
-        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
-    )
+<#
+.SYNOPSIS
+Query Groups
+
+.DESCRIPTION
+Returns a list of groups on current site.
+
+.PARAMETER Filter
+(Optional)
+An expression that lets you specify a subset of data records to return.
+Ref. https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#groups
+
+.PARAMETER Sort
+(Optional)
+An expression that lets you specify the order in which data is returned.
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#groups
+
+.PARAMETER Fields
+(Optional)
+An expression that lets you specify which data attributes are included in response.
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_fields.htm#query_groups
+
+.PARAMETER PageSize
+(Optional) Page size when paging through results.
+
+.EXAMPLE
+$group = Get-TSGroup -Filter "name:eq:$groupName"
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#query_groups
+#>
+[OutputType([PSCustomObject[]])]
+Param(
+    [Parameter()][string[]] $Filter,
+    [Parameter()][string[]] $Sort,
+    [Parameter()][string[]] $Fields,
+    [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     $pageNumber = 0
     do {
@@ -1198,16 +1345,50 @@ function Get-TSGroup {
 }
 
 function Add-TSGroup {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $Name,
-        [Parameter()][ValidateSet('Creator','Explorer','ExplorerCanPublish','SiteAdministratorExplorer','SiteAdministratorCreator','Viewer','Unlicensed')][string] $MinimumSiteRole,
-        [Parameter()][string] $DomainName,
-        [Parameter()][ValidateSet('onLogin','onSync')][string] $GrantLicenseMode,
-        [Parameter()][switch] $EphemeralUsersEnabled,
-        [Parameter()][switch] $BackgroundTask
-    )
+<#
+.SYNOPSIS
+Create Group
+
+.DESCRIPTION
+Creates a group on Tableau Server or Tableau Cloud site.
+
+.PARAMETER Name
+The name for the new group.
+
+.PARAMETER MinimumSiteRole
+Site role that is granted for new users of this group (grant license on-sync or on-login mode).
+
+.PARAMETER DomainName
+(Optional) The domain of the Active Directory group to import (applicable for AD setup).
+
+.PARAMETER GrantLicenseMode
+(Optional) The mode for automatically applying licenses for group members.
+When the mode is onLogin, a license is granted for each group member when they log in to a site.
+For AD setup, the mode can be also onSync.
+
+.PARAMETER EphemeralUsersEnabled
+(Optional) A boolean value that is used to enable on-demand access for embedded Tableau content when the
+Tableau Cloud site is licensed with Embedded Analytics(Link opens in a new window) usage-based model.
+
+.PARAMETER BackgroundTask
+(Optional) Boolean switch, if true, the import process runs as an asynchronous process.
+
+.EXAMPLE
+$group = Add-TSGroup -Name $groupName -MinimumSiteRole Viewer -GrantLicenseMode onLogin
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#create_group
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $Name,
+    [Parameter()][ValidateSet('Creator','Explorer','ExplorerCanPublish','SiteAdministratorExplorer','SiteAdministratorCreator','Viewer','Unlicensed')][string] $MinimumSiteRole,
+    [Parameter()][string] $DomainName,
+    [Parameter()][ValidateSet('onLogin','onSync')][string] $GrantLicenseMode,
+    [Parameter()][switch] $EphemeralUsersEnabled,
+    [Parameter()][switch] $BackgroundTask
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -1245,17 +1426,54 @@ function Add-TSGroup {
 }
 
 function Update-TSGroup {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $GroupId,
-        [Parameter()][string] $Name,
-        [Parameter()][ValidateSet('Creator','Explorer','ExplorerCanPublish','SiteAdministratorExplorer','SiteAdministratorCreator','Viewer','Unlicensed')][string] $MinimumSiteRole,
-        [Parameter()][string] $DomainName,
-        [Parameter()][ValidateSet('onLogin','onSync')][string] $GrantLicenseMode,
-        [Parameter()][switch] $EphemeralUsersEnabled,
-        [Parameter()][switch] $BackgroundTask
-    )
+<#
+.SYNOPSIS
+Update Group
+
+.DESCRIPTION
+Updates a group on a Tableau Server or Tableau Cloud site.
+
+.PARAMETER GroupId
+The LUID of the group to update.
+
+.PARAMETER Name
+(Optional) The new name for the group.
+
+.PARAMETER MinimumSiteRole
+(Optional) Site role that is granted for new users of this group (grant license on-sync or on-login mode).
+
+.PARAMETER DomainName
+(Optional) The domain of the Active Directory group (for AD setup).
+
+.PARAMETER GrantLicenseMode
+(Optional) The mode for automatically applying licenses for group members.
+When the mode is onLogin, a license is granted for each group member when they log in to a site.
+For AD setup, the mode can be also onSync.
+
+.PARAMETER EphemeralUsersEnabled
+(Optional) A boolean value that is used to enable on-demand access for embedded Tableau content when the
+Tableau Cloud site is licensed with Embedded Analytics(Link opens in a new window) usage-based model.
+
+.PARAMETER BackgroundTask
+(Optional) Boolean switch, if true, the import process runs as an asynchronous process.
+
+.EXAMPLE
+$group = Update-TSGroup -GroupId $groupId -Name $groupNewName
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#update_group
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $GroupId,
+    [Parameter()][string] $Name,
+    [Parameter()][ValidateSet('Creator','Explorer','ExplorerCanPublish','SiteAdministratorExplorer','SiteAdministratorCreator','Viewer','Unlicensed')][string] $MinimumSiteRole,
+    [Parameter()][string] $DomainName,
+    [Parameter()][ValidateSet('onLogin','onSync')][string] $GrantLicenseMode,
+    [Parameter()][switch] $EphemeralUsersEnabled,
+    [Parameter()][switch] $BackgroundTask
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -1293,11 +1511,28 @@ function Update-TSGroup {
 }
 
 function Remove-TSGroup {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $GroupId
-    )
+<#
+.SYNOPSIS
+Delete Group
+
+.DESCRIPTION
+Deletes the group on the current site.
+Deleting a group does not delete the users in group, but users are no longer members of the group.
+
+.PARAMETER GroupId
+The LUID of the group to delete.
+
+.EXAMPLE
+$response = Remove-TSGroup -GroupId $testGroupId
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#delete_group
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $GroupId
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     if ($PSCmdlet.ShouldProcess($GroupId)) {
         Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Group -Param $GroupId) -Method Delete
@@ -1305,12 +1540,31 @@ function Remove-TSGroup {
 }
 
 function Add-TSUserToGroup {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $UserId,
-        [Parameter(Mandatory)][string] $GroupId
-    )
+<#
+.SYNOPSIS
+Add User to Group
+
+.DESCRIPTION
+Adds a user to the specified group.
+
+.PARAMETER UserId
+The LUID of the user to add.
+
+.PARAMETER GroupId
+The LUID of the group to add the user to.
+
+.EXAMPLE
+$user = Add-TSUserToGroup -UserId $userId -GroupId $adminGroupId
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#add_user_to_group
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $UserId,
+    [Parameter(Mandatory)][string] $GroupId
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -1323,12 +1577,31 @@ function Add-TSUserToGroup {
 }
 
 function Remove-TSUserFromGroup {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $UserId,
-        [Parameter(Mandatory)][string] $GroupId
-    )
+<#
+.SYNOPSIS
+Remove User from Group
+
+.DESCRIPTION
+Removes a user from the specified group.
+
+.PARAMETER UserId
+The LUID of the user to remove.
+
+.PARAMETER GroupId
+The LUID of the group to remove the user from.
+
+.EXAMPLE
+$response = Remove-TSUserFromGroup -UserId $userId -GroupId $adminGroupId
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#remove_user_to_group
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $UserId,
+    [Parameter(Mandatory)][string] $GroupId
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     if ($PSCmdlet.ShouldProcess("user:$UserId, group:$GroupId")) {
         Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Group -Param $GroupId/users/$UserId) -Method Delete
@@ -1336,11 +1609,30 @@ function Remove-TSUserFromGroup {
 }
 
 function Get-TSUsersInGroup {
-    [OutputType([PSCustomObject[]])]
-    Param(
-        [Parameter(Mandatory)][string] $GroupId,
-        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
-    )
+<#
+.SYNOPSIS
+Get Users in Group
+
+.DESCRIPTION
+Gets a list of users in the specified group.
+
+.PARAMETER GroupId
+The LUID of the group to get the users for.
+
+.PARAMETER PageSize
+(Optional) Page size when paging through results.
+
+.EXAMPLE
+$users = Get-TSUsersInGroup -GroupId $groupId
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#get_users_in_group
+#>
+[OutputType([PSCustomObject[]])]
+Param(
+    [Parameter(Mandatory)][string] $GroupId,
+    [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     $pageNumber = 0
     do {
@@ -1354,11 +1646,30 @@ function Get-TSUsersInGroup {
 }
 
 function Get-TSGroupsForUser {
-    [OutputType([PSCustomObject[]])]
-    Param(
-        [Parameter(Mandatory)][string] $UserId,
-        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
-    )
+<#
+.SYNOPSIS
+Get Groups for a User
+
+.DESCRIPTION
+Gets a list of groups of which the specified user is a member.
+
+.PARAMETER UserId
+The LUID of the user whose group memberships are listed.
+
+.PARAMETER PageSize
+(Optional) Page size when paging through results.
+
+.EXAMPLE
+$groups = Get-TSGroupsForUser -UserId $selectedUserId
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#get_groups_for_a_user
+#>
+[OutputType([PSCustomObject[]])]
+Param(
+    [Parameter(Mandatory)][string] $UserId,
+    [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+)
     Assert-TSRestApiVersion -AtLeast 3.7
     $pageNumber = 0
     do {
