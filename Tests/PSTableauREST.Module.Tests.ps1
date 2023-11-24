@@ -70,5 +70,41 @@ Describe "Module Structure and Validation Tests" -Tag Module -WarningAction Sile
             }
         }
     }
+}
 
+# https://vexx32.github.io/2020/07/08/Verify-Module-Help-Pester/
+Describe "Module Help" -Tag Module,ModuleHelp {
+    BeforeAll {
+        Import-Module -Name $ModuleManifest -Force -ErrorAction Stop
+    }
+    BeforeDiscovery {
+        $Module = Get-Module $ModuleName
+        $script:CommandList = $Module.ExportedFunctions.Keys
+        $script:CommandList += $Module.ExportedCmdlets.Keys
+    }
+    Context "Module <ModuleName> contains help for all functions" -ForEach $CommandList {
+        BeforeEach {
+            $Command = $_
+            $Help = Get-Help -Name $Command -Full | Select-Object -Property *
+            $Help | Out-Null
+        }
+        It "Help contains synopsis for <Command>" {
+            $Help.Synopsis | Should -Not -BeNullOrEmpty
+        }
+        It "Help contains description for <Command>" {
+            $Help.Description | Should -Not -BeNullOrEmpty
+        }
+        It "Help contains for all parameters of <Command>" {
+            $Ast = (Get-Content -Path "function:/$Command" -ErrorAction Ignore).Ast
+            $ShouldProcessParameters = 'WhatIf', 'Confirm'
+            $Parameters = Get-Help -Name $Command -Parameter * -ErrorAction Ignore | Where-Object { $_.Name -and $_.Name -notin $ShouldProcessParameters }
+            $Parameters.Count | Should -Be $Ast.Body.ParamBlock.Parameters.Count -Because 'the number of parameters in the help should match the number in the function script'
+            foreach ($param in $Parameters) {
+                $param.Description.Text | Should -Not -BeNullOrEmpty -Because "parameter $($param.Name) should have a help description"
+            }
+        }
+        It "Help contains at least one usage example for <Command>" {
+            $Help.Examples.Example.Code.Count | Should -BeGreaterOrEqual 1
+        }
+    }
 }

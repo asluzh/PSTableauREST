@@ -372,7 +372,7 @@ Param(
     [Parameter()][securestring] $PersonalAccessTokenSecret,
     [Parameter()][string] $Site = '',
     [Parameter()][string] $ImpersonateUserId,
-    [Parameter()][boolean] $UseServerVersion = $true
+    [Parameter()][bool] $UseServerVersion = $true
 )
     # Assert-TSRestApiVersion -AtLeast 2.0
     $script:TSServerUrl = $ServerUrl
@@ -1684,11 +1684,34 @@ Param(
 
 ### Publishing methods
 function Send-TSFileUpload {
-    [OutputType([string])]
-    Param(
-        [Parameter(Mandatory)][string] $InFile,
-        [Parameter()][string] $FileName = "file"
-    )
+<#
+.SYNOPSIS
+Perform File Upload in Chunks
+
+.DESCRIPTION
+Initiates the upload process for a file, and then performs Append to File Upload to send individual blocks of the file to the server.
+When the complete file has been sent to the server, the result (upload id string) can be used to publish the file as workbook, datasource or flow.
+Note: this is an internal routine for Publish- methods, should not be used separately.
+
+.PARAMETER InFile
+The filename of the file to upload.
+
+.PARAMETER FileName
+(Optional) The filename that is included into the request payload.
+This usually doesn't matter for Tableau Server uploads.
+By default, the filename is sent as "file".
+
+.EXAMPLE
+$uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_publishing.htm#initiate_file_upload
+#>
+[OutputType([string])]
+Param(
+    [Parameter(Mandatory)][string] $InFile,
+    [Parameter()][string] $FileName = "file"
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     if ($FileName -match '[^\x20-\x7e]') { # special non-ASCII characters in the filename cause issues on some API versions
         Write-Verbose "Filename $FileName contains special characters, replacing with tableau_file"
