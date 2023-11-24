@@ -361,7 +361,7 @@ Typically, a credentials token is valid for 240 minutes.
 With administrator permissions on Tableau Server you can increase this idle timeout.
 
 .LINK
-https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_authentication.htm#sign_in
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_authentication.htm
 #>
 [OutputType([PSCustomObject])]
 Param(
@@ -461,9 +461,6 @@ Signs you out of the current session. This call invalidates the authentication t
 Close-TSSignOut
 
 .LINK
-Open-TSSignIn
-
-.LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_authentication.htm#sign_out
 #>
 [OutputType([PSCustomObject])]
@@ -550,7 +547,7 @@ This method is not available for Tableau Cloud and is typically used in programm
 .PARAMETER SessionId
 The session ID to be deleted.
 
-.NOTES
+.LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_server.htm#delete_server_session
 #>
 [CmdletBinding(SupportsShouldProcess)]
@@ -568,7 +565,7 @@ Param(
 function Get-TSSite {
 <#
 .SYNOPSIS
-Query Site or Query Sites
+Query Site / Query Sites
 
 .DESCRIPTION
 Option 1: $Current = $true
@@ -711,6 +708,7 @@ The new name of the site.
 .PARAMETER SiteParams
 (Optional)
 Hashtable with site options. Please check the linked help page for up-to-date supported options.
+See also Add-TSSite
 
 .EXAMPLE
 $site = Update-TSSite -SiteId $siteId -Name "New Site" -SiteParams @{adminMode="ContentAndUsers"; userQuota="1"}
@@ -718,9 +716,6 @@ $site = Update-TSSite -SiteId $siteId -Name "New Site" -SiteParams @{adminMode="
 .NOTES
 You must be signed in to a site in order to update it.
 No validation is done for SiteParams. If some invalid option is included in the request, an HTTP error will be returned by the request.
-
-.LINK
-Add-TSSite
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_site.htm#update_site
@@ -813,17 +808,17 @@ Returns a list of projects on the specified site, with optional parameters.
 .PARAMETER Filter
 (Optional)
 An expression that lets you specify a subset of data records to return.
-Ref. https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#projects
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#projects
 
 .PARAMETER Sort
 (Optional)
 An expression that lets you specify the order in which data is returned.
-Ref. https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#projects
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#projects
 
 .PARAMETER Fields
 (Optional)
 An expression that lets you specify which data attributes are included in response.
-Ref. https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_fields.htm#query_projects
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_fields.htm#query_projects
 
 .PARAMETER PageSize
 (Optional) Page size when paging through results.
@@ -1065,7 +1060,7 @@ Query User On Site: the LUID of the user to get information for.
 .PARAMETER Filter
 (Optional, Get Users on Site)
 An expression that lets you specify a subset of data records to return.
-Ref. https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#users
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#users
 
 .PARAMETER Sort
 (Optional, Get Users on Site)
@@ -1291,7 +1286,7 @@ Returns a list of groups on current site.
 .PARAMETER Filter
 (Optional)
 An expression that lets you specify a subset of data records to return.
-Ref. https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#groups
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#groups
 
 .PARAMETER Sort
 (Optional)
@@ -1491,9 +1486,9 @@ Param(
         if ($MinimumSiteRole) {
             $el_group.SetAttribute("minimumSiteRole", $MinimumSiteRole)
         }
-        if ($EphemeralUsersEnabled) {
+        if ($PSBoundParameters.ContainsKey('EphemeralUsersEnabled')) {
             Assert-TSRestApiVersion -AtLeast 3.21
-            $el_group.SetAttribute("ephemeralUsersEnabled", "true")
+            $el_group.SetAttribute("ephemeralUsersEnabled", $EphemeralUsersEnabled)
         }
     }
     $uri = Get-TSRequestUri -Endpoint Group -Param $GroupId
@@ -1697,7 +1692,7 @@ Note: this is an internal routine for Publish- methods, should not be used separ
 The filename of the file to upload.
 
 .PARAMETER FileName
-(Optional) The filename that is included into the request payload.
+(Optional) The filename (without path) that is included into the request payload.
 This usually doesn't matter for Tableau Server uploads.
 By default, the filename is sent as "file".
 
@@ -1706,6 +1701,9 @@ $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_publishing.htm#initiate_file_upload
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_publishing.htm#append_to_file_upload
 #>
 [OutputType([string])]
 Param(
@@ -1789,20 +1787,73 @@ Param(
 
 ### Workbooks methods
 function Get-TSWorkbook {
-    [OutputType([PSCustomObject[]])]
-    Param(
-        [Parameter(Mandatory,ParameterSetName='WorkbookById')]
-        [Parameter(Mandatory,ParameterSetName='WorkbookRevisions')]
-        [string] $WorkbookId,
-        [Parameter(Mandatory,ParameterSetName='WorkbookByContentUrl')][string] $ContentUrl,
-        [Parameter(Mandatory,ParameterSetName='WorkbookRevisions')][switch] $Revisions,
-        [Parameter(ParameterSetName='Workbooks')][string[]] $Filter,
-        [Parameter(ParameterSetName='Workbooks')][string[]] $Sort,
-        [Parameter(ParameterSetName='Workbooks')][string[]] $Fields,
-        [Parameter(ParameterSetName='Workbooks')]
-        [Parameter(ParameterSetName='WorkbookRevisions')]
-        [ValidateRange(1,100)][int] $PageSize = 100
-    )
+<#
+.SYNOPSIS
+Get Workbook / Workbooks on Site / Workbook Revisions
+
+.DESCRIPTION
+Returns information about the specified workbook, or workbooks on a site.
+
+.PARAMETER WorkbookId
+Get Workbook by Id: The LUID of the workbook.
+
+.PARAMETER ContentUrl
+Get Workbook by Content URL: The content URL of the workbook.
+
+.PARAMETER Revisions
+(Optional for Get Workbook Revisions)
+Boolean switch, if supplied, the workbook revisions are returned.
+
+.PARAMETER Filter
+(Optional)
+An expression that lets you specify a subset of data records to return.
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#workbooks
+
+.PARAMETER Sort
+(Optional)
+An expression that lets you specify the order in which data is returned.
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#workbooks
+
+.PARAMETER Fields
+(Optional)
+An expression that lets you specify which data attributes are included in response.
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_fields.htm#query_workbooks_site
+
+.PARAMETER PageSize
+(Optional) Page size when paging through results.
+
+.EXAMPLE
+$workbook = Get-TSWorkbook -WorkbookId $workbookId
+
+.EXAMPLE
+$workbookRevisions = Get-TSWorkbook -WorkbookId $workbookId -Revisions
+
+.EXAMPLE
+$workbooks = Get-TSWorkbook -Filter "name:eq:$workbookName" -Sort name:asc -Fields id,name
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#query_workbooks_for_site
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#query_workbook
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#get_workbook_revisions
+#>
+[OutputType([PSCustomObject[]])]
+Param(
+    [Parameter(Mandatory,ParameterSetName='WorkbookById')]
+    [Parameter(Mandatory,ParameterSetName='WorkbookRevisions')]
+    [string] $WorkbookId,
+    [Parameter(Mandatory,ParameterSetName='WorkbookByContentUrl')][string] $ContentUrl,
+    [Parameter(Mandatory,ParameterSetName='WorkbookRevisions')][switch] $Revisions,
+    [Parameter(ParameterSetName='Workbooks')][string[]] $Filter,
+    [Parameter(ParameterSetName='Workbooks')][string[]] $Sort,
+    [Parameter(ParameterSetName='Workbooks')][string[]] $Fields,
+    [Parameter(ParameterSetName='Workbooks')]
+    [Parameter(ParameterSetName='WorkbookRevisions')]
+    [ValidateRange(1,100)][int] $PageSize = 100
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     if ($ContentUrl) {
         Assert-TSRestApiVersion -AtLeast 3.17
@@ -1853,12 +1904,34 @@ function Get-TSWorkbook {
 }
 
 function Get-TSWorkbooksForUser {
-    [OutputType([PSCustomObject[]])]
-    Param(
-        [Parameter(Mandatory)][string] $UserId,
-        [Parameter()][switch] $IsOwner,
-        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
-    )
+<#
+.SYNOPSIS
+Query Workbooks for User
+
+.DESCRIPTION
+Returns the workbooks that the specified user owns or has read (view) permissions for.
+
+.PARAMETER UserId
+The LUID of the user to get workbooks for.
+
+.PARAMETER IsOwner
+(Optional) Boolean switch, if supplied, returns only workbooks that the specified user owns.
+
+.PARAMETER PageSize
+(Optional) Page size when paging through results.
+
+.EXAMPLE
+$workbooks = Get-TSWorkbooksForUser -UserId (Get-TSCurrentUserId)
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#query_workbooks_for_user
+#>
+[OutputType([PSCustomObject[]])]
+Param(
+    [Parameter(Mandatory)][string] $UserId,
+    [Parameter()][switch] $IsOwner,
+    [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     $pageNumber = 0
     do {
@@ -1873,23 +1946,71 @@ function Get-TSWorkbooksForUser {
 }
 
 function Get-TSWorkbookConnection {
-    [OutputType([PSCustomObject[]])]
-    Param(
-        [Parameter(Mandatory)][string] $WorkbookId
-    )
+<#
+.SYNOPSIS
+Query Workbook Connections
+
+.DESCRIPTION
+Returns a list of data connections for the specific workbook.
+
+.PARAMETER WorkbookId
+The LUID of the workbook to return connection information about.
+
+.EXAMPLE
+$workbookConnections = Get-TSWorkbookConnection -WorkbookId $workbookId
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#query_workbook_connections
+#>
+[OutputType([PSCustomObject[]])]
+Param(
+    [Parameter(Mandatory)][string] $WorkbookId
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/connections) -Method Get
     return $response.tsResponse.connections.connection
 }
 
 function Export-TSWorkbook {
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $WorkbookId,
-        [Parameter()][string] $OutFile,
-        [Parameter()][switch] $ExcludeExtract,
-        [Parameter()][int] $Revision
-    )
+<#
+.SYNOPSIS
+Download Workbook / Download Workbook Revision
+
+.DESCRIPTION
+Downloads a workbook or workbook revision in .twb or .twbx format.
+
+.PARAMETER WorkbookId
+The LUID of the workbook to be downloaded.
+
+.PARAMETER OutFile
+(Optional) Filename where the workbook is saved upon download.
+If not provided, the downloaded content is piped to the output.
+
+.PARAMETER ExcludeExtract
+(Optional) Boolean switch, if supplied and the workbook contains an extract, it is not included when you download the workbook.
+
+.PARAMETER Revision
+(Optional) If revision number is specified, this revision will be downloaded.
+
+.EXAMPLE
+Export-TSWorkbook -WorkbookId $sampleWorkbookId -OutFile "Superstore.twbx"
+
+.EXAMPLE
+Export-TSWorkbook -WorkbookId $sampleWorkbookId -OutFile "Superstore_1.twbx" -Revision 1
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#download_workbook
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_revisions.htm#download_workbook_revision
+#>
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $WorkbookId,
+    [Parameter()][string] $OutFile,
+    [Parameter()][switch] $ExcludeExtract,
+    [Parameter()][int] $Revision
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     $OutFileParam = @{}
     if ($OutFile) {
@@ -1913,25 +2034,91 @@ function Export-TSWorkbook {
 }
 
 function Publish-TSWorkbook {
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $InFile,
-        [Parameter(Mandatory)][string] $Name,
-        [Parameter()][string] $FileName,
-        [Parameter()][string] $FileType,
-        [Parameter()][string] $Description,
-        [Parameter()][string] $ProjectId,
-        [Parameter()][switch] $ShowTabs,
-        [Parameter()][hashtable] $HideViews,
-        [Parameter()][string] $ThumbnailsUserId,
-        [Parameter()][switch] $Overwrite,
-        [Parameter()][switch] $SkipConnectionCheck,
-        [Parameter()][switch] $BackgroundTask,
-        [Parameter()][switch] $Chunked,
-        [Parameter()][hashtable] $Credentials,
-        [Parameter()][hashtable[]] $Connections
-        # [Parameter()][switch] $EncryptExtracts,
-    )
+<#
+.SYNOPSIS
+Publish Workbook
+
+.DESCRIPTION
+Publishes supplied workbook.
+
+.PARAMETER InFile
+The filename (incl. path) of the workbook to upload and publish.
+
+.PARAMETER Name
+The name of the published workbook.
+
+.PARAMETER FileName
+(Optional) The filename (without path) that is included into the request payload.
+If omitted, the filename is derived from the InFile parameter.
+
+.PARAMETER FileType
+(Optional) The file type of the source workbook.
+
+.PARAMETER Description
+(Optional) The description for the published workbook.
+
+.PARAMETER ProjectId
+(Optional) The LUID of the project to assign the workbook to.
+If the project is not specified, the workbook will be published to the default project.
+
+.PARAMETER ShowTabs
+(Optional) Boolean switch, if supplied, the published workbook shows views in tabs.
+
+.PARAMETER HideViews
+(Optional) Hashtable, containing the mapping of view names and true/false if the specific view should be hidden in the published workbook.
+If omitted, all original views are snown.
+
+.PARAMETER ThumbnailsUserId
+(Optional) The LUID of the user to generate thumbnails as.
+
+.PARAMETER Overwrite
+(Optional) Boolean switch, if supplied, the workbook will be overwritten (otherwise existing published workbook with the same name is not overwritten).
+
+.PARAMETER SkipConnectionCheck
+(Optional) Boolean switch, if supplied, Tableau server will not check if a non-published connection of a workbook is reachable.
+
+.PARAMETER BackgroundTask
+(Optional) Boolean switch, if supplied, the publishing process (its final stage) is run asynchronously.
+
+.PARAMETER Chunked
+(Optional) Boolean switch, if supplied, the publish process is forced to run as chunked.
+By default, the payload is send in one request for files < 64MB size.
+This can be helpful if timeouts occur during upload.
+
+.PARAMETER Credentials
+(Optional) Hashtable containing connection credentials (see online help).
+
+.PARAMETER Connections
+(Optional) Hashtable array containing connection attributes and credentials (see online help).
+
+.EXAMPLE
+$workbook = Publish-TSWorkbook -Name $sampleWorkbookName -InFile "Superstore.twbx" -ProjectId $samplesProjectId
+
+.EXAMPLE
+$workbook = Publish-TSWorkbook -Name $sampleWorkbookName -InFile "Superstore.twbx" -ProjectId $samplesProjectId -Overwrite -HideViews @{Shipping="true";Performance="true";Forecast="true"}
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#publish_workbook
+#>
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $InFile,
+    [Parameter(Mandatory)][string] $Name,
+    [Parameter()][string] $FileName,
+    [Parameter()][string] $FileType,
+    [Parameter()][string] $Description,
+    [Parameter()][string] $ProjectId,
+    [Parameter()][switch] $ShowTabs,
+    [Parameter()][hashtable] $HideViews,
+    [Parameter()][string] $ThumbnailsUserId,
+    [Parameter()][switch] $Overwrite,
+    [Parameter()][switch] $SkipConnectionCheck,
+    [Parameter()][switch] $BackgroundTask,
+    [Parameter()][switch] $Chunked,
+    [Parameter()][hashtable] $Credentials,
+    [Parameter()][hashtable[]] $Connections
+    # [Parameter()][switch] $EncryptExtracts,
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     $fileItem = Get-Item -LiteralPath $InFile
     if (-Not $FileName) {
@@ -2068,20 +2255,66 @@ function Publish-TSWorkbook {
 }
 
 function Update-TSWorkbook {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $WorkbookId,
-        [Parameter()][string] $Name,
-        [Parameter()][string] $Description,
-        [Parameter()][string] $NewProjectId,
-        [Parameter()][string] $NewOwnerId,
-        [Parameter()][switch] $ShowTabs,
-        [Parameter()][switch] $RecentlyViewed,
-        [Parameter()][switch] $EncryptExtracts,
-        [Parameter()][switch] $EnableDataAcceleration,
-        [Parameter()][switch] $AccelerateNow
-    )
+<#
+.SYNOPSIS
+Update Workbook
+
+.DESCRIPTION
+Modifies existing workbook's properties.
+This allows to change for example the owner or project that the workbook belongs to and whether the workbook shows views in tabs.
+
+.PARAMETER WorkbookId
+The LUID of the workbook to update.
+
+.PARAMETER Name
+(Optional) The new name for the published workbook.
+
+.PARAMETER Description
+(Optional) The new description for the published workbook.
+
+.PARAMETER NewProjectId
+(Optional) The LUID of the project where the published workbook should be moved.
+
+.PARAMETER NewOwnerId
+(Optional) The LUID of the user who should own the workbook.
+
+.PARAMETER ShowTabs
+(Optional) Boolean, controls if the published workbook shows views in tabs.
+
+.PARAMETER RecentlyViewed
+(Optional) Boolean switch, if supplied, the updated workbook will show in the site's recently viewed list.
+
+.PARAMETER EncryptExtracts
+(Optional) Boolean switch, include to encrypt the embedded extracts.
+
+.PARAMETER EnableDataAcceleration
+(Optional) Boolean switch, include to enable data acceleration for the workbook.
+Note: this feature is not supported anymore in API 3.16 and higher.
+
+.PARAMETER AccelerateNow
+(Optional) Boolean switch, when acceleration is enabled, start the pre-computation for acceleration immediately when the next backgrounder process becomes available.
+Note: this feature is not supported anymore in API 3.16 and higher.
+
+.EXAMPLE
+$workbook = Update-TSWorkbook -WorkbookId $sampleWorkbookId -ShowTabs:$false
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#update_workbook
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $WorkbookId,
+    [Parameter()][string] $Name,
+    [Parameter()][string] $Description,
+    [Parameter()][string] $NewProjectId,
+    [Parameter()][string] $NewOwnerId,
+    [Parameter()][switch] $ShowTabs,
+    [Parameter()][switch] $RecentlyViewed,
+    [Parameter()][switch] $EncryptExtracts,
+    [Parameter()][switch] $EnableDataAcceleration,
+    [Parameter()][switch] $AccelerateNow
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -2093,12 +2326,14 @@ function Update-TSWorkbook {
         Assert-TSRestApiVersion -AtLeast 3.21
         $el_workbook.SetAttribute("description", $Description)
     }
-    $el_workbook.SetAttribute("showTabs", $ShowTabs)
-    if ($RecentlyViewed) {
-        $el_workbook.SetAttribute("recentlyViewed", "true")
+    if ($PSBoundParameters.ContainsKey('ShowTabs')) {
+        $el_workbook.SetAttribute("showTabs", $ShowTabs)
     }
-    if ($EncryptExtracts) {
-        $el_workbook.SetAttribute("encryptExtracts", "true")
+    if ($PSBoundParameters.ContainsKey('RecentlyViewed')) {
+        $el_workbook.SetAttribute("recentlyViewed", $RecentlyViewed)
+    }
+    if ($PSBoundParameters.ContainsKey('EncryptExtracts')) {
+        $el_workbook.SetAttribute("encryptExtracts", $EncryptExtracts)
     }
     if ($NewProjectId) {
         $el_project = $el_workbook.AppendChild($xml.CreateElement("project"))
@@ -2108,12 +2343,12 @@ function Update-TSWorkbook {
         $el_owner = $el_workbook.AppendChild($xml.CreateElement("owner"))
         $el_owner.SetAttribute("id", $NewOwnerId)
     }
-    if ($EnableDataAcceleration) {
+    if ($PSBoundParameters.ContainsKey('EnableDataAcceleration')) {
         Assert-TSRestApiVersion -AtLeast 3.16
         $el_dataaccel = $el_workbook.AppendChild($xml.CreateElement("dataAccelerationConfig"))
-        $el_dataaccel.SetAttribute("accelerationEnabled", "true")
-        if ($AccelerateNow) {
-            $el_dataaccel.SetAttribute("accelerateNow", "true")
+        $el_dataaccel.SetAttribute("accelerationEnabled", $EnableDataAcceleration)
+        if ($PSBoundParameters.ContainsKey('AccelerateNow')) {
+            $el_dataaccel.SetAttribute("accelerateNow", $AccelerateNow)
         }
     }
     $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId
@@ -2124,18 +2359,56 @@ function Update-TSWorkbook {
 }
 
 function Update-TSWorkbookConnection {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $WorkbookId,
-        [Parameter(Mandatory)][string] $ConnectionId,
-        [Parameter()][string] $ServerAddress,
-        [Parameter()][string] $ServerPort,
-        [Parameter()][string] $Username,
-        [Parameter()][securestring] $SecurePassword,
-        [Parameter()][switch] $EmbedPassword,
-        [Parameter()][switch] $QueryTagging
-    )
+<#
+.SYNOPSIS
+Update Workbook Connection
+
+.DESCRIPTION
+Updates the server address, port, username, or password for the specified workbook connection.
+
+.PARAMETER WorkbookId
+The LUID of the workbook to update.
+
+.PARAMETER ConnectionId
+The LUID of the connection to update.
+
+.PARAMETER ServerAddress
+(Optional) The new server address of the connection.
+
+.PARAMETER ServerPort
+(Optional) The new server port of the connection.
+
+.PARAMETER Username
+(Optional) The new user name of the connection.
+
+.PARAMETER SecurePassword
+(Optional) The new password of the connection, should be supplied as SecurePassword.
+
+.PARAMETER EmbedPassword
+(Optional) Boolean switch, if supplied, the connection password is embedded.
+
+.PARAMETER QueryTagging
+(Optional) Boolean, true to enable query tagging for the connection.
+https://help.tableau.com/current/pro/desktop/en-us/performance_tips.htm
+
+.EXAMPLE
+$workbookConnection = Update-TSWorkbookConnection -WorkbookId $sampleWorkbookId -ConnectionId $connectionId -ServerAddress myserver.com
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#update_workbook_connection
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $WorkbookId,
+    [Parameter(Mandatory)][string] $ConnectionId,
+    [Parameter()][string] $ServerAddress,
+    [Parameter()][string] $ServerPort,
+    [Parameter()][string] $Username,
+    [Parameter()][securestring] $SecurePassword,
+    [Parameter()][switch] $EmbedPassword,
+    [Parameter()][switch] $QueryTagging
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -2153,12 +2426,12 @@ function Update-TSWorkbookConnection {
         $private:PlainPassword = (New-Object System.Net.NetworkCredential("", $SecurePassword)).Password
         $el_connection.SetAttribute("password", $private:PlainPassword)
     }
-    if ($EmbedPassword) {
-        $el_connection.SetAttribute("embedPassword", "true")
+    if ($PSBoundParameters.ContainsKey('EmbedPassword')) {
+        $el_connection.SetAttribute("embedPassword", $EmbedPassword)
     }
-    if ($QueryTagging) {
+    if ($PSBoundParameters.ContainsKey('QueryTagging')) {
         Assert-TSRestApiVersion -AtLeast 3.13
-        $el_connection.SetAttribute("queryTaggingEnabled", "true")
+        $el_connection.SetAttribute("queryTaggingEnabled", $QueryTagging)
     }
     $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/connections/$ConnectionId
     if ($PSCmdlet.ShouldProcess($ConnectionId)) {
@@ -2168,12 +2441,39 @@ function Update-TSWorkbookConnection {
 }
 
 function Remove-TSWorkbook {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $WorkbookId,
-        [Parameter()][int] $Revision
-    )
+<#
+.SYNOPSIS
+Delete Workbook / Delete Workbook Revision
+
+.DESCRIPTION
+Deletes a published workbook. When a workbook is deleted, all of its assets and revisions are also deleted.
+If a specific revision is deleted, the workbook is still available.
+It's not possible to delete the latest revision of the workbook.
+
+.PARAMETER WorkbookId
+The LUID of the workbook to remove.
+
+.PARAMETER Revision
+(Delete Workbook Revision) The revision number of the workbook to delete.
+
+.EXAMPLE
+Remove-TSWorkbook -WorkbookId $sampleWorkbookId
+
+.EXAMPLE
+Remove-TSWorkbook -WorkbookId $sampleWorkbookId -Revision 2
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#delete_workbook
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_revisions.htm#remove_workbook_revision
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $WorkbookId,
+    [Parameter()][int] $Revision
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     if ($Revision) { # Remove Workbook Revision
         # Assert-TSRestApiVersion -AtLeast 2.3
@@ -2188,26 +2488,97 @@ function Remove-TSWorkbook {
 }
 
 function Get-TSWorkbookDowngradeInfo {
-    [OutputType([PSCustomObject[]])]
-    Param(
-        [Parameter(Mandatory)][string] $WorkbookId,
-        [Parameter(Mandatory)][version] $DowngradeVersion
-    )
+<#
+.SYNOPSIS
+Get Workbook Downgrade Info
+
+.DESCRIPTION
+Returns a list of the features that would be impacted, and the severity of the impact,
+when a workbook is exported as a downgraded version (for instance, exporting a v2019.3 workbook to a v10.5 version).
+
+.PARAMETER WorkbookId
+The LUID of the workbook which would be downgraded.
+
+.PARAMETER DowngradeVersion
+The Tableau release version number the workbook would be downgraded to.
+
+.EXAMPLE
+$downgradeInfo = Get-TSWorkbookDowngradeInfo -WorkbookId $sampleWorkbookId -DowngradeVersion 2019.3
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#get_workbook_downgrade_info
+#>
+[OutputType([PSCustomObject[]])]
+Param(
+    [Parameter(Mandatory)][string] $WorkbookId,
+    [Parameter(Mandatory)][version] $DowngradeVersion
+)
     Assert-TSRestApiVersion -AtLeast 3.5
     $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/downGradeInfo?productVersion=$DowngradeVersion) -Method Get
     return $response.tsResponse.downgradeInfo
 }
 
 function Export-TSWorkbookToFormat {
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $WorkbookId,
-        [Parameter(Mandatory)][ValidateSet('pdf','powerpoint','image')][string] $Format,
-        [Parameter()][ValidateSet('A3','A4','A5','B4','B5','Executive','Folio','Ledger','Legal','Letter','Note','Quarto','Tabloid','Unspecified')][string] $PageType = 'A4',
-        [Parameter()][ValidateSet('Portrait','Landscape')][string] $PageOrientation = 'Portrait',
-        [Parameter()][int] $MaxAge, # The maximum number of minutes a workbook preview will be cached before being refreshed
-        [Parameter()][string] $OutFile
-    )
+<#
+.SYNOPSIS
+Download Workbook as PDF / PowerPoint / Image
+
+.DESCRIPTION
+Downloads a .pdf containing images of the sheets that the user has permission to view in a workbook
+or
+Downloads a PowerPoint (.pptx) file containing slides with images of the sheets that the user has permission to view in a workbook
+or
+Query Workbook Preview Image
+
+.PARAMETER WorkbookId
+The LUID of the workbook to use as the source.
+
+.PARAMETER Format
+The output format of the export: pdf, powerpoint or image.
+
+.PARAMETER PageType
+(Optional) The type of page, which determines the page dimensions of the .pdf file returned.
+The value can be: A3, A4, A5, B5, Executive, Folio, Ledger, Legal, Letter, Note, Quarto, or Tabloid.
+Default is A4.
+
+.PARAMETER PageOrientation
+(Optional) The orientation of the pages in the .pdf file produced. The value can be Portrait or Landscape.
+Default is Portrait.
+
+.PARAMETER MaxAge
+(Optional) The maximum number of minutes a workbook export output will be cached before being refreshed.
+
+.PARAMETER OutFile
+(Optional) Filename where the workbook is saved upon download.
+If not provided, the downloaded content is piped to the output.
+
+.EXAMPLE
+Export-TSWorkbookToFormat -WorkbookId $sampleWorkbookId -Format pdf -PageOrientation Landscape -OutFile "export.pdf"
+
+.EXAMPLE
+Export-TSWorkbookToFormat -WorkbookId $sampleWorkbookId -Format powerpoint -OutFile "export.pptx"
+
+.EXAMPLE
+Export-TSWorkbookToFormat -WorkbookId $sampleWorkbookId -Format image -OutFile "export.png"
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#download_workbook_pdf
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#download_workbook_powerpoint
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#query_workbook_preview_image
+#>
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $WorkbookId,
+    [Parameter(Mandatory)][ValidateSet('pdf','powerpoint','image')][string] $Format,
+    [Parameter()][ValidateSet('A3','A4','A5','B4','B5','Executive','Folio','Ledger','Legal','Letter','Note','Quarto','Tabloid','Unspecified')][string] $PageType = 'A4',
+    [Parameter()][ValidateSet('Portrait','Landscape')][string] $PageOrientation = 'Portrait',
+    [Parameter()][int] $MaxAge, # The maximum number of minutes a workbook preview will be cached before being refreshed
+    [Parameter()][string] $OutFile
+)
     $OutFileParam = @{}
     if ($OutFile) {
         $OutFileParam.Add("OutFile", $OutFile)
@@ -2236,11 +2607,27 @@ function Export-TSWorkbookToFormat {
 }
 
 function Update-TSWorkbookNow {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $WorkbookId
-    )
+<#
+.SYNOPSIS
+Update Workbook Now
+
+.DESCRIPTION
+Performs an immediate extract refresh for the specified workbook.
+
+.PARAMETER WorkbookId
+The LUID of the workbook to refresh.
+
+.EXAMPLE
+$job = Update-TSWorkbookNow -WorkbookId $workbook.id
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#update_workbook_now
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $WorkbookId
+)
     Assert-TSRestApiVersion -AtLeast 2.8
     $xml = New-Object System.Xml.XmlDocument
     $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -2505,14 +2892,14 @@ function Update-TSDatasource {
     if ($Name) {
         $el_datasource.SetAttribute("name", $Name)
     }
-    if ($Certified) {
-        $el_datasource.SetAttribute("isCertified", "true")
+    if ($PSBoundParameters.ContainsKey('Certified')) {
+        $el_datasource.SetAttribute("isCertified", $Certified)
     }
     if ($CertificationNote) {
         $el_datasource.SetAttribute("certificationNote", $CertificationNote)
     }
-    if ($EncryptExtracts) {
-        $el_datasource.SetAttribute("encryptExtracts", "true")
+    if ($PSBoundParameters.ContainsKey('EncryptExtracts')) {
+        $el_datasource.SetAttribute("encryptExtracts", $EncryptExtracts)
     }
     if ($NewProjectId) {
         $el_project = $el_datasource.AppendChild($xml.CreateElement("project"))
@@ -2522,10 +2909,10 @@ function Update-TSDatasource {
         $el_owner = $el_datasource.AppendChild($xml.CreateElement("owner"))
         $el_owner.SetAttribute("id", $NewOwnerId)
     }
-    if ($EnableAskData) {
+    if ($PSBoundParameters.ContainsKey('EnableAskData')) {
         Assert-TSRestApiVersion -LessThan 3.12
         $el_askdata = $el_datasource.AppendChild($xml.CreateElement("askData"))
-        $el_askdata.SetAttribute("enablement", "true")
+        $el_askdata.SetAttribute("enablement", $EnableAskData)
     }
     $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId
     if ($PSCmdlet.ShouldProcess($DatasourceId)) {
@@ -2564,12 +2951,12 @@ function Update-TSDatasourceConnection {
         $private:PlainPassword = (New-Object System.Net.NetworkCredential("", $SecurePassword)).Password
         $el_connection.SetAttribute("password", $private:PlainPassword)
     }
-    if ($EmbedPassword) {
-        $el_connection.SetAttribute("embedPassword", "true")
+    if ($PSBoundParameters.ContainsKey('EmbedPassword')) {
+        $el_connection.SetAttribute("embedPassword", $EmbedPassword)
     }
-    if ($QueryTagging) {
+    if ($PSBoundParameters.ContainsKey('QueryTagging')) {
         Assert-TSRestApiVersion -AtLeast 3.13
-        $el_connection.SetAttribute("queryTaggingEnabled", "true")
+        $el_connection.SetAttribute("queryTaggingEnabled", $QueryTagging)
     }
     $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/connections/$ConnectionId
     if ($PSCmdlet.ShouldProcess($ConnectionId)) {
@@ -3225,8 +3612,8 @@ function Update-TSFlowConnection {
         $private:PlainPassword = (New-Object System.Net.NetworkCredential("", $SecurePassword)).Password
         $el_connection.SetAttribute("password", $private:PlainPassword)
     }
-    if ($EmbedPassword) {
-        $el_connection.SetAttribute("embedPassword", "true")
+    if ($PSBoundParameters.ContainsKey('EmbedPassword')) {
+        $el_connection.SetAttribute("embedPassword", $EmbedPassword)
     }
     $uri = Get-TSRequestUri -Endpoint Flow -Param $FlowId/connections/$ConnectionId
     if ($PSCmdlet.ShouldProcess($ConnectionId)) {

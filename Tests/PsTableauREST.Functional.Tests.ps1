@@ -643,7 +643,11 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 It "Update sample workbook (showTabs) on <ConfigFile.server>" {
                     $workbook = Update-TSWorkbook -WorkbookId $sampleWorkbookId -ShowTabs:$false
                     $workbook.showTabs | Should -Be false
+                    $workbook = Update-TSWorkbook -WorkbookId $sampleWorkbookId -Description "Test description"
+                    $workbook.showTabs | Should -Be false
                     $workbook = Update-TSWorkbook -WorkbookId $sampleWorkbookId -ShowTabs
+                    $workbook.showTabs | Should -Be true
+                    $workbook = Update-TSWorkbook -WorkbookId $sampleWorkbookId -Description "Test description"
                     $workbook.showTabs | Should -Be true
                 }
                 It "Update sample workbook (description) on <ConfigFile.server>" {
