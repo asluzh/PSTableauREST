@@ -1801,8 +1801,7 @@ Get Workbook by Id: The LUID of the workbook.
 Get Workbook by Content URL: The content URL of the workbook.
 
 .PARAMETER Revisions
-(Optional for Get Workbook Revisions)
-Boolean switch, if supplied, the workbook revisions are returned.
+(Get Workbook Revisions) Boolean switch, if supplied, the workbook revisions are returned.
 
 .PARAMETER Filter
 (Optional)
@@ -1987,7 +1986,7 @@ The LUID of the workbook to be downloaded.
 If not provided, the downloaded content is piped to the output.
 
 .PARAMETER ExcludeExtract
-(Optional) Boolean switch, if supplied and the workbook contains an extract, it is not included when you download the workbook.
+(Optional) Boolean switch, if supplied and the workbook contains an extract, it is not included for the download.
 
 .PARAMETER Revision
 (Optional) If revision number is specified, this revision will be downloaded.
@@ -2045,14 +2044,15 @@ Publishes supplied workbook.
 The filename (incl. path) of the workbook to upload and publish.
 
 .PARAMETER Name
-The name of the published workbook.
+The name for the published workbook.
 
 .PARAMETER FileName
 (Optional) The filename (without path) that is included into the request payload.
 If omitted, the filename is derived from the InFile parameter.
 
 .PARAMETER FileType
-(Optional) The file type of the source workbook.
+(Optional) The file type of the workbook file.
+If omitted, the file type is derived from the Filename parameter.
 
 .PARAMETER Description
 (Optional) The description for the published workbook.
@@ -2260,8 +2260,7 @@ function Update-TSWorkbook {
 Update Workbook
 
 .DESCRIPTION
-Modifies existing workbook's properties.
-This allows to change for example the owner or project that the workbook belongs to and whether the workbook shows views in tabs.
+Updates the owner, project or other properties of the specified workbook.
 
 .PARAMETER WorkbookId
 The LUID of the workbook to update.
@@ -2640,19 +2639,68 @@ Param(
 
 ### Datasources methods
 function Get-TSDatasource {
-    [OutputType([PSCustomObject[]])]
-    Param(
-        [Parameter(Mandatory,ParameterSetName='DatasourceById')]
-        [Parameter(Mandatory,ParameterSetName='DatasourceRevisions')]
-        [string] $DatasourceId,
-        [Parameter(Mandatory,ParameterSetName='DatasourceRevisions')][Parameter()][switch] $Revisions,
-        [Parameter(ParameterSetName='Datasources')][string[]] $Filter,
-        [Parameter(ParameterSetName='Datasources')][string[]] $Sort,
-        [Parameter(ParameterSetName='Datasources')][string[]] $Fields,
-        [Parameter(ParameterSetName='Datasources')]
-        [Parameter(ParameterSetName='DatasourceRevisions')]
-        [ValidateRange(1,100)][int] $PageSize = 100
-    )
+<#
+.SYNOPSIS
+Query Data Source / Query Data Sources / Get Data Source Revisions
+
+.DESCRIPTION
+Returns information about the specified data source or data sources.
+
+.PARAMETER DatasourceId
+Query Data Source by Id: The LUID of the data source.
+
+.PARAMETER Revisions
+(Get Data Source Revisions) Boolean switch, if supplied, the data source revisions are returned.
+
+.PARAMETER Filter
+(Optional)
+An expression that lets you specify a subset of data records to return.
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#datasources
+
+.PARAMETER Sort
+(Optional)
+An expression that lets you specify the order in which data is returned.
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#datasources
+
+.PARAMETER Fields
+(Optional)
+An expression that lets you specify which data attributes are included in response.
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_fields.htm#query_datasources
+
+.PARAMETER PageSize
+(Optional) Page size when paging through results.
+
+.EXAMPLE
+$datasource = Get-TSDatasource -DatasourceId $datasourceId
+
+.EXAMPLE
+$dsRevisions = Get-TSDatasource -DatasourceId $datasourceId -Revisions
+
+.EXAMPLE
+$datasources = Get-TSDatasource -Filter "name:eq:$datasourceName" -Sort name:asc -Fields id,name
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sources.htm#query_data_source
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sources.htm#query_data_sources
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_revisions.htm#get_data_source_revisions
+#>
+[OutputType([PSCustomObject[]])]
+Param(
+    [Parameter(Mandatory,ParameterSetName='DatasourceById')]
+    [Parameter(Mandatory,ParameterSetName='DatasourceRevisions')]
+    [string] $DatasourceId,
+    [Parameter(Mandatory,ParameterSetName='DatasourceRevisions')][Parameter()][switch] $Revisions,
+    [Parameter(ParameterSetName='Datasources')][string[]] $Filter,
+    [Parameter(ParameterSetName='Datasources')][string[]] $Sort,
+    [Parameter(ParameterSetName='Datasources')][string[]] $Fields,
+    [Parameter(ParameterSetName='Datasources')]
+    [Parameter(ParameterSetName='DatasourceRevisions')]
+    [ValidateRange(1,100)][int] $PageSize = 100
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     if ($Revisions) { # Get Data Source Revisions
         # Assert-TSRestApiVersion -AtLeast 2.3
@@ -2695,23 +2743,71 @@ function Get-TSDatasource {
 }
 
 function Get-TSDatasourceConnection {
-    [OutputType([PSCustomObject[]])]
-    Param(
-        [Parameter(Mandatory)][string] $DatasourceId
-    )
+<#
+.SYNOPSIS
+Query Data Source Connections
+
+.DESCRIPTION
+Returns a list of data connections for the specific data source.
+
+.PARAMETER DatasourceId
+The LUID of the data source to return connection information about.
+
+.EXAMPLE
+$dsConnections = Get-TSDatasourceConnection -DatasourceId $datasourceId
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sources.htm#query_data_source_connections
+#>
+[OutputType([PSCustomObject[]])]
+Param(
+    [Parameter(Mandatory)][string] $DatasourceId
+)
     # Assert-TSRestApiVersion -AtLeast 2.3
     $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/connections) -Method Get
     return $response.tsResponse.connections.connection
 }
 
 function Export-TSDatasource {
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $DatasourceId,
-        [Parameter()][string] $OutFile,
-        [Parameter()][switch] $ExcludeExtract,
-        [Parameter()][int] $Revision
-    )
+<#
+.SYNOPSIS
+Download Data Source / Download Data Source Revision
+
+.DESCRIPTION
+Downloads a data source or data source revision in .tds or .tdsx format.
+
+.PARAMETER DatasourceId
+The LUID of the data source to be downloaded.
+
+.PARAMETER OutFile
+(Optional) Filename where the data source is saved upon download.
+If not provided, the downloaded content is piped to the output.
+
+.PARAMETER ExcludeExtract
+(Optional) Boolean switch, if supplied and the data source contains an extract, it is not included for the download.
+
+.PARAMETER Revision
+(Optional) If revision number is specified, this revision will be downloaded.
+
+.EXAMPLE
+Export-TSDatasource -DatasourceId $sampleDatasourceId -OutFile "Superstore_Data.tdsx" -ExcludeExtract
+
+.EXAMPLE
+Export-TSDatasource -DatasourceId $sampleDatasourceId -OutFile "Superstore_Data_1.tdsx" -Revision 1
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sources.htm#download_data_source
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_revisions.htm#download_data_source_revision
+#>
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $DatasourceId,
+    [Parameter()][string] $OutFile,
+    [Parameter()][switch] $ExcludeExtract,
+    [Parameter()][int] $Revision
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     $OutFileParam = @{}
     if ($OutFile) {
@@ -2735,22 +2831,85 @@ function Export-TSDatasource {
 }
 
 function Publish-TSDatasource {
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $InFile,
-        [Parameter(Mandatory)][string] $Name,
-        [Parameter()][string] $FileName,
-        [Parameter()][string] $FileType,
-        [Parameter()][string] $Description,
-        [Parameter()][string] $ProjectId,
-        [Parameter()][switch] $Overwrite,
-        [Parameter()][switch] $Append,
-        [Parameter()][switch] $BackgroundTask,
-        [Parameter()][switch] $Chunked,
-        [Parameter()][switch] $UseRemoteQueryAgent,
-        [Parameter()][hashtable] $Credentials,
-        [Parameter()][hashtable[]] $Connections
-    )
+<#
+.SYNOPSIS
+Publish Data Source
+
+.DESCRIPTION
+Publishes supplied data source.
+
+.PARAMETER InFile
+The filename (incl. path) of the data source to upload and publish.
+
+.PARAMETER Name
+The name for the published data source.
+
+.PARAMETER FileName
+(Optional) The filename (without path) that is included into the request payload.
+If omitted, the filename is derived from the InFile parameter.
+
+.PARAMETER FileType
+(Optional) The file type of the data source file.
+If omitted, the file type is derived from the Filename parameter.
+
+.PARAMETER Description
+(Optional) The description for the published data source.
+
+.PARAMETER ProjectId
+(Optional) The LUID of the project to assign the data source to.
+If the project is not specified, the data source will be published to the default project.
+
+.PARAMETER Overwrite
+(Optional) Boolean switch, if supplied, the data source will be overwritten (otherwise existing published data source with the same name is not overwritten).
+
+.PARAMETER Append
+(Optional) Boolean switch, if supplied, the data will be appended to the existin data source.
+If the data source doesn't already exist, the operation will fail.
+Append flag cannot be used together with the Overwrite flag.
+
+.PARAMETER BackgroundTask
+(Optional) Boolean switch, if supplied, the publishing process (its final stage) is run asynchronously.
+
+.PARAMETER Chunked
+(Optional) Boolean switch, if supplied, the publish process is forced to run as chunked.
+By default, the payload is send in one request for files < 64MB size.
+This can be helpful if timeouts occur during upload.
+
+.PARAMETER UseRemoteQueryAgent
+(Optional) When true, this flag will allow your Tableau Cloud site to use Tableau Bridge clients.
+Bridge allows you to maintain data sources with live connections to supported on-premises data sources.
+
+.PARAMETER Credentials
+(Optional) Hashtable containing connection credentials (see online help).
+
+.PARAMETER Connections
+(Optional) Hashtable array containing connection attributes and credentials (see online help).
+
+.EXAMPLE
+$datasource = Publish-TSDatasource -Name $sampleDatasourceName -InFile "Superstore_2023.tdsx" -ProjectId $samplesProjectId -Overwrite
+
+.EXAMPLE
+$datasource = Publish-TSDatasource -Name "Datasource" -InFile "data.hyper" -ProjectId $samplesProjectId -Append -Chunked
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sources.htm#publish_data_source
+#>
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $InFile,
+    [Parameter(Mandatory)][string] $Name,
+    [Parameter()][string] $FileName,
+    [Parameter()][string] $FileType,
+    [Parameter()][string] $Description,
+    [Parameter()][string] $ProjectId,
+    [Parameter()][switch] $Overwrite,
+    [Parameter()][switch] $Append,
+    [Parameter()][switch] $BackgroundTask,
+    [Parameter()][switch] $Chunked,
+    [Parameter()][switch] $UseRemoteQueryAgent,
+    [Parameter()][hashtable] $Credentials,
+    [Parameter()][hashtable[]] $Connections
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     $fileItem = Get-Item -LiteralPath $InFile
     if (-Not $FileName) {
@@ -2873,18 +3032,56 @@ function Publish-TSDatasource {
 }
 
 function Update-TSDatasource {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $DatasourceId,
-        [Parameter()][string] $Name,
-        [Parameter()][string] $NewProjectId,
-        [Parameter()][string] $NewOwnerId,
-        [Parameter()][switch] $Certified,
-        [Parameter()][string] $CertificationNote,
-        [Parameter()][switch] $EncryptExtracts,
-        [Parameter()][switch] $EnableAskData
-    )
+<#
+.SYNOPSIS
+Update Data Source
+
+.DESCRIPTION
+Updates the owner, project or certification status of the specified data source.
+
+.PARAMETER DatasourceId
+The LUID of the data source to update.
+
+.PARAMETER Name
+(Optional) The new name for the published data source.
+
+.PARAMETER NewProjectId
+(Optional) The LUID of the project where the published data source should be moved.
+
+.PARAMETER NewOwnerId
+(Optional) The LUID of the user who should own the data source.
+
+.PARAMETER Certified
+(Optional) Boolean switch, if supplied, updates whether the data source is certified.
+
+.PARAMETER CertificationNote
+(Optional) A note that provides more information on the certification of the data source, if applicable.
+
+.PARAMETER EncryptExtracts
+(Optional) Boolean switch, include to encrypt the embedded extract.
+
+.PARAMETER EnableAskData
+(Optional) Boolean switch, determines if a data source allows use of Ask Data.
+Note: This attribute is removed in API 3.12 and later (Tableau Cloud September 2021 / Server 2021.3).
+
+.EXAMPLE
+$datasource = Update-TSDatasource -DatasourceId $sampleDatasourceId -Certified
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sources.htm#update_data_source
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $DatasourceId,
+    [Parameter()][string] $Name,
+    [Parameter()][string] $NewProjectId,
+    [Parameter()][string] $NewOwnerId,
+    [Parameter()][switch] $Certified,
+    [Parameter()][string] $CertificationNote,
+    [Parameter()][switch] $EncryptExtracts,
+    [Parameter()][switch] $EnableAskData
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -2922,18 +3119,56 @@ function Update-TSDatasource {
 }
 
 function Update-TSDatasourceConnection {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $DatasourceId,
-        [Parameter(Mandatory)][string] $ConnectionId,
-        [Parameter()][string] $ServerAddress,
-        [Parameter()][string] $ServerPort,
-        [Parameter()][string] $Username,
-        [Parameter()][securestring] $SecurePassword,
-        [Parameter()][switch] $EmbedPassword,
-        [Parameter()][switch] $QueryTagging
-    )
+<#
+.SYNOPSIS
+Update Data Source Connection
+
+.DESCRIPTION
+Updates the server address, port, username, or password for the specified data source connection.
+
+.PARAMETER DatasourceId
+The LUID of the data source to update.
+
+.PARAMETER ConnectionId
+The LUID of the connection to update.
+
+.PARAMETER ServerAddress
+(Optional) The new server address of the connection.
+
+.PARAMETER ServerPort
+(Optional) The new server port of the connection.
+
+.PARAMETER Username
+(Optional) The new user name of the connection.
+
+.PARAMETER SecurePassword
+(Optional) The new password of the connection, should be supplied as SecurePassword.
+
+.PARAMETER EmbedPassword
+(Optional) Boolean switch, if supplied, the connection password is embedded.
+
+.PARAMETER QueryTagging
+(Optional) Boolean, true to enable query tagging for the connection.
+https://help.tableau.com/current/pro/desktop/en-us/performance_tips.htm
+
+.EXAMPLE
+$datasourceConnection = Update-TSDatasourceConnection -DatasourceId $sampleDatasourceId -ConnectionId $connectionId -ServerAddress myserver.com
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sources.htm#update_data_source_connection
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $DatasourceId,
+    [Parameter(Mandatory)][string] $ConnectionId,
+    [Parameter()][string] $ServerAddress,
+    [Parameter()][string] $ServerPort,
+    [Parameter()][string] $Username,
+    [Parameter()][securestring] $SecurePassword,
+    [Parameter()][switch] $EmbedPassword,
+    [Parameter()][switch] $QueryTagging
+)
     # Assert-TSRestApiVersion -AtLeast 2.3
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -2966,12 +3201,38 @@ function Update-TSDatasourceConnection {
 }
 
 function Remove-TSDatasource {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $DatasourceId,
-        [Parameter()][int] $Revision
-    )
+<#
+.SYNOPSIS
+Delete Data Source / Delete Data Source Revision
+
+.DESCRIPTION
+Deletes a published data source.
+Note: it's not possible to delete the latest revision of the data source.
+
+.PARAMETER DatasourceId
+The LUID of the data source to remove.
+
+.PARAMETER Revision
+(Delete Data Source Revision) The revision number of the data source to delete.
+
+.EXAMPLE
+Remove-TSDatasource -DatasourceId $sampleDatasourceId
+
+.EXAMPLE
+Remove-TSDatasource -DatasourceId $sampleDatasourceId -Revision 1
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sources.htm#delete_data_source
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_revisions.htm#remove_data_source_revision
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $DatasourceId,
+    [Parameter()][int] $Revision
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     if ($Revision) { # Remove Data Source Revision
         # Assert-TSRestApiVersion -AtLeast 2.3
@@ -2986,11 +3247,27 @@ function Remove-TSDatasource {
 }
 
 function Update-TSDatasourceNow {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $DatasourceId
-    )
+<#
+.SYNOPSIS
+Update Data Source Now
+
+.DESCRIPTION
+Performs an immediate extract refresh for the specified data source.
+
+.PARAMETER DatasourceId
+The LUID of the data source to refresh.
+
+.EXAMPLE
+$job = Update-TSWorkbookNow -DatasourceId $datasource.id
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sources.htm#update_data_source_now
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $DatasourceId
+)
     Assert-TSRestApiVersion -AtLeast 2.8
     $xml = New-Object System.Xml.XmlDocument
     $xml.AppendChild($xml.CreateElement("tsRequest"))
