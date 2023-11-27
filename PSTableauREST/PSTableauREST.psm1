@@ -2536,19 +2536,19 @@ The LUID of the workbook to use as the source.
 The output format of the export: pdf, powerpoint or image.
 
 .PARAMETER PageType
-(Optional) The type of page, which determines the page dimensions of the .pdf file returned.
+(Optional, for PDF) The type of page, which determines the page dimensions of the .pdf file returned.
 The value can be: A3, A4, A5, B5, Executive, Folio, Ledger, Legal, Letter, Note, Quarto, or Tabloid.
 Default is A4.
 
 .PARAMETER PageOrientation
-(Optional) The orientation of the pages in the .pdf file produced. The value can be Portrait or Landscape.
+(Optional, for PDF) The orientation of the pages in the .pdf file produced. The value can be Portrait or Landscape.
 Default is Portrait.
 
 .PARAMETER MaxAge
 (Optional) The maximum number of minutes a workbook export output will be cached before being refreshed.
 
 .PARAMETER OutFile
-(Optional) Filename where the workbook is saved upon download.
+(Optional) Filename where the download is saved.
 If not provided, the downloaded content is piped to the output.
 
 .EXAMPLE
@@ -3279,18 +3279,71 @@ Param(
 }
 
 ### Views methods
-# Get View by Path - use Get-TSView with filter viewUrlName:eq:<url>
 function Get-TSView {
-    [OutputType([PSCustomObject[]])]
-    Param(
-        [Parameter(Mandatory,ParameterSetName='ViewById')][string] $ViewId,
-        [Parameter(Mandatory,ParameterSetName='ViewsInWorkbook')][string] $WorkbookId,
-        [Parameter(ParameterSetName='ViewsInWorkbook')][switch] $IncludeUsageStatistics,
-        [Parameter(ParameterSetName='Views')][string[]] $Filter,
-        [Parameter(ParameterSetName='Views')][string[]] $Sort,
-        [Parameter(ParameterSetName='Views')][string[]] $Fields,
-        [Parameter(ParameterSetName='Views')][ValidateRange(1,100)][int] $PageSize = 100
-    )
+<#
+.SYNOPSIS
+Get View / Query Views for Site / Query Views for Workbook
+
+.DESCRIPTION
+Returns all the views for the specified site or workbook, or gets the details of a specific view.
+
+.PARAMETER ViewId
+Get View: The LUID of the view whose details are requested.
+
+.PARAMETER WorkbookId
+Query Views for Workbook: The LUID of the workbook to get the views for.
+
+.PARAMETER IncludeUsageStatistics
+Query Views: include this boolean switch to return usage statistics with the views in response.
+
+.PARAMETER Filter
+(Optional)
+An expression that lets you specify a subset of data records to return.
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#views
+Also: Get View by Path - use Get-TSView with filter viewUrlName:eq:<url>
+
+.PARAMETER Sort
+(Optional)
+An expression that lets you specify the order in which data is returned.
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#views
+
+.PARAMETER Fields
+(Optional)
+An expression that lets you specify which data attributes are included in response.
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_fields.htm#query_views_site
+
+.PARAMETER PageSize
+(Optional) Page size when paging through results.
+
+.EXAMPLE
+$view = Get-TSView -ViewId $viewId
+
+.EXAMPLE
+$views = Get-TSView -Filter "name:eq:$viewName" -Sort name:asc -Fields id,name
+
+.EXAMPLE
+$viewsInWorkbook = Get-TSView -WorkbookId $workbookId -IncludeUsageStatistics
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#get_view
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#query_views_for_site
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#query_views_for_workbook
+#>
+[OutputType([PSCustomObject[]])]
+Param(
+    [Parameter(Mandatory,ParameterSetName='ViewById')][string] $ViewId,
+    [Parameter(Mandatory,ParameterSetName='ViewsInWorkbook')][string] $WorkbookId,
+    [Parameter(ParameterSetName='ViewsInWorkbook')][switch] $IncludeUsageStatistics,
+    [Parameter(ParameterSetName='Views')][string[]] $Filter,
+    [Parameter(ParameterSetName='Views')][string[]] $Sort,
+    [Parameter(ParameterSetName='Views')][string[]] $Fields,
+    [Parameter(ParameterSetName='Views')][ValidateRange(1,100)][int] $PageSize = 100
+)
+    # Assert-TSRestApiVersion -AtLeast 2.0
     if ($ViewId) { # Get View
         Assert-TSRestApiVersion -AtLeast 3.0
     }
@@ -3298,7 +3351,6 @@ function Get-TSView {
         $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint View -Param $ViewId) -Method Get
         $response.tsResponse.view
     } elseif ($WorkbookId) { # Query Views for Workbook
-        # Assert-TSRestApiVersion -AtLeast 2.0
         $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/views
         if ($IncludeUsageStatistics) {
             $uri += "?includeUsageStatistics=true"
@@ -3336,12 +3388,35 @@ function Get-TSView {
 }
 
 function Export-TSViewPreviewImage {
-    [OutputType([PSCustomObject[]])]
-    Param(
-        [Parameter(Mandatory)][string] $ViewId,
-        [Parameter(Mandatory)][string] $WorkbookId,
-        [Parameter()][string] $OutFile
-    )
+<#
+.SYNOPSIS
+Query View Preview Image
+
+.DESCRIPTION
+Returns the thumbnail image for the specified view.
+
+.PARAMETER ViewId
+The LUID of the view to return a thumbnail image for.
+
+.PARAMETER WorkbookId
+The LUID of the workbook that contains the view to return a thumbnail image for.
+
+.PARAMETER OutFile
+(Optional) Filename where the download is saved.
+If not provided, the downloaded content is piped to the output.
+
+.EXAMPLE
+Export-TSViewPreviewImage -ViewId $view.id -WorkbookId $workbookId -OutFile "preview.png"
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#query_view_with_preview
+#>
+[OutputType([PSCustomObject[]])]
+Param(
+    [Parameter(Mandatory)][string] $ViewId,
+    [Parameter(Mandatory)][string] $WorkbookId,
+    [Parameter()][string] $OutFile
+)
     # Assert-TSRestApiVersion -AtLeast 2.0
     $OutFileParam = @{}
     if ($OutFile) {
@@ -3352,23 +3427,85 @@ function Export-TSViewPreviewImage {
 }
 
 function Export-TSViewToFormat {
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $ViewId,
-        [Parameter(Mandatory)][ValidateSet('pdf','image','csv','excel')][string] $Format,
-        [Parameter()][ValidateSet('A3','A4','A5','B4','B5','Executive','Folio','Ledger','Legal','Letter','Note','Quarto','Tabloid','Unspecified')][string] $PageType = 'A4',
-        [Parameter()][ValidateSet('Portrait','Landscape')][string] $PageOrientation = 'Portrait',
-        [Parameter()][int] $MaxAge, # The maximum number of minutes a view pdf/image/data/crosstab will be cached before being refreshed
-        # The height/width of the rendered pdf image in pixels; these parameter determine its resolution and aspect ratio
-        [Parameter()][int] $VizWidth,
-        [Parameter()][int] $VizHeight,
-        # The resolution of the image. Image width and actual pixel density are determined by the display context of the image.
-        # Aspect ratio is always preserved. Set the value to high to ensure maximum pixel density.
-        [Parameter()][ValidateSet('standard','high')][string] $Resolution = 'high',
-        [Parameter()][string] $OutFile,
-        # https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#Filter-query-views
-        [Parameter()][hashtable] $ViewFilters
-    )
+<#
+.SYNOPSIS
+Query View PDF / Image / Data
+
+.DESCRIPTION
+Returns a specified view rendered as a .pdf file.
+or
+Returns an image of the specified view.
+or
+Returns a specified view rendered as data in comma-separated-value (CSV) format.
+
+.PARAMETER ViewId
+The LUID of the view to export.
+
+.PARAMETER Format
+The output format of the export: pdf, powerpoint or image.
+
+.PARAMETER PageType
+(Optional, for PDF) The type of page, which determines the page dimensions of the .pdf file returned.
+The value can be: A3, A4, A5, B5, Executive, Folio, Ledger, Legal, Letter, Note, Quarto, or Tabloid.
+Default is A4.
+
+.PARAMETER PageOrientation
+(Optional, for PDF) The orientation of the pages in the .pdf file produced. The value can be Portrait or Landscape.
+Default is Portrait.
+
+.PARAMETER MaxAge
+(Optional) The maximum number of minutes a view export output will be cached before being refreshed.
+
+.PARAMETER VizWidth
+The width of the rendered pdf image in pixels, these parameter determine its resolution and aspect ratio.
+
+.PARAMETER VizHeight
+The height of the rendered pdf image in pixels, these parameter determine its resolution and aspect ratio.
+
+.PARAMETER Resolution
+The resolution of the image (high/standard). Image width and actual pixel density are determined by the display context of the image.
+Aspect ratio is always preserved. Set the value to high to ensure maximum pixel density.
+
+.PARAMETER OutFile
+(Optional) Filename where the download is saved.
+If not provided, the downloaded content is piped to the output.
+
+.PARAMETER ViewFilters
+Filter expression to modify the view data returned. The expression uses fields in the underlying workbook data to define the filter.
+To filter a view using a field, add one or more query parameters to your method call, structured as key=value pairs, prefaced by the constant 'vf_'
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#Filter-query-views
+
+.EXAMPLE
+Export-TSViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "export.pdf" -ViewFilters @{Region="Europe"}
+
+.EXAMPLE
+Export-TSViewToFormat -ViewId $sampleViewId -Format image -OutFile "export.png" -Resolution high
+
+.EXAMPLE
+Export-TSViewToFormat -ViewId $sampleViewId -Format csv -OutFile "export.csv" -ViewFilters @{"Ease of Business (clusters)"="Low"}
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#query_view_pdf
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#query_view_image
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#query_view_data
+#>
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $ViewId,
+    [Parameter(Mandatory)][ValidateSet('pdf','image','csv','excel')][string] $Format,
+    [Parameter()][ValidateSet('A3','A4','A5','B4','B5','Executive','Folio','Ledger','Legal','Letter','Note','Quarto','Tabloid','Unspecified')][string] $PageType = 'A4',
+    [Parameter()][ValidateSet('Portrait','Landscape')][string] $PageOrientation = 'Portrait',
+    [Parameter()][int] $MaxAge,
+    [Parameter()][int] $VizWidth,
+    [Parameter()][int] $VizHeight,
+    [Parameter()][ValidateSet('standard','high')][string] $Resolution = 'high',
+    [Parameter()][string] $OutFile,
+    [Parameter()][hashtable] $ViewFilters
+)
     $OutFileParam = @{}
     if ($OutFile) {
         $OutFileParam.Add("OutFile", $OutFile)
@@ -3415,8 +3552,21 @@ function Export-TSViewToFormat {
 }
 
 function Get-TSViewRecommendation {
-    [OutputType([PSCustomObject[]])]
-    Param()
+<#
+.SYNOPSIS
+Get Recommendations for Views
+
+.DESCRIPTION
+Gets a list of views that are recommended for a user.
+
+.EXAMPLE
+$recommendations = Get-TSViewRecommendation
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#get_view_recommendations
+#>
+[OutputType([PSCustomObject[]])]
+Param()
     Assert-TSRestApiVersion -AtLeast 3.7
     $uri = Get-TSRequestUri -Endpoint Recommendation -Param "?type=view"
     $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
@@ -3424,10 +3574,26 @@ function Get-TSViewRecommendation {
 }
 
 function Hide-TSViewRecommendation {
-    [OutputType([string])]
-    Param(
-        [Parameter(Mandatory)][string] $ViewId
-    )
+<#
+.SYNOPSIS
+Hide a Recommendation for a View
+
+.DESCRIPTION
+Hides a view from being recommended by the server by adding it to a list of views that are dismissed for a user.
+
+.PARAMETER ViewId
+The LUID of the view to be added to the list of views hidden from recommendation for a user.
+
+.EXAMPLE
+Hide-TSViewRecommendation -ViewId $viewId
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#hide_view_recommendation
+#>
+[OutputType([string])]
+Param(
+    [Parameter(Mandatory)][string] $ViewId
+)
     Assert-TSRestApiVersion -AtLeast 3.7
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -3439,24 +3605,81 @@ function Hide-TSViewRecommendation {
 }
 
 function Show-TSViewRecommendation {
-    [OutputType([string])]
-    Param(
-        [Parameter(Mandatory)][string] $ViewId
-    )
+<#
+.SYNOPSIS
+Unhide a Recommendation for a View
+
+.DESCRIPTION
+Unhides a view from being recommended by the server by removing it from the list of views that are dimissed for a user.
+
+.PARAMETER ViewId
+The LUID of the view to be removed from the list of views hidden from recommendation for a user.
+
+.EXAMPLE
+Show-TSViewRecommendation -ViewId $viewId
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#unhide_view_recommendation
+#>
+[OutputType([string])]
+Param(
+    [Parameter(Mandatory)][string] $ViewId
+)
     Assert-TSRestApiVersion -AtLeast 3.7
     $uri = Get-TSRequestUri -Endpoint Recommendation -Param "dismissals/?type=view&id=$ViewId"
     Invoke-TSRestApiMethod -Uri $uri -Method Delete
 }
 
 function Get-TSCustomView {
-    [OutputType([PSCustomObject[]])]
-    Param(
-        [Parameter(Mandatory,ParameterSetName='CustomViewById')][string] $CustomViewId,
-        [Parameter(ParameterSetName='CustomViews')][string[]] $Filter,
-        [Parameter(ParameterSetName='CustomViews')][string[]] $Sort,
-        [Parameter(ParameterSetName='CustomViews')][string[]] $Fields,
-        [Parameter(ParameterSetName='CustomViews')][ValidateRange(1,100)][int] $PageSize = 100
-    )
+<#
+.SYNOPSIS
+Get Custom View / List Custom Views
+
+.DESCRIPTION
+Gets the details of a specified custom view, or a list of custom views on a site.
+
+.PARAMETER CustomViewId
+(Get Custom View) The LUID for the custom view.
+
+.PARAMETER Filter
+(Optional)
+An expression that lets you specify a subset of data records to return.
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#views
+Also: Get View by Path - use Get-TSView with filter viewUrlName:eq:<url>
+
+.PARAMETER Sort
+(Optional)
+An expression that lets you specify the order in which data is returned.
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#views
+
+.PARAMETER Fields
+(Optional)
+An expression that lets you specify which data attributes are included in response.
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_fields.htm#query_views_site
+
+.PARAMETER PageSize
+(Optional) Page size when paging through results.
+
+.EXAMPLE
+$customView = Get-TSCustomView -CustomViewId $id
+
+.EXAMPLE
+$views = Get-TSCustomView -Filter "name:eq:Overview"
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#get_custom_view
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#list_custom_views
+#>
+[OutputType([PSCustomObject[]])]
+Param(
+    [Parameter(Mandatory,ParameterSetName='CustomViewById')][string] $CustomViewId,
+    [Parameter(ParameterSetName='CustomViews')][string[]] $Filter,
+    [Parameter(ParameterSetName='CustomViews')][string[]] $Sort,
+    [Parameter(ParameterSetName='CustomViews')][string[]] $Fields,
+    [Parameter(ParameterSetName='CustomViews')][ValidateRange(1,100)][int] $PageSize = 100
+)
     Assert-TSRestApiVersion -AtLeast 3.18
     if ($CustomViewId) { # Get Custom View
         $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint CustomView -Param $CustomViewId) -Method Get
@@ -3488,10 +3711,26 @@ function Get-TSCustomView {
 }
 
 function Get-TSCustomViewAsUserDefault {
-    [OutputType([PSCustomObject[]])]
-    Param(
-        [Parameter(Mandatory)][string] $CustomViewId
-    )
+<#
+.SYNOPSIS
+List Users with Custom View as Default
+
+.DESCRIPTION
+Gets the list of users whose default view is the specified custom view.
+
+.PARAMETER CustomViewId
+The LUID for the custom view.
+
+.EXAMPLE
+$users = Get-TSCustomViewAsUserDefault -CustomViewId $id
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#list_users_with_custom_view_as_default
+#>
+[OutputType([PSCustomObject[]])]
+Param(
+    [Parameter(Mandatory)][string] $CustomViewId
+)
     Assert-TSRestApiVersion -AtLeast 3.21
     $uri = Get-TSRequestUri -Endpoint CustomView -Param "$CustomViewId/default/users"
     $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
@@ -3499,12 +3738,31 @@ function Get-TSCustomViewAsUserDefault {
 }
 
 function Set-TSCustomViewAsUserDefault {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject[]])]
-    Param(
-        [Parameter(Mandatory)][string] $CustomViewId,
-        [Parameter(Mandatory)][string[]] $UserId
-    )
+<#
+.SYNOPSIS
+Set Custom View as Default for Users
+
+.DESCRIPTION
+Sets the specified custom for as the default view for up to 100 specified users.
+
+.PARAMETER CustomViewId
+The LUID for the custom view.
+
+.PARAMETER UserId
+List of user LUIDs.
+
+.EXAMPLE
+$result = Set-TSCustomViewAsUserDefault -CustomViewId $id -UserId $user1,$user2
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#set_custom_view_as_default_for_users
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject[]])]
+Param(
+    [Parameter(Mandatory)][string] $CustomViewId,
+    [Parameter(Mandatory)][string[]] $UserId
+)
     Assert-TSRestApiVersion -AtLeast 3.21
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -3521,14 +3779,46 @@ function Set-TSCustomViewAsUserDefault {
 }
 
 function Export-TSCustomViewImage {
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $CustomViewId,
-        [Parameter()][int] $MaxAge,
-        [Parameter()][ValidateSet('standard','high')][string] $Resolution = "high",
-        [Parameter()][string] $OutFile,
-        [Parameter()][hashtable] $ViewFilters
-    )
+<#
+.SYNOPSIS
+Get Custom View Image
+
+.DESCRIPTION
+Downloads a .png format image file of a specified custom view.
+
+.PARAMETER CustomViewId
+The LUID of the custom view.
+
+.PARAMETER MaxAge
+(Optional) The maximum number of minutes a view export output will be cached before being refreshed.
+
+.PARAMETER Resolution
+The resolution of the image (high/standard). Image width and actual pixel density are determined by the display context of the image.
+Aspect ratio is always preserved. Set the value to high to ensure maximum pixel density.
+
+.PARAMETER OutFile
+(Optional) Filename where the download is saved.
+If not provided, the downloaded content is piped to the output.
+
+.PARAMETER ViewFilters
+Filter expression to modify the view data returned. The expression uses fields in the underlying workbook data to define the filter.
+To filter a view using a field, add one or more query parameters to your method call, structured as key=value pairs, prefaced by the constant 'vf_'
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#Filter-query-views
+
+.EXAMPLE
+Export-TSCustomViewImage -CustomViewId $id -OutFile "export.png" -Resolution high
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#get_custom_view_image
+#>
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $CustomViewId,
+    [Parameter()][int] $MaxAge,
+    [Parameter()][ValidateSet('standard','high')][string] $Resolution = "high",
+    [Parameter()][string] $OutFile,
+    [Parameter()][hashtable] $ViewFilters
+)
     Assert-TSRestApiVersion -AtLeast 3.18
     $OutFileParam = @{}
     if ($OutFile) {
@@ -3552,13 +3842,35 @@ function Export-TSCustomViewImage {
 }
 
 function Update-TSCustomView {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $CustomViewId,
-        [Parameter()][string] $NewName,
-        [Parameter()][string] $NewOwnerId
-    )
+<#
+.SYNOPSIS
+Update Custom View
+
+.DESCRIPTION
+Changes the owner or name of an existing custom view.
+
+.PARAMETER CustomViewId
+The LUID for the custom view being updated.
+
+.PARAMETER NewName
+(Optional) The new name of the custom view that replaces the existing one.
+
+.PARAMETER NewOwnerId
+(Optional) The LUID of the new owner of custom view that replaces the existing one.
+
+.EXAMPLE
+$result = Update-TSCustomView -CustomViewId $id -Name "My Custom View"
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#update_custom_view
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $CustomViewId,
+    [Parameter()][string] $NewName,
+    [Parameter()][string] $NewOwnerId
+)
     Assert-TSRestApiVersion -AtLeast 3.18
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -3577,11 +3889,27 @@ function Update-TSCustomView {
 }
 
 function Remove-TSCustomView {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $CustomViewId
-    )
+<#
+.SYNOPSIS
+Delete Custom View
+
+.DESCRIPTION
+Deletes the specified custom view.
+
+.PARAMETER CustomViewId
+The LUID for the custom view being removed.
+
+.EXAMPLE
+Remove-TSCustomView -CustomViewId $id
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#delete_custom_view
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $CustomViewId
+)
     Assert-TSRestApiVersion -AtLeast 3.18
     if ($PSCmdlet.ShouldProcess($CustomViewId)) {
         Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint CustomView -Param $CustomViewId) -Method Delete
@@ -3589,11 +3917,27 @@ function Remove-TSCustomView {
 }
 
 function Get-TSViewUrl {
-    [OutputType([string])]
-    Param(
-        [Parameter(Mandatory,ParameterSetName='ViewId')][string] $ViewId,
-        [Parameter(Mandatory,ParameterSetName='ContentUrl')][string] $ContentUrl
-    )
+<#
+.SYNOPSIS
+Get View URL
+
+.DESCRIPTION
+Returns the full URL of the specified view.
+
+.PARAMETER ViewId
+The LUID of the specified view. Either ViewId or ContentUrl needs to be provided.
+
+.PARAMETER ContentUrl
+The content URL of the specified view. Either ViewId or ContentUrl needs to be provided.
+
+.EXAMPLE
+Get-TSViewUrl -ViewId $view.id
+#>
+[OutputType([string])]
+Param(
+    [Parameter(Mandatory,ParameterSetName='ViewId')][string] $ViewId,
+    [Parameter(Mandatory,ParameterSetName='ContentUrl')][string] $ContentUrl
+)
     if ($ViewId) {
         $view = Get-TSView -ViewId $ViewId
         $ContentUrl = $view.contentUrl

@@ -1246,6 +1246,12 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     Test-Path -Path "Tests/Output/$sampleViewName.pdf" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/$sampleViewName.pdf"
                 }
+                It "Query view preview image from <ConfigFile.server>" {
+                    $view = Get-View -ViewId $sampleViewId
+                    Export-TSViewPreviewImage -ViewId $sampleViewId -Workbook $view.workbook.id -OutFile "Tests/Output/$sampleViewName.png"
+                    Test-Path -Path "Tests/Output/$sampleViewName.png" | Should -BeTrue
+                    Remove-Item -Path "Tests/Output/$sampleViewName.png"
+                }
                 It "Download sample view as PNG from <ConfigFile.server>" {
                     Export-TSViewToFormat -ViewId $sampleViewId -Format image -OutFile "Tests/Output/$sampleViewName.png"
                     Test-Path -Path "Tests/Output/$sampleViewName.png" | Should -BeTrue

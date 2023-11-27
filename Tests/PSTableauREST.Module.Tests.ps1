@@ -88,13 +88,13 @@ Describe "Module Help" -Tag Module,ModuleHelp {
             $Help = Get-Help -Name $Command -Full | Select-Object -Property *
             $Help | Out-Null
         }
-        It "Help contains synopsis for <Command>" {
+        It " <Command>: help contains synopsis" {
             $Help.Synopsis | Should -Not -BeNullOrEmpty
         }
-        It "Help contains description for <Command>" {
+        It " <Command>: help contains description" {
             $Help.Description | Should -Not -BeNullOrEmpty
         }
-        It "Help contains for all parameters of <Command>" {
+        It " <Command>: help contains for all parameters" {
             $Ast = (Get-Content -Path "function:/$Command" -ErrorAction Ignore).Ast
             $ShouldProcessParameters = 'WhatIf', 'Confirm'
             $Parameters = Get-Help -Name $Command -Parameter * -ErrorAction Ignore | Where-Object { $_.Name -and $_.Name -notin $ShouldProcessParameters }
@@ -103,8 +103,13 @@ Describe "Module Help" -Tag Module,ModuleHelp {
                 $param.Description.Text | Should -Not -BeNullOrEmpty -Because "parameter $($param.Name) should have a help description"
             }
         }
-        It "Help contains at least one usage example for <Command>" {
+        It " <Command>: help contains at least one usage example" {
             $Help.Examples.Example.Code.Count | Should -BeGreaterOrEqual 1
+        }
+        It " <Command>: help example should contain the command" -Skip {
+            $Help.Examples | ForEach-Object {
+                $_.Example.Code.Contains($Command) | Should -BeTrue
+            }
         }
     }
 }
