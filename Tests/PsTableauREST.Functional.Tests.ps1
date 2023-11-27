@@ -40,7 +40,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
         }
         It "Request PAT sign-in for <ConfigFile.server>" {
             if (-not $ConfigFile.pat_name) {
-                Set-ItResult -Skipped
+                Set-ItResult -Skipped -Because "PAT not provided"
             }
             $credentials = Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
             $credentials.user.id | Should -BeOfType String
@@ -49,7 +49,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
         }
         It "Impersonate user sign-in for <ConfigFile.server>" {
             if (-not $ConfigFile.impersonate_user_id) {
-                Set-ItResult -Skipped
+                Set-ItResult -Skipped -Because "impersonate user ID not provided"
             }
             $credentials = Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password -ImpersonateUserId $ConfigFile.impersonate_user_id
             $credentials.user.id | Should -Be $ConfigFile.impersonate_user_id
@@ -97,7 +97,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $script:testSiteId = $site.id
                     $script:testSite = $site.contentUrl
                 } else {
-                    Set-ItResult -Skipped
+                    Set-ItResult -Skipped -Because "Server admin privileges required"
                 }
             }
             It "Update site <testSite> on <ConfigFile.server>" {
@@ -110,7 +110,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $site.name | Should -Be $siteNewName
                     Update-TSSite -SiteId $testSiteId -Name $ConfigFile.test_site_name -SiteParams @{adminMode="ContentAndUsers"; userQuota="1"}
                 } else {
-                    Set-ItResult -Skipped
+                    Set-ItResult -Skipped -Because "Server admin privileges required"
                 }
             }
             It "Query sites on <ConfigFile.server>" {
@@ -147,7 +147,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     }
                     $credentials.user.id | Should -BeOfType String
                 } else {
-                    Set-ItResult -Skipped
+                    Set-ItResult -Skipped -Because "Server admin privileges required"
                 }
             }
             It "Delete site on <ConfigFile.server> asynchronously" {
@@ -167,7 +167,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     }
                     $credentials.user.id | Should -BeOfType String
                 } else {
-                    Set-ItResult -Skipped
+                    Set-ItResult -Skipped -Because "Server admin privileges required"
                 }
             }
         }
@@ -668,7 +668,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         Remove-Item -Path "Tests/Output/download_revision.twbx"
                         Remove-TSWorkbook -WorkbookId $sampleWorkbookId -Revision $revision
                     } else {
-                        Set-ItResult -Skipped
+                        Set-ItResult -Skipped -Because "only one revision was found"
                     }
                 }
                 It "Download latest workbook revision on <ConfigFile.server>" {
@@ -963,7 +963,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         Remove-Item -Path "Tests/Output/download_revision.tdsx"
                         Remove-TSDatasource -DatasourceId $sampleDatasourceId -Revision $revision
                     } else {
-                        Set-ItResult -Skipped
+                        Set-ItResult -Skipped -Because "only one revision was found"
                     }
                 }
                 It "Download latest datasource revision on <ConfigFile.server>" {
@@ -1472,7 +1472,8 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $flow.id | Should -BeOfType String
                     $script:sampleFlowId = $flow.id
                 }
-                It "Download & remove previous flow revision on <ConfigFile.server>" -Skip {
+                It "Download & remove previous flow revision on <ConfigFile.server>" {
+                    Set-ItResult -Skipped -Because "flow revisions are currently not supported via REST API"
                     $revisions = Get-TSFlow -FlowId $sampleFlowId -Revisions
                     if (($revisions | Measure-Object).Count -gt 1) {
                         $revision = $revisions | Sort-Object revisionNumber -Descending | Select-Object -Skip 1 -First 1 -ExpandProperty revisionNumber
@@ -1481,7 +1482,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         Remove-Item -Path "Tests/Output/download_revision.tflx"
                         Remove-TSFlow -FlowId $sampleFlowId -Revision $revision
                     } else {
-                        Set-ItResult -Skipped
+                        Set-ItResult -Skipped -Because "only one revision was found"
                     }
                 }
                 It "Download latest flow revision on <ConfigFile.server>" -Skip {
@@ -1592,7 +1593,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                         Assert-Equivalent -Actual $actualPermissionTable -Expected $expectedPermissionTable
                     }
                 }
-                It "Remove sample flow on <ConfigFile.server>" -Skip {
+                It "Remove sample flow on <ConfigFile.server>" {
                     Remove-TSFlow -FlowId $sampleFlowId
                 }
                 It "Publish flow with invalid extension on <ConfigFile.server>" {
@@ -1710,7 +1711,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 if ($flowRun) {
                     Get-TSFlowRun -Filter "flowId:eq:$($flowRun.flowId)" | Should -Not -BeNullOrEmpty
                 } else {
-                    Set-ItResult -Skipped
+                    Set-ItResult -Skipped -Because "flow runs not found"
                 }
             }
             It "Filter jobs on <ConfigFile.server>" {
@@ -1719,7 +1720,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     Get-TSJob -Filter "jobType:eq:$($job.jobType)" | Should -Not -BeNullOrEmpty
                     Get-TSJob -Filter "priority:eq:$($job.priority)" | Should -Not -BeNullOrEmpty
                 } else {
-                    Set-ItResult -Skipped
+                    Set-ItResult -Skipped -Because "jobs not found"
                 }
             }
             # It "Filter metrics by <> on <ConfigFile.server>" {
@@ -1844,7 +1845,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $schedule.id | Should -BeOfType String
                     $script:testScheduleId = $schedule.id
                 } else {
-                    Set-ItResult -Skipped
+                    Set-ItResult -Skipped -Because "Server admin privileges required"
                 }
             }
             It "Update schedule <testScheduleId> on <ConfigFile.server>" {
@@ -1904,7 +1905,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     # $schedule.frequencyDetails.start | Should -Be "08:00:00"
                     # $schedule.frequencyDetails.intervals.interval.monthDay | Should -Be "3"
                 } else {
-                    Set-ItResult -Skipped
+                    Set-ItResult -Skipped -Because "Server admin privileges required"
                 }
             }
             It "Query schedules on <ConfigFile.server>" {
@@ -1930,7 +1931,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $response | Should -BeOfType String
                     $script:testScheduleId = $null
                 } else {
-                    Set-ItResult -Skipped
+                    Set-ItResult -Skipped -Because "Server admin privileges required"
                 }
             }
             It "Add/remove monthly schedule on <ConfigFile.server>" {
@@ -1950,7 +1951,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $response = Remove-TSSchedule -ScheduleId $schedule.id
                     $response | Should -BeOfType String
                 } else {
-                    Set-ItResult -Skipped
+                    Set-ItResult -Skipped -Because "Server admin privileges required"
                 }
             }
         }
@@ -1974,7 +1975,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $project.id | Should -Be $samplesProjectId
                     # Start-Sleep -s 3
                 } else {
-                    Set-ItResult -Skipped
+                    Set-ItResult -Skipped -Because "sample project doesn't exist"
                 }
             }
             It "Add extract refresh tasks into a schedule on <ConfigFile.server>" {

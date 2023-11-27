@@ -2647,7 +2647,7 @@ Query Data Source / Query Data Sources / Get Data Source Revisions
 Returns information about the specified data source or data sources.
 
 .PARAMETER DatasourceId
-Query Data Source by Id: The LUID of the data source.
+(Query Data Source by Id) The LUID of the data source.
 
 .PARAMETER Revisions
 (Get Data Source Revisions) Boolean switch, if supplied, the data source revisions are returned.
@@ -3953,20 +3953,70 @@ Param(
 
 ### Flows methods
 function Get-TSFlow {
-    [OutputType([PSCustomObject[]])]
-    Param(
-        [Parameter(Mandatory,ParameterSetName='FlowById')]
-        [Parameter(Mandatory,ParameterSetName='FlowRevisions')]
-        [string] $FlowId,
-        [Parameter(Mandatory,ParameterSetName='FlowRevisions')][switch] $Revisions, # Note: flow revisions currently not supported via REST API
-        [Parameter(ParameterSetName='FlowById')][switch] $OutputSteps,
-        [Parameter(ParameterSetName='Flows')][string[]] $Filter,
-        [Parameter(ParameterSetName='Flows')][string[]] $Sort,
-        [Parameter(ParameterSetName='Flows')][string[]] $Fields,
-        [Parameter(ParameterSetName='Flows')]
-        [Parameter(ParameterSetName='FlowRevisions')]
-        [ValidateRange(1,100)][int] $PageSize = 100
-    )
+<#
+.SYNOPSIS
+Query Flow / Query Flows / Query Flow Revisions
+
+.DESCRIPTION
+Returns information about the specified flow, or flows.
+
+.PARAMETER FlowId
+(Query Flow by Id) The LUID of the flow.
+
+.PARAMETER Revisions
+(Get Flow Revisions) Boolean switch, if supplied, the flow revisions are returned.
+Note: reserved for future use, flow revisions are currently not supported via REST API
+
+.PARAMETER OutputSteps
+(Optional, Query Flow) Boolean switch, if supplied, the flow output steps are returned, instead of flow.
+
+.PARAMETER Filter
+(Optional)
+An expression that lets you specify a subset of data records to return.
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#flows
+
+.PARAMETER Sort
+(Optional)
+An expression that lets you specify the order in which data is returned.
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#flows
+
+.PARAMETER Fields
+(Optional)
+An expression that lets you specify which data attributes are included in response.
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_fields.htm#query_flows
+
+.PARAMETER PageSize
+(Optional) Page size when paging through results.
+
+.EXAMPLE
+$flow = Get-TSFlow -FlowId $flowId
+
+.EXAMPLE
+$outputSteps = Get-TSFlow -FlowId $flowId -OutputSteps
+
+.EXAMPLE
+$flows = Get-TSFlow -Filter "name:eq:$flowName"
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#query_flow
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#query_flows_for_site
+#>
+[OutputType([PSCustomObject[]])]
+Param(
+    [Parameter(Mandatory,ParameterSetName='FlowById')]
+    [Parameter(Mandatory,ParameterSetName='FlowRevisions')]
+    [string] $FlowId,
+    [Parameter(Mandatory,ParameterSetName='FlowRevisions')][switch] $Revisions, # Note: flow revisions currently not supported via REST API
+    [Parameter(ParameterSetName='FlowById')][switch] $OutputSteps,
+    [Parameter(ParameterSetName='Flows')][string[]] $Filter,
+    [Parameter(ParameterSetName='Flows')][string[]] $Sort,
+    [Parameter(ParameterSetName='Flows')][string[]] $Fields,
+    [Parameter(ParameterSetName='Flows')]
+    [Parameter(ParameterSetName='FlowRevisions')]
+    [ValidateRange(1,100)][int] $PageSize = 100
+)
     Assert-TSRestApiVersion -AtLeast 3.3
     if ($Revisions) { # Get Flow Revisions
         $pageNumber = 0
@@ -4012,12 +4062,34 @@ function Get-TSFlow {
 }
 
 function Get-TSFlowsForUser {
-    [OutputType([PSCustomObject[]])]
-    Param(
-        [Parameter(Mandatory)][string] $UserId,
-        [Parameter()][switch] $IsOwner,
-        [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
-    )
+<#
+.SYNOPSIS
+Query Flows for User
+
+.DESCRIPTION
+Returns the flows that the specified user owns or has read (view) permissions for.
+
+.PARAMETER UserId
+The LUID of the user to get flows for.
+
+.PARAMETER IsOwner
+(Optional) Boolean switch, if supplied, returns only flows that the specified user owns.
+
+.PARAMETER PageSize
+(Optional) Page size when paging through results.
+
+.EXAMPLE
+$flows = Get-TSFlowsForUser -UserId (Get-TSCurrentUserId)
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#query_flows_for_user
+#>
+[OutputType([PSCustomObject[]])]
+Param(
+    [Parameter(Mandatory)][string] $UserId,
+    [Parameter()][switch] $IsOwner,
+    [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+)
     Assert-TSRestApiVersion -AtLeast 3.3
     $pageNumber = 0
     do {
@@ -4032,22 +4104,62 @@ function Get-TSFlowsForUser {
 }
 
 function Get-TSFlowConnection {
-    [OutputType([PSCustomObject[]])]
-    Param(
-        [Parameter(Mandatory)][string] $FlowId
-    )
+<#
+.SYNOPSIS
+Query Flow Connections
+
+.DESCRIPTION
+Returns a list of data connections for the specific flow.
+
+.PARAMETER FlowId
+The LUID of the flow to return connection information about.
+
+.EXAMPLE
+$connections = Get-TSFlowConnection -FlowId $flowId
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#query_flow_connections
+#>
+[OutputType([PSCustomObject[]])]
+Param(
+    [Parameter(Mandatory)][string] $FlowId
+)
     Assert-TSRestApiVersion -AtLeast 3.3
     $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param $FlowId/connections) -Method Get
     return $response.tsResponse.connections.connection
 }
 
 function Export-TSFlow {
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $FlowId,
-        [Parameter()][string] $OutFile,
-        [Parameter()][int] $Revision # Note: flow revisions currently not supported via REST API
-    )
+<#
+.SYNOPSIS
+Download Flow
+
+.DESCRIPTION
+Downloads a flow in .tfl or .tflx format.
+
+.PARAMETER FlowId
+The LUID of the flow to download.
+
+.PARAMETER OutFile
+(Optional) Filename where the download is saved.
+If not provided, the downloaded content is piped to the output.
+
+.PARAMETER Revision
+(Optional) If revision number is specified, this revision will be downloaded.
+Note: reserved for future use, flow revisions are currently not supported via REST API
+
+.EXAMPLE
+Export-TSFlow -FlowId $sampleflowId -OutFile "Flow.tflx"
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#download_flow
+#>
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $FlowId,
+    [Parameter()][string] $OutFile,
+    [Parameter()][int] $Revision
+)
     Assert-TSRestApiVersion -AtLeast 3.3
     $OutFileParam = @{}
     if ($OutFile) {
@@ -4066,18 +4178,60 @@ function Export-TSFlow {
 }
 
 function Publish-TSFlow {
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $InFile,
-        [Parameter(Mandatory)][string] $Name,
-        [Parameter()][string] $FileName,
-        [Parameter()][string] $FileType,
-        [Parameter()][string] $ProjectId,
-        [Parameter()][switch] $Overwrite,
-        [Parameter()][switch] $Chunked,
-        # [Parameter()][hashtable] $Credentials, # connectionCredentials is not supported in this API method
-        [Parameter()][hashtable[]] $Connections
-    )
+<#
+.SYNOPSIS
+Publish Flow
+
+.DESCRIPTION
+Publishes a flow on the current site.
+
+.PARAMETER InFile
+The filename (incl. path) of the flow to upload and publish.
+
+.PARAMETER Name
+The name for the published flow.
+
+.PARAMETER FileName
+(Optional) The filename (without path) that is included into the request payload.
+If omitted, the filename is derived from the InFile parameter.
+
+.PARAMETER FileType
+(Optional) The file type of the flow file.
+If omitted, the file type is derived from the Filename parameter.
+
+.PARAMETER ProjectId
+(Optional) The LUID of the project to assign the flow to.
+If the project is not specified, the flow will be published to the default project.
+
+.PARAMETER Overwrite
+(Optional) Boolean switch, if supplied, the flow will be overwritten (otherwise existing published flow with the same name is not overwritten).
+
+.PARAMETER Chunked
+(Optional) Boolean switch, if supplied, the publish process is forced to run as chunked.
+By default, the payload is send in one request for files < 64MB size.
+This can be helpful if timeouts occur during upload.
+
+.PARAMETER Connections
+(Optional) Hashtable array containing connection attributes and credentials (see online help).
+
+.EXAMPLE
+$flow = Publish-TSFlow -Name $sampleFlowName -InFile "Flow.tflx" -ProjectId $projectId -Overwrite
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#publish_flow
+#>
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $InFile,
+    [Parameter(Mandatory)][string] $Name,
+    [Parameter()][string] $FileName,
+    [Parameter()][string] $FileType,
+    [Parameter()][string] $ProjectId,
+    [Parameter()][switch] $Overwrite,
+    [Parameter()][switch] $Chunked,
+    # [Parameter()][hashtable] $Credentials, # connectionCredentials is not supported in this API method
+    [Parameter()][hashtable[]] $Connections
+)
     Assert-TSRestApiVersion -AtLeast 3.3
     $fileItem = Get-Item -LiteralPath $InFile
     if (-Not $FileName) {
@@ -4179,13 +4333,35 @@ function Publish-TSFlow {
 }
 
 function Update-TSFlow {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $FlowId,
-        [Parameter()][string] $NewProjectId,
-        [Parameter()][string] $NewOwnerId
-    )
+<#
+.SYNOPSIS
+Update Flow
+
+.DESCRIPTION
+Updates the owner, project, of the specified flow.
+
+.PARAMETER FlowId
+The LUID of the flow to update.
+
+.PARAMETER NewProjectId
+(Optional) The LUID of a project to add the flow to.
+
+.PARAMETER NewOwnerId
+(Optional) The LUID of a user to assign the flow to as owner.
+
+.EXAMPLE
+$flow = Update-TSFlow -FlowId $flow.id -NewProjectId $project.id
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#update_flow
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $FlowId,
+    [Parameter()][string] $NewProjectId,
+    [Parameter()][string] $NewOwnerId
+)
     Assert-TSRestApiVersion -AtLeast 3.3
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -4205,17 +4381,51 @@ function Update-TSFlow {
 }
 
 function Update-TSFlowConnection {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $FlowId,
-        [Parameter(Mandatory)][string] $ConnectionId,
-        [Parameter()][string] $ServerAddress,
-        [Parameter()][string] $ServerPort,
-        [Parameter()][string] $Username,
-        [Parameter()][securestring] $SecurePassword,
-        [Parameter()][switch] $EmbedPassword
-    )
+<#
+.SYNOPSIS
+Update Flow Connection
+
+.DESCRIPTION
+Updates the server address, port, username, or password for the specified flow connection.
+
+.PARAMETER FlowId
+The LUID of the data source to update.
+
+.PARAMETER ConnectionId
+The LUID of the connection to update.
+
+.PARAMETER ServerAddress
+(Optional) The new server address of the connection.
+
+.PARAMETER ServerPort
+(Optional) The new server port of the connection.
+
+.PARAMETER Username
+(Optional) The new user name of the connection.
+
+.PARAMETER SecurePassword
+(Optional) The new password of the connection, should be supplied as SecurePassword.
+
+.PARAMETER EmbedPassword
+(Optional) Boolean switch, if supplied, the connection password is embedded.
+
+.EXAMPLE
+$flowConnection = Update-TSFlowConnection -FlowId $flow.id -ConnectionId $connectionId -ServerAddress myserver.com
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#update_flow_connection
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $FlowId,
+    [Parameter(Mandatory)][string] $ConnectionId,
+    [Parameter()][string] $ServerAddress,
+    [Parameter()][string] $ServerPort,
+    [Parameter()][string] $Username,
+    [Parameter()][securestring] $SecurePassword,
+    [Parameter()][switch] $EmbedPassword
+)
     Assert-TSRestApiVersion -AtLeast 3.3
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -4244,12 +4454,33 @@ function Update-TSFlowConnection {
 }
 
 function Remove-TSFlow {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $FlowId,
-        [Parameter()][int] $Revision # Note: flow revisions currently not supported via REST API
-    )
+<#
+.SYNOPSIS
+Delete Flow
+
+.DESCRIPTION
+Deletes a flow.
+When a flow is deleted, its associated connections, the output and input steps, any associated scheduled tasks, and run history are also deleted.
+
+.PARAMETER FlowId
+The LUID of the flow to delete.
+
+.PARAMETER Revision
+(Optional) If revision number is specified, this revision will be removed.
+Note: reserved for future use, flow revisions are currently not supported via REST API
+
+.EXAMPLE
+Remove-TSFlow -FlowId $sampleFlowId
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#delete_flow
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $FlowId,
+    [Parameter()][int] $Revision # Note: flow revisions currently not supported via REST API
+)
     Assert-TSRestApiVersion -AtLeast 3.3
     if ($Revision) { # Remove Flow Revision
         if ($PSCmdlet.ShouldProcess("$FlowId, revision $Revision")) {
@@ -4263,14 +4494,39 @@ function Remove-TSFlow {
 }
 
 function Start-TSFlowNow {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $FlowId,
-        [Parameter()][ValidateSet('full','incremental')][string] $RunMode = "full",
-        [Parameter()][string] $OutputStepId,
-        [Parameter()][hashtable] $FlowParams
-    )
+<#
+.SYNOPSIS
+Run Flow Now
+
+.DESCRIPTION
+Runs the specified flow (asynchronously).
+
+.PARAMETER FlowId
+The LUID of the flow to run.
+
+.PARAMETER RunMode
+(Optional) The mode to use for running this flow, either 'full' or 'incremental'. Default is 'full'.
+
+.PARAMETER OutputStepId
+(Optional) The LUID of the output steps you want to run.
+
+.PARAMETER FlowParams
+(Optional) The hashtable of the flow parameters, with flow parameter IDs and values.
+
+.EXAMPLE
+$job = Start-TSFlowNow -FlowId $flow.id
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#run_flow_now
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $FlowId,
+    [Parameter()][ValidateSet('full','incremental')][string] $RunMode = 'full',
+    [Parameter()][string] $OutputStepId,
+    [Parameter()][hashtable] $FlowParams
+)
     Assert-TSRestApiVersion -AtLeast 3.3
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -4299,12 +4555,42 @@ function Start-TSFlowNow {
 }
 
 function Get-TSFlowRun {
-    [OutputType([PSCustomObject[]])]
-    Param(
-        [Parameter(Mandatory,ParameterSetName='FlowRunById')][string] $FlowRunId,
-        [Parameter(ParameterSetName='FlowRuns')][string[]] $Filter,
-        [Parameter(ParameterSetName='FlowRuns')][ValidateRange(1,100)][int] $PageSize = 100
-    )
+<#
+.SYNOPSIS
+Get Flow Run / Get Flow Runs
+
+.DESCRIPTION
+Gets a specific flow run details, or flow runs.
+
+.PARAMETER FlowRunId
+(Get Flow Run by Id) The LUID of the flow run.
+
+.PARAMETER Filter
+(Optional)
+An expression that lets you specify a subset of data records to return.
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#flow-runs
+
+.PARAMETER PageSize
+(Optional) Page size when paging through results.
+
+.EXAMPLE
+$run = Get-TSFlowRun -FlowRunId $id
+
+.EXAMPLE
+$runs = Get-TSFlowRun -Filter "flowId:eq:$($flowRun.flowId)"
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#get_flow_run
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#get_flow_runs
+#>
+[OutputType([PSCustomObject[]])]
+Param(
+    [Parameter(Mandatory,ParameterSetName='FlowRunById')][string] $FlowRunId,
+    [Parameter(ParameterSetName='FlowRuns')][string[]] $Filter,
+    [Parameter(ParameterSetName='FlowRuns')][ValidateRange(1,100)][int] $PageSize = 100
+)
     Assert-TSRestApiVersion -AtLeast 3.10
     if ($FlowRunId) { # Get Flow Run
         $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param runs/$FlowRunId) -Method Get
@@ -4330,11 +4616,27 @@ function Get-TSFlowRun {
 }
 
 function Stop-TSFlowRun {
-    [CmdletBinding(SupportsShouldProcess)]
-    [OutputType([PSCustomObject])]
-    Param(
-        [Parameter(Mandatory)][string] $FlowRunId
-    )
+<#
+.SYNOPSIS
+Cancel Flow Run
+
+.DESCRIPTION
+Cancels a flow run that is in progress.
+
+.PARAMETER FlowRunId
+The LUID of the flow run.
+
+.EXAMPLE
+Stop-TSFlowRun -FlowRunId $run.id
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#cancel_flow_run
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $FlowRunId
+)
     Assert-TSRestApiVersion -AtLeast 3.10
     if ($PSCmdlet.ShouldProcess($FlowRunId)) {
         $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param runs/$FlowRunId) -Method Put
