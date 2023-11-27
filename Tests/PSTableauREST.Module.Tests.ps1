@@ -73,7 +73,7 @@ Describe "Module Structure and Validation Tests" -Tag Module -WarningAction Sile
 }
 
 # https://vexx32.github.io/2020/07/08/Verify-Module-Help-Pester/
-Describe "Module Help" -Tag Module,ModuleHelp {
+Describe "Module Help" -Tag Module {
     BeforeAll {
         Import-Module -Name $ModuleManifest -Force -ErrorAction Stop
     }
@@ -106,9 +106,9 @@ Describe "Module Help" -Tag Module,ModuleHelp {
         It " <Command>: help contains at least one usage example" {
             $Help.Examples.Example.Code.Count | Should -BeGreaterOrEqual 1
         }
-        It " <Command>: help example should contain the command" -Skip {
-            $Help.Examples | ForEach-Object {
-                $_.Example.Code.Contains($Command) | Should -BeTrue
+        It " <Command>: help example should contain the command" {
+            $Help.Examples.Example.Code | ForEach-Object {
+                $_.Contains($Command) | Should -BeTrue
             }
         }
     }

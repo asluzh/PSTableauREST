@@ -2054,7 +2054,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $extractTaskId = Get-TSTask -Type ExtractRefresh | Where-Object -FilterScript {$_.workbook.id -eq $workbookForTasks.id} | Select-Object -First 1 -ExpandProperty id
                     $extractTaskId | Should -Be $extractTaskResult.extractRefresh.id
                     Write-Verbose "Extract task id: $extractTaskId"
-                    $extractTaskResult = Update-TSExtractsRefreshTask -TaskId -WorkbookId $workbookForTasks.id -Type FullRefresh -Frequency Hourly -StartTime 08:00:00 -EndTime 20:00:00 -IntervalHours 6 -IntervalWeekdays 'Tuesday'
+                    $extractTaskResult = Update-TSExtractsRefreshTask -TaskId $extractTaskId -WorkbookId $workbookForTasks.id -Type FullRefresh -Frequency Hourly -StartTime 08:00:00 -EndTime 20:00:00 -IntervalHours 6 -IntervalWeekdays 'Tuesday'
                     $extractTaskResult | Should -Not -BeNullOrEmpty
                     $job = Start-TSTaskNow -Type ExtractRefresh -TaskId $extractTaskId
                     $job | Should -Not -BeNullOrEmpty
@@ -2066,7 +2066,7 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     $extractTaskId = Get-TSTask -Type ExtractRefresh | Where-Object -FilterScript {$_.datasource.id -eq $datasourceForTasks.id} | Select-Object -First 1 -ExpandProperty id
                     $extractTaskId | Should -Be $extractTaskResult.extractRefresh.id
                     Write-Verbose "Extract task id: $extractTaskId"
-                    $extractTaskResult = Update-TSExtractsRefreshTask -TaskId -DatasourceId $datasourceForTasks.id -Type FullRefresh -Frequency Monthly -StartTime 08:00:00 -IntervalMonthdays 1,15
+                    $extractTaskResult = Update-TSExtractsRefreshTask -TaskId $extractTaskId -DatasourceId $datasourceForTasks.id -Type FullRefresh -Frequency Monthly -StartTime 08:00:00 -IntervalMonthdays 1,15
                     $extractTaskResult | Should -Not -BeNullOrEmpty
                     $job = Start-TSTaskNow -Type ExtractRefresh -TaskId $extractTaskId
                     $job | Should -Not -BeNullOrEmpty
