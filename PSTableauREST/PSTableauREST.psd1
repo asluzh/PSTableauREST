@@ -131,7 +131,6 @@ FunctionsToExport = @(
 'Get-TSSchedule', 'Add-TSSchedule', 'Update-TSSchedule', 'Remove-TSSchedule', 'Add-TSContentToSchedule',
 'Get-TSJob', 'Stop-TSJob', 'Wait-TSJob',
 'Get-TSTask', 'Remove-TSTask', 'Start-TSTaskNow',
-# TODO Wait for job to finish (see tsc: wait_for_job)
 
 ### Extract and Encryption methods
 'Get-TSExtractRefreshTasksInSchedule',
