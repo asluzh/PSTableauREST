@@ -579,7 +579,7 @@ Param(
     }
 }
 
-### Sites methods
+### Site methods
 function Get-TSSite {
 <#
 .SYNOPSIS
@@ -811,6 +811,93 @@ Param(
         }
     } else {
         Write-Error "You can only remove the site for which you are currently authenticated" -Category PermissionDenied -ErrorAction Stop
+    }
+}
+
+function Get-TSRecentlyViewedContent {
+<#
+.SYNOPSIS
+Get Recently Viewed for Site
+
+.DESCRIPTION
+Gets the details of the views and workbooks on a site that have been most recently created, updated, or accessed by the signed in user.
+The 24 most recently viewed items are returned, though it may take some minutes after being viewed for an item to appear in the results.
+
+.EXAMPLE
+$recents = Get-TSRecentlyViewedContent
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_site.htm#get_recently_viewed
+#>
+[OutputType([PSCustomObject[]])]
+Param()
+    Assert-TSRestApiVersion -AtLeast 3.5
+    $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Site -Param $SiteId/content/recent) -Method Get
+    return $response.tsResponse.recents.recent
+}
+
+function Get-TSSettingsForEmbedding {
+<#
+.SYNOPSIS
+Get Embedding Settings for a Site
+
+.DESCRIPTION
+Returns the current embedding settings for the current site.
+
+.EXAMPLE
+$settings = Get-TSSettingsForEmbedding
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_site.htm#embedding_settings_for_site
+#>
+[OutputType([PSCustomObject[]])]
+Param()
+    Assert-TSRestApiVersion -AtLeast 3.16
+    $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Site -Param $SiteId/settings/embedding) -Method Get
+    return $response.tsResponse.site.settings
+}
+
+function Update-TSSettingsForEmbedding {
+<#
+.SYNOPSIS
+Update Embedding Settings for Site
+
+.DESCRIPTION
+Updates the embedding settings for a site. Embedding settings can be used to restrict embedding Tableau views to only certain domains.
+
+.PARAMETER UnrestrictedEmbedding
+(Optional) Boolean switch, specifies whether embedding is not restricted to certain domains.
+When supplied, Tableau views on this site can be embedded in any domain.
+
+.PARAMETER AllowDomains
+(Optional) Specifies the domains where Tableau views on this site can be embedded.
+Use this setting with UnrestrictedEmbedding set to false, to restrict embedding functionality to only certain domains.
+
+.EXAMPLE
+$result = Update-TSSettingsForEmbedding -Unrestricted false -Allow "mydomain.com"
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_site.htm#update_embedding_settings_for_site
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject[]])]
+Param(
+    [Parameter(Mandatory,ParameterSetName='Unrestricted')][switch] $UnrestrictedEmbedding,
+    [Parameter(Mandatory,ParameterSetName='AllowDomains')][string] $AllowDomains
+)
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_site = $tsRequest.AppendChild($xml.CreateElement("site"))
+    $el_settings = $el_site.AppendChild($xml.CreateElement("settings"))
+    if ($UnrestrictedEmbedding) {
+        $el_settings.SetAttribute("unrestrictedEmbedding", $UnrestrictedEmbedding)
+    } else {
+        $el_settings.SetAttribute("unrestrictedEmbedding", $false)
+        $el_settings.SetAttribute("allowList", $AllowDomains)
+    }
+    if ($PSCmdlet.ShouldProcess("Unrestricted embedding: $UnrestrictedEmbedding, allow domains: $AllowDomains")) {
+        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Site -Param $SiteId/settings/embedding) -Method Put
+        return $response.tsResponse.site.settings
     }
 }
 
@@ -2649,11 +2736,9 @@ Param(
     [Parameter(Mandatory)][string] $WorkbookId
 )
     Assert-TSRestApiVersion -AtLeast 2.8
-    $xml = New-Object System.Xml.XmlDocument
-    $xml.AppendChild($xml.CreateElement("tsRequest"))
     $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/refresh
     if ($PSCmdlet.ShouldProcess($WorkbookId)) {
-        $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Post -ContentType "text/xml"
+        $response = Invoke-TSRestApiMethod -Uri $uri -Body "<tsRequest />" -Method Post -ContentType "application/xml"
         return $response.tsResponse.job
     }
 }
@@ -3290,11 +3375,9 @@ Param(
     [Parameter(Mandatory)][string] $DatasourceId
 )
     Assert-TSRestApiVersion -AtLeast 2.8
-    $xml = New-Object System.Xml.XmlDocument
-    $xml.AppendChild($xml.CreateElement("tsRequest"))
     $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/refresh
     if ($PSCmdlet.ShouldProcess($DatasourceId)) {
-        $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Post -ContentType "text/xml"
+        $response = Invoke-TSRestApiMethod -Uri $uri -Body "<tsRequest />" -Method Post -ContentType "application/xml"
         return $response.tsResponse.job
     }
 }
@@ -6423,6 +6506,62 @@ Param(
     }
 }
 
+function Wait-TSJob {
+<#
+.SYNOPSIS
+Wait For Job to complete
+
+.DESCRIPTION
+Wait until the job completion, while displaying the progress status.
+
+.PARAMETER JobId
+The LUID of the job process.
+
+.PARAMETER Timeout
+(Optional) Timeout in seconds. Default is 3600 (1 hour).
+Set timeout to 0 to wait indefinitely long.
+
+.PARAMETER Interval
+(Optional) Poll interval in seconds. Default is 1.
+Increase interval to reduce the frequency of refresh status requests.
+
+.EXAMPLE
+$finished = Wait-TSJob -JobId $job.id -Timeout 600
+
+.NOTES
+See also: wait_for_job() in TSC
+#>
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $JobId,
+    [Parameter()][int] $Timeout = 3600,
+    [Parameter()][int] $Interval = 1
+)
+    do {
+        Start-Sleep -s $Interval
+        $Timeout--
+        $jobUpdate = Get-TSJob -JobId $JobId
+        if ($jobUpdate.progress) {
+            Write-Progress -Activity "Running" -Status ("Job progress: {0}%" -f $jobUpdate.progress) -PercentComplete $jobUpdate.progress
+        } else {
+            Write-Progress -Activity "Waiting" -Status "Job not started yet" -PercentComplete 0
+        }
+    } until ($jobUpdate.completedAt -or $Timeout -eq 0)
+    if ($jobUpdate.completedAt) {
+        if ($jobUpdate.finishCode -eq 0) {
+            $finishStatus = '(Success)'
+        } elseif ($jobUpdate.finishCode -eq 1) {
+            $finishStatus = '(FAILED)'
+        } elseif ($jobUpdate.finishCode -eq 2) {
+            $finishStatus = '(CANCELLED)'
+        }
+        Write-Progress -Activity "Finished" -Status ("Job progress: {0}% {1}" -f $jobUpdate.progress, $finishStatus) -PercentComplete $jobUpdate.progress
+        Start-Sleep -s 1
+        Write-Progress -Completed
+    }
+    return $jobUpdate
+}
+
 function Get-TSTask {
 <#
 .SYNOPSIS
@@ -6633,17 +6772,17 @@ Param(
         switch ($Type) {
             'ExtractRefresh' { # Run Extract Refresh Task
                 Assert-TSRestApiVersion -AtLeast 2.6
-                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param extractRefreshes/$TaskId/runNow) -Body "<tsRequest />" -Method Post -ContentType "text/xml"
+                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param extractRefreshes/$TaskId/runNow) -Body "<tsRequest />" -Method Post -ContentType "application/xml"
                 return $response.tsResponse.job
             }
             'FlowRun' { # Run Flow Task
                 Assert-TSRestApiVersion -AtLeast 3.3
-                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param runFlow/$TaskId/runNow) -Body "<tsRequest />" -Method Post -ContentType "text/xml"
+                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param runFlow/$TaskId/runNow) -Body "<tsRequest />" -Method Post -ContentType "application/xml"
                 return $response.tsResponse.job
             }
             'Linked' { # Run Linked Task Now
                 Assert-TSRestApiVersion -AtLeast 3.15
-                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param linked/$TaskId/runNow) -Body "<tsRequest />" -Method Post -ContentType "text/xml"
+                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param linked/$TaskId/runNow) -Body "<tsRequest />" -Method Post -ContentType "application/xml"
                 return $response.tsResponse.linkedTaskJob
             }
         }

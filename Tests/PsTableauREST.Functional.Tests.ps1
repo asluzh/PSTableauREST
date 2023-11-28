@@ -5,7 +5,7 @@ BeforeAll {
     # InModuleScope 'PSTableauREST' { $script:VerbosePreference = 'Continue' } # display verbose output of module functions
     $script:VerbosePreference = 'Continue' # display verbose output of the tests
     # InModuleScope 'PSTableauREST' { $script:DebugPreference = 'Continue' } # display debug output
-    InModuleScope 'PSTableauREST' { $script:ProgressPreference = 'SilentlyContinue' } # suppress progress for upload/download operations
+    # InModuleScope 'PSTableauREST' { $script:ProgressPreference = 'SilentlyContinue' } # suppress progress for upload/download operations
     # see also: https://stackoverflow.com/questions/18770723/hide-progress-of-invoke-webrequest
 }
 BeforeDiscovery {
@@ -797,22 +797,19 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     Write-Verbose "Queueing extract refresh job"
                     $job = Update-TSWorkbookNow -WorkbookId $workbook.id
                     $job | Should -Not -BeNullOrEmpty
-                    # $job | Export-Clixml -Path "Tests/Assets/Misc/job.xml"
-                    $job[1].type | Should -Be "RefreshExtract"
-                    $timeout = 90
-                    do {
-                        Start-Sleep -s 1
-                        $timeout--
-                        $jobStatus = Get-TSJob -JobId $job[1].id
-                        $jobStatus | Should -Not -BeNullOrEmpty
-                        if ($jobStatus.progress) {
-                            Write-Verbose ("Job progress: {0}%" -f $jobStatus.progress)
-                        } else {
-                            Write-Verbose "Job not started yet"
+                    $job.type | Should -Be "RefreshExtract"
+                    $job.mode | Should -Be "Asynchronous"
+                    $jobFinished = Wait-TSJob -JobId $job.id -Timeout 300
+                    Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobFinished.completedAt, $jobFinished.finishCode)
+                    if ($jobFinished.extractRefreshJob.notes) {
+                        Write-Verbose ("Job notes: {0}" -f $jobFinished.extractRefreshJob.notes)
+                    }
+                    if ($jobFinished.statusNotes) {
+                        $jobFinished.statusNotes.statusNote | ForEach-Object {
+                            Write-Verbose ("Job status notes: {0}" -f $_.text)
                         }
-                    } until ($jobStatus.progress -eq 100 -or $timeout -eq 0)
-                    $jobStatus.finishCode | Should -Be 0
-                    Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobStatus.completedAt, $jobStatus.finishCode)
+                    }
+                    $jobFinished.finishCode | Should -Be 0
                     # Remove-TSWorkbook -WorkbookId $workbook.id
                 }
                 It "Publish workbook with connections on <ConfigFile.server>" -Tag WorkbookP {
@@ -823,40 +820,27 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     Write-Verbose "Queueing extract refresh job"
                     $job = Update-TSWorkbookNow -WorkbookId $workbook.id
                     $job | Should -Not -BeNullOrEmpty
-                    $job[1].type | Should -Be "RefreshExtract"
-                    $timeout = 90
-                    do {
-                        Start-Sleep -s 1
-                        $timeout--
-                        $jobStatus = Get-TSJob -JobId $job[1].id
-                        $jobStatus | Should -Not -BeNullOrEmpty
-                        if ($jobStatus.progress) {
-                            Write-Verbose ("Job progress: {0}%" -f $jobStatus.progress)
-                        } else {
-                            Write-Verbose "Job not started yet"
+                    $job.type | Should -Be "RefreshExtract"
+                    $job.mode | Should -Be "Asynchronous"
+                    $jobFinished = Wait-TSJob -JobId $job.id -Timeout 300
+                    Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobFinished.completedAt, $jobFinished.finishCode)
+                    if ($jobFinished.extractRefreshJob.notes) {
+                        Write-Verbose ("Job notes: {0}" -f $jobFinished.extractRefreshJob.notes)
+                    }
+                    if ($jobFinished.statusNotes) {
+                        $jobFinished.statusNotes.statusNote | ForEach-Object {
+                            Write-Verbose ("Job status notes: {0}" -f $_.text)
                         }
-                    } until ($jobStatus.progress -eq 100 -or $timeout -eq 0)
-                    $jobStatus.finishCode | Should -Be 0
-                    Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobStatus.completedAt, $jobStatus.finishCode)
+                    }
+                    $jobFinished.finishCode | Should -Be 0
                     # Remove-TSWorkbook -WorkbookId $workbook.id
                 }
                 It "Publish workbook as background job on <ConfigFile.server>" -Tag WorkbookP {
                     $job = Publish-TSWorkbook -Name "AW Customer Address 3" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -BackgroundTask
                     $job | Should -Not -BeNullOrEmpty
-                    $timeout = 90
-                    do {
-                        Start-Sleep -s 1
-                        $timeout--
-                        $jobStatus = Get-TSJob -JobId $job.id
-                        $jobStatus | Should -Not -BeNullOrEmpty
-                        if ($jobStatus.progress) {
-                            Write-Verbose ("Job progress: {0}%" -f $jobStatus.progress)
-                        } else {
-                            Write-Verbose "Job not started yet"
-                        }
-                    } until ($jobStatus.progress -eq 100 -or $timeout -eq 0)
-                    $jobStatus.finishCode | Should -Be 0
-                    Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobStatus.completedAt, $jobStatus.finishCode)
+                    $jobFinished = Wait-TSJob -JobId $job.id -Timeout 60
+                    Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobFinished.completedAt, $jobFinished.finishCode)
+                    $jobFinished.finishCode | Should -Be 0
                     # Remove-TSWorkbook -WorkbookId $workbook.id
                 }
                 Context "Publish / download workbooks from test assets on <ConfigFile.server>" -Tag WorkbookSamples -ForEach $WorkbookFiles {
@@ -1101,22 +1085,19 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     Write-Verbose "Queueing extract refresh job"
                     $job = Update-TSDatasourceNow -DatasourceId $datasource.id
                     $job | Should -Not -BeNullOrEmpty
-                    # $job | Export-Clixml -Path "Tests/Assets/Misc/job.xml"
-                    $job[1].type | Should -Be "RefreshExtract"
-                    $timeout = 90
-                    do {
-                        Start-Sleep -s 1
-                        $timeout--
-                        $jobStatus = Get-TSJob -JobId $job[1].id
-                        $jobStatus | Should -Not -BeNullOrEmpty
-                        if ($jobStatus.progress) {
-                            Write-Verbose ("Job progress: {0}%" -f $jobStatus.progress)
-                        } else {
-                            Write-Verbose "Job not started yet"
+                    $job.type | Should -Be "RefreshExtract"
+                    $job.mode | Should -Be "Asynchronous"
+                    $jobFinished = Wait-TSJob -JobId $job.id -Timeout 300
+                    Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobFinished.completedAt, $jobFinished.finishCode)
+                    if ($jobFinished.extractRefreshJob.notes) {
+                        Write-Verbose ("Job notes: {0}" -f $jobFinished.extractRefreshJob.notes)
+                    }
+                    if ($jobFinished.statusNotes) {
+                        $jobFinished.statusNotes.statusNote | ForEach-Object {
+                            Write-Verbose ("Job status notes: {0}" -f $_.text)
                         }
-                    } until ($jobStatus.progress -eq 100 -or $timeout -eq 0)
-                    $jobStatus.finishCode | Should -Be 0
-                    Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobStatus.completedAt, $jobStatus.finishCode)
+                    }
+                    $jobFinished.finishCode | Should -Be 0
                     # Remove-TSDatasource -DatasourceId $datasource.id
                 }
                 It "Publish datasource with connections on <ConfigFile.server>" -Tag DatasourceP -Skip {
@@ -1129,40 +1110,27 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                     Write-Verbose "Queueing extract refresh job"
                     $job = Update-TSDatasourceNow -DatasourceId $datasource.id
                     $job | Should -Not -BeNullOrEmpty
-                    $job[1].type | Should -Be "RefreshExtract"
-                    $timeout = 90
-                    do {
-                        Start-Sleep -s 1
-                        $timeout--
-                        $jobStatus = Get-TSJob -JobId $job[1].id
-                        $jobStatus | Should -Not -BeNullOrEmpty
-                        if ($jobStatus.progress) {
-                            Write-Verbose ("Job progress: {0}%" -f $jobStatus.progress)
-                        } else {
-                            Write-Verbose "Job not started yet"
+                    $job.type | Should -Be "RefreshExtract"
+                    $job.mode | Should -Be "Asynchronous"
+                    $jobFinished = Wait-TSJob -JobId $job.id -Timeout 300
+                    Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobFinished.completedAt, $jobFinished.finishCode)
+                    if ($jobFinished.extractRefreshJob.notes) {
+                        Write-Verbose ("Job notes: {0}" -f $jobFinished.extractRefreshJob.notes)
+                    }
+                    if ($jobFinished.statusNotes) {
+                        $jobFinished.statusNotes.statusNote | ForEach-Object {
+                            Write-Verbose ("Job status notes: {0}" -f $_.text)
                         }
-                    } until ($jobStatus.progress -eq 100 -or $timeout -eq 0)
-                    $jobStatus.finishCode | Should -Be 0
-                    Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobStatus.completedAt, $jobStatus.finishCode)
+                    }
+                    $jobFinished.finishCode | Should -Be 0
                     # Remove-TSDatasource -DatasourceId $datasource.id
                 }
                 It "Publish datasource as background job on <ConfigFile.server>" -Tag DatasourceP {
                     $job = Publish-TSDatasource -Name "AW SalesOrders 3" -InFile "Tests/Assets/Misc/AW_SalesOrders.tdsx" -ProjectId $samplesProjectId -BackgroundTask -Overwrite
                     $job | Should -Not -BeNullOrEmpty
-                    $timeout = 90
-                    do {
-                        Start-Sleep -s 1
-                        $timeout--
-                        $jobStatus = Get-TSJob -JobId $job.id
-                        $jobStatus | Should -Not -BeNullOrEmpty
-                        if ($jobStatus.progress) {
-                            Write-Verbose ("Job progress: {0}%" -f $jobStatus.progress)
-                        } else {
-                            Write-Verbose "Job not started yet"
-                        }
-                    } until ($jobStatus.progress -eq 100 -or $timeout -eq 0)
-                    $jobStatus.finishCode | Should -Be 0
-                    Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobStatus.completedAt, $jobStatus.finishCode)
+                    $jobFinished = Wait-TSJob -JobId $job.id -Timeout 60
+                    Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobFinished.completedAt, $jobFinished.finishCode)
+                    $jobFinished.finishCode | Should -Be 0
                     # Remove-TSDatasource -DatasourceId $datasource.id
                 }
                 Context "Publish / download datasources from test assets on <ConfigFile.server>"  -Tag DatasourceSamples -ForEach $DatasourceFiles {

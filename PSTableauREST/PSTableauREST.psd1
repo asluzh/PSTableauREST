@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.1.34'
+ModuleVersion = '0.2.0'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -81,10 +81,8 @@ FunctionsToExport = @(
 
 ### Site methods
 'Get-TSSite', 'Add-TSSite', 'Update-TSSite', 'Remove-TSSite',
-# Get Recently Viewed for Site
-# Get Data Acceleration Report for a Site
-# Get Embedding Settings for a Site
-# Update Embedding Settings for Site
+'Get-TSRecentlyViewedContent', 'Get-TSSettingsForEmbedding', 'Update-TSSettingsForEmbedding',
+# Get Data Acceleration Report for a Site - feature deprecated in 2022.1 (API 3.16)
 
 ### Projects methods
 'Get-TSProject', 'Add-TSProject', 'Update-TSProject', 'Remove-TSProject', 'Get-TSDefaultProject',
@@ -124,16 +122,14 @@ FunctionsToExport = @(
 'Get-TSContentPermission', 'Set-TSContentPermission', 'Add-TSContentPermission', 'Remove-TSContentPermission',
 'ConvertTo-TSPermissionTable',
 'Get-TSDefaultPermission', 'Set-TSDefaultPermission', 'Remove-TSDefaultPermission',
-# List Ask Data Lens Permissions
-# Add Ask Data Lens Permissions
-# Delete Ask Data Lens Permission
+# List/Add/Delete Ask Data Lens Permissions - will be retired in 2024.2 (API 3.22)
 
 ### Tags methods
 'Add-TSTagsToContent', 'Remove-TSTagFromContent',
 
 ### Jobs, Tasks and Schedules methods
 'Get-TSSchedule', 'Add-TSSchedule', 'Update-TSSchedule', 'Remove-TSSchedule', 'Add-TSContentToSchedule',
-'Get-TSJob', 'Stop-TSJob',
+'Get-TSJob', 'Stop-TSJob', 'Wait-TSJob',
 'Get-TSTask', 'Remove-TSTask', 'Start-TSTaskNow',
 # TODO Wait for job to finish (see tsc: wait_for_job)
 
@@ -145,7 +141,7 @@ FunctionsToExport = @(
 
 ### Favorites methods
 'Get-TSUserFavorite', 'Add-TSUserFavorite', 'Remove-TSUserFavorite', 'Move-TSUserFavorite',
-# Add Metric to Favorites - will be retired in API 3.22
+# Add Metric to Favorites - will be retired in 2024.2 (API 3.22)
 
 ### Subscription methods
 'Get-TSSubscription', 'Add-TSSubscription', 'Update-TSSubscription', 'Remove-TSSubscription',
