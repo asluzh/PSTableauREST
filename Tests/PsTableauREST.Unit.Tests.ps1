@@ -1,6 +1,6 @@
 BeforeAll {
-    Import-Module ./PSTableauREST/PSTableauREST.psm1 -Force
-    Import-Module Assert
+    Import-Module ./PSTableauREST -Force
+    # Import-Module Assert
     . ./Tests/Test.Functions.ps1
 }
 BeforeDiscovery {

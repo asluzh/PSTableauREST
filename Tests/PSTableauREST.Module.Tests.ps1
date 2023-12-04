@@ -1,6 +1,6 @@
 BeforeAll {
     Import-Module PSScriptAnalyzer
-    Import-Module Assert
+    # Import-Module Assert
     # $script:VerbosePreference = 'Continue' # display verbose output of the tests
     $script:DebugPreference = 'Continue' # display debug output of the tests
 }
