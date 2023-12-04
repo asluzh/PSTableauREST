@@ -2152,12 +2152,12 @@ Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFi
                 $column.id | Should -Be $columnId
             }
             It "Simple GraphQL queries on <ConfigFile.server>" {
-                $query = Get-Content "Tests/Assets/GraphQL/workbooks.graphql" | Out-String
+                $query = Get-Content "Tests/Assets/GraphQL/workbooks.gql" | Out-String
                 $results = Get-TSMetadataGraphQL -Query $query
                 ($results | Measure-Object).Count | Should -BeGreaterThan 0
             }
             It "Paginated GraphQL queries on <ConfigFile.server>" {
-                $query = Get-Content "Tests/Assets/GraphQL/fields-paginated.graphql" | Out-String
+                $query = Get-Content "Tests/Assets/GraphQL/fields-paginated.gql" | Out-String
                 $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection"
                 ($results | Measure-Object).Count | Should -BeGreaterThan 100
                 $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 500

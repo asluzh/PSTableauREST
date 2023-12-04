@@ -1,0 +1,23 @@
+query {
+    workbooks {
+        id
+        luid
+        name
+        description
+        createdAt
+        site {
+            luid
+        }
+        projectName
+        projectVizportalUrlId
+        owner {
+            id
+        }
+        uri
+        upstreamDatasources {
+            id
+            luid
+            name
+        }
+    }
+}

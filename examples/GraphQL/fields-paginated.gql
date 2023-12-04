@@ -1,0 +1,18 @@
+query fieldsPaginated {
+  fieldsConnection {
+    nodes {
+      id
+      name
+      isHidden
+      folderName
+      datasource {
+        id
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+    totalCount
+  }
+}

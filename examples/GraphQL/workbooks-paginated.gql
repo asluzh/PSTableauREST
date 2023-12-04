@@ -1,0 +1,43 @@
+query workbooksPaginated {
+  workbooksConnection {
+    nodes {
+      id
+      name
+      projectName
+      embeddedDatasources {
+        name
+        hasExtracts
+        hasUserReference
+        upstreamDatabases {
+          name
+          connectionType
+          __typename
+        }
+        fields {
+          id
+          name
+          __typename
+          fullyQualifiedName
+          sheetsConnection {
+            totalCount
+          }
+        }
+        upstreamDatasources {
+          id
+          name
+          projectName
+          upstreamTables {
+            name
+            fullName
+            connectionType
+          }
+        }
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+    totalCount
+  }
+}
