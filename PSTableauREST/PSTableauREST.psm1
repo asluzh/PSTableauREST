@@ -8614,11 +8614,13 @@ Param(
             $totalCount = $response.data.$PaginatedEntity.totalCount
             $nodesCount += $response.data.$PaginatedEntity.nodes.length
             $response.data.$PaginatedEntity.nodes
-            $percentCompleted = [Math]::Round($nodesCount / $totalCount * 100)
-            Write-Progress -Activity "Fetching metadata" -Status "$nodesCount / $totalCount entities retrieved ($percentCompleted%)" -PercentComplete $percentCompleted
+            if ($totalCount -gt 0) {
+                $percentCompleted = [Math]::Round($nodesCount / $totalCount * 100)
+                Write-Progress -Activity "Fetching metadata" -Status "$nodesCount / $totalCount entities retrieved ($percentCompleted%)" -PercentComplete $percentCompleted
+            }
         }
         Write-Progress -Activity "Fetching metadata completed" -Completed
-        if ($nodesCount -ne $totalCount) {
+        if ($totalCount -and $nodesCount -ne $totalCount) {
             throw "Nodes count ($nodesCount) is not equal to totalCount ($totalCount), fetched results are incomplete."
         }
     } else { # run non-paginated (unmodified) query
