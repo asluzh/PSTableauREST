@@ -1829,6 +1829,7 @@ Param(
     $chunkNumber = 0
     $buffer = New-Object System.Byte[]($script:TSRestApiChunkSize)
     $fileStream = New-Object System.IO.FileStream($fileItem.FullName, [System.IO.FileMode]::Open)
+    $byteReader = $null
     try {
         $byteReader = New-Object System.IO.BinaryReader($fileStream)
         # $totalChunks = [Math]::Ceiling($fileItem.Length / $script:TSRestApiChunkSize) # not required here
@@ -1884,7 +1885,10 @@ Param(
             Write-Progress -Activity "Uploading file $FileName" -Status "$uploadedSizeMb / $totalSizeMb MB uploaded ($percentCompleted%)" -PercentComplete $percentCompleted -SecondsRemaining $remainingTime.TotalSeconds
         } until ($script:TSRestApiChunkSize*$chunkNumber -ge $fileItem.Length)
     } finally {
-        $fileStream.Close()
+        if ($byteReader) {
+            $byteReader.Dispose()
+        }
+        $fileStream.Dispose()
     }
     # final Write-Progress update
     Write-Progress -Activity "Uploading file $FileName" -Status "$totalSizeMb / $totalSizeMb MB uploaded (100%)" -PercentComplete 100
@@ -2323,7 +2327,7 @@ Param(
                 $multipartContent.Add($fileContent)
                 $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post
             } finally {
-                $fileStream.Close()
+                $fileStream.Dispose()
             }
         }
     } else {
@@ -3102,7 +3106,7 @@ Param(
                 $multipartContent.Add($fileContent)
                 $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post
             } finally {
-                $fileStream.Close()
+                $fileStream.Dispose()
             }
         }
     } else {
@@ -4405,7 +4409,7 @@ Param(
                 $multipartContent.Add($fileContent)
                 $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post
             } finally {
-                $fileStream.Close()
+                $fileStream.Dispose()
             }
         }
     } else {
