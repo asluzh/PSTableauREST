@@ -15,7 +15,7 @@ BeforeDiscovery {
     $script:FlowFiles = Get-ChildItem -Path "./Tests/Assets/Flows" -Recurse | Resolve-Path -Relative
 }
 
-Describe "Functional Tests for PSTableauREST" -Tag Functional -ForEach $ConfigFiles {
+Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $ConfigFiles {
     BeforeAll {
         $script:ConfigFile = Get-Content $_ | ConvertFrom-Json
         if ($ConfigFile.username) {
