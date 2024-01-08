@@ -1,30 +1,40 @@
 Import-Module ./PSTableauREST -Force
 . ./Tests/Test.Functions.ps1
 
-# $script:VerbosePreference = 'Continue' # display verbose output of the module functions
-$ConfigFile = Get-Content 'Tests/Config/test_tableau_cloud.json' | ConvertFrom-Json
+$ConfigFile = 'Tests/Config/test_tableau_cloud.json'
 
-if ($ConfigFile.username) {
-    $ConfigFile | Add-Member -MemberType NoteProperty -Name "secure_password" -Value (Test-GetSecurePassword -Namespace $ConfigFile.server -Username $ConfigFile.username)
+# $script:VerbosePreference = 'Continue' # display verbose output of the module functions
+Write-Host "This script runs a suite of tests with various REST API calls. The temporary content objects are then removed."
+
+try {
+    $Config = Get-Content $ConfigFile | ConvertFrom-Json
+    if ($Config.username) {
+        $Config | Add-Member -MemberType NoteProperty -Name "secure_password" -Value (Test-GetSecurePassword -Namespace $Config.server -Username $Config.username)
+    }
+    if ($Config.pat_name) {
+        $Config | Add-Member -MemberType NoteProperty -Name "pat_secret" -Value (Test-GetSecurePassword -Namespace $Config.server -Username $Config.pat_name)
+    }
+} catch {
+    Write-Error 'Please provide a valid configuration file via $ConfigFile variable' -ErrorAction Stop
 }
-if ($ConfigFile.pat_name) {
-    $ConfigFile | Add-Member -MemberType NoteProperty -Name "pat_secret" -Value (Test-GetSecurePassword -Namespace $ConfigFile.server -Username $ConfigFile.pat_name)
-}
+
 
 try {
 
-    if ($ConfigFile.pat_name) {
-        $credentials = Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
+    if ($Config.pat_name) {
+        $credentials = Open-TSSignIn -Server $Config.server -Site $Config.site -PersonalAccessTokenName $Config.pat_name -PersonalAccessTokenSecret $Config.pat_secret
     } else {
-        $credentials = Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
+        $credentials = Open-TSSignIn -Server $Config.server -Site $Config.site -Username $Config.username -SecurePassword $Config.secure_password
     }
-    Write-Host ("Logged in user id: {0}" -f $credentials.user.id)
+    Write-Host ("Successfully logged in as user id: {0}" -f $credentials.user.id)
 
     $project = Add-TSProject -Name (New-Guid)
     $testProjectId = $project.id
     $testProjectName = $project.name
     $project = Update-TSProject -ProjectId $testProjectId -PublishSamples
     $workbooks = Get-TSWorkbooksForUser -UserId (Get-TSCurrentUserId)
+    Write-Host ("Workbooks available for user: {0}" -f ($workbooks | Measure-Object).Count)
+    $workbooks = Get-TSWorkbook -Filter "projectName:eq:$testProjectName"
     Write-Host ("Sample workbooks found: {0}" -f ($workbooks | Measure-Object).Count)
 
     $workbook = Get-TSWorkbook -Filter "projectName:eq:$testProjectName","name:eq:Superstore" | Select-Object -First 1
@@ -54,8 +64,8 @@ try {
     }
 
     $null = Add-TSTagsToContent -WorkbookId $testWorkbookId -Tags "active","test"
-    Remove-TSTagFromContent -WorkbookId $testWorkbookId -Tag "test"
-    Remove-TSTagFromContent -WorkbookId $testWorkbookId -Tag "active"
+    $null = Remove-TSTagFromContent -WorkbookId $testWorkbookId -Tag "test"
+    $null = Remove-TSTagFromContent -WorkbookId $testWorkbookId -Tag "active"
 
     Write-Host "All tests completed!" -ForegroundColor Green
 
