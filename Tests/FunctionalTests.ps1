@@ -39,6 +39,7 @@ try {
     if (($workbooks | Measure-Object).Count -lt 2) {
         Write-Host "Waiting for sample content to update..."
         Start-Sleep -s 3
+        $workbooks = Get-TSWorkbook -Filter "projectName:eq:$testProjectName"
         Write-Host ("Sample workbooks found: {0}" -f ($workbooks | Measure-Object).Count)
     }
 
