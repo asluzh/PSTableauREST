@@ -337,6 +337,13 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 $permissions.Length | Should -Be 0
                 # add all possible permissions (random Allow/Deny) for the current user
                 foreach ($ct in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
+                    if ($ct -eq 'dataroles' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
+                        continue
+                    } elseif ($ct -eq 'lenses' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
+                        continue
+                    } elseif ($ct -in 'databases','tables' -and (Get-TSRestApiVersion) -lt [version]3.6) {
+                        continue
+                    }
                     switch ($ct) {
                         'workbooks' {
                             $possibleCap = 'Read','Filter','ViewComments','AddComment','ExportImage','ExportData','ShareView','ViewUnderlyingData','WebAuthoring','RunExplainData','ExportXml','Write','CreateRefreshMetrics','ChangeHierarchy','Delete','ChangePermissions'
@@ -395,6 +402,13 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 Remove-TSDefaultPermission -ProjectId $testProjectId -All
                 # apply all possible permission templates for the current user
                 foreach ($ct in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
+                    if ($ct -eq 'dataroles' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
+                        continue
+                    } elseif ($ct -eq 'lenses' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
+                        continue
+                    } elseif ($ct -in 'databases','tables' -and (Get-TSRestApiVersion) -lt [version]3.6) {
+                        continue
+                    }
                     foreach ($tpl in 'View','Explore','Denied','Publish','Administer','None') {
                         $tplPermissionTable = @{contentType=$ct; granteeType="User"; granteeId=(Get-TSCurrentUserId); template=$tpl}
                         $permissions = Set-TSDefaultPermission -ProjectId $testProjectId -PermissionTable $tplPermissionTable
@@ -578,7 +592,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $sampleWorkbookId | Should -BeOfType String
                 }
                 It "Get sample workbook by content URL from <ConfigFile.server>" {
-                    if ((Get-TSRestApiVersion) -ge 3.17) {
+                    if ((Get-TSRestApiVersion) -ge [version]3.17) {
                         $workbook = Get-TSWorkbook -ContentUrl $sampleWorkbookContentUrl
                         $workbook.id | Should -Be $script:sampleWorkbookId
                         $workbook.name | Should -Be $script:sampleWorkbookName
@@ -629,7 +643,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $script:sampleWorkbookId = $workbook.id
                 }
                 It "Publish sample workbook (with options) on <ConfigFile.server>" {
-                    if ((Get-TSRestApiVersion) -ge 3.21) {
+                    if ((Get-TSRestApiVersion) -ge [version]3.21) {
                         $description = "Testing sample workbook - description 123"
                         $workbook = Publish-TSWorkbook -Name $sampleWorkbookName -InFile "Tests/Output/$sampleWorkbookName.twbx" -ProjectId $samplesProjectId -Overwrite -ShowTabs -ThumbnailsUserId (Get-TSCurrentUserId) -Description $description
                         $workbook.id | Should -BeOfType String
@@ -651,7 +665,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $workbook.showTabs | Should -Be true
                 }
                 It "Update sample workbook (description) on <ConfigFile.server>" {
-                    if ((Get-TSRestApiVersion) -ge 3.21) {
+                    if ((Get-TSRestApiVersion) -ge [version]3.21) {
                         $description = "Testing sample workbook - description 456" # - special symbols äöü©®!?
                         $workbook = Update-TSWorkbook -WorkbookId $sampleWorkbookId -Description $description
                         $workbook.description | Should -Be $description
@@ -1215,7 +1229,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     Remove-Item -Path "Tests/Output/$sampleViewName.pdf"
                 }
                 It "Query view preview image from <ConfigFile.server>" {
-                    $view = Get-View -ViewId $sampleViewId
+                    $view = Get-TSView -ViewId $sampleViewId
                     Export-TSViewPreviewImage -ViewId $sampleViewId -Workbook $view.workbook.id -OutFile "Tests/Output/$sampleViewName.png"
                     Test-Path -Path "Tests/Output/$sampleViewName.png" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/$sampleViewName.png"
@@ -1658,7 +1672,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             # It "Filter custom views by <> on <ConfigFile.server>" {
             # }
             It "Filter datasources by project name on <ConfigFile.server>" {
-                if ((Get-TSRestApiVersion) -lt 3.13 -or (Get-TSRestApiVersion) -gt 3.17) { # this filter doesn't work in API 3.13 to 3.17
+                if ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -gt [version]3.17) { # this filter doesn't work in API 3.13 to 3.17
                     $datasources = Get-TSDatasource -Filter "projectName:eq:$samplesProjectName"
                     $datasources.Length | Should -BeGreaterThan 0
                 } else {

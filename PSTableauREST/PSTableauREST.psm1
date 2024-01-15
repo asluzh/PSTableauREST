@@ -5422,7 +5422,7 @@ Param(
     $permissionTable = @()
     $uri = Get-TSRequestUri -Endpoint Project -Param "$ProjectId/default-permissions/"
     foreach ($ct in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') { #,'virtualconnections' not supported yet
-        if ($ct -eq 'dataroles' -and (Get-TSRestApiVersion) -lt [version]3.13) {
+        if ($ct -eq 'dataroles' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
             continue
         } elseif ($ct -eq 'lenses' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
             continue
@@ -5501,7 +5501,7 @@ Param(
     $uri = Get-TSRequestUri -Endpoint Project -Param "$ProjectId/default-permissions/"
     $outputPermissionTable = @()
     foreach ($ct in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
-        if ($ct -eq 'dataroles' -and (Get-TSRestApiVersion) -lt [version]3.13) {
+        if ($ct -eq 'dataroles' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
             continue
         } elseif ($ct -eq 'lenses' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
             continue
@@ -5749,7 +5749,7 @@ Param(
         if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
             $allDefaultPermissions = Get-TSDefaultPermission -ProjectId $ProjectId
             foreach ($ct in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
-                if ($ct -eq 'dataroles' -and (Get-TSRestApiVersion) -lt [version]3.13) {
+                if ($ct -eq 'dataroles' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
                     continue
                 } elseif ($ct -eq 'lenses' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
                     continue
@@ -5777,7 +5777,7 @@ Param(
         if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
             $allDefaultPermissions = Get-TSDefaultPermission -ProjectId $ProjectId
             foreach ($ct in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
-                if ($ct -eq 'dataroles' -and (Get-TSRestApiVersion) -lt [version]3.13) {
+                if ($ct -eq 'dataroles' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
                     continue
                 } elseif ($ct -eq 'lenses' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
                     continue
