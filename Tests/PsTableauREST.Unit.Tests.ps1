@@ -12,7 +12,7 @@ Describe "Unit Tests for PSTableauREST" -Tag Unit {
         BeforeAll {
             $script:ConfigFile = Get-Content $_ | ConvertFrom-Json
         }
-        It "<_> should be valid config file" {
+        It "Validation check for config file <_>" {
             $ConfigFile.server | Should -Not -BeNullOrEmpty
             # $ConfigFile.site | Should -Not -BeNullOrEmpty
             $ConfigFile.username | Should -Not -BeNullOrEmpty

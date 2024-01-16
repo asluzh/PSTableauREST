@@ -4,7 +4,7 @@ if ($env:windir) { # running on Windows platform (PS 5.1)
     $private:secure_password = Import-CliXml -Path 'Tests/Config/securestore_passwd.xml'
     Unlock-SecretStore -Password $private:secure_password -PasswordTimeout 3600
     Add-Type -AssemblyName System.Net.Http
-} else { # running on MacOS/Unix platform (PS 7.3)
+} else { # running on MacOS/Unix platform (PS 7.x)
     Import-Module Microsoft.PowerShell.SecretManagement
 }
 
