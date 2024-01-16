@@ -17,6 +17,9 @@ See help for Invoke-RestMethod for common parameters description.
 .PARAMETER NoStandardHeader
 Switch parameter, indicates not to include the standard Tableau Server auth token in the headers
 
+.PARAMETER AddHeaders
+(Optional) Specifies additional HTTP headers in a hashtable.
+
 .LINK
 Invoke-RestMethod
 #>
@@ -32,6 +35,7 @@ Param(
     [Parameter()][string] $ContentType,
     [Parameter()][switch] $SkipCertificateCheck,
     # own params
+    [Parameter()][hashtable] $AddHeaders,
     [Parameter()][switch] $NoStandardHeader
 )
     begin {
@@ -42,10 +46,15 @@ Param(
             if ($script:TSAuthToken) {
                 $headers.Add('X-Tableau-Auth', $script:TSAuthToken)
             }
-            # if ($ContentType) { # not needed, already considered via the param to Invoke-RestMethod
-            #     $headers.Add('Content-Type', $ContentType)
-            # }
+            # ContentType header not needed, already considered via the param to Invoke-RestMethod
+            if ($AddHeaders) {
+                $AddHeaders.GetEnumerator() | ForEach-Object {
+                    $headers.Add($_.Key, $_.Value)
+                }
+                $PSBoundParameters.Remove('AddHeaders')
+            }
             $PSBoundParameters.Add('Headers', $headers)
+            Write-Debug ($headers | ConvertTo-Json -Compress)
         }
         if ($DebugPreference -eq 'Continue') {
             $requestInfo = "{0} {1} " -f $Method.ToString().ToUpper(), $Uri
@@ -3382,6 +3391,95 @@ Param(
     $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/refresh
     if ($PSCmdlet.ShouldProcess($DatasourceId)) {
         $response = Invoke-TSRestApiMethod -Uri $uri -Body "<tsRequest />" -Method Post -ContentType "application/xml"
+        return $response.tsResponse.job
+    }
+}
+
+function Update-TSHyperData {
+<#
+.SYNOPSIS
+Update Data in Hyper Data Source or Connection
+
+.DESCRIPTION
+Incrementally updates data (insert, update, upsert, replace and delete) in a published data source from a live-to-Hyper connection,
+where the data source has a single connection or multiple connections.
+See also: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_how_to_update_data_to_hyper.htm
+
+.PARAMETER Action
+The actions list to perform. Each element of the list is a hashtable, describing the action's properties.
+The actions are performed sequentially, first to last, and if any of the actions fail, the whole operation is discarded.
+The actions have the following properties:
+- action: insert, update, delete, replace, or upsert
+- target-table: The table name inside the target database
+- target-schema: The name of a schema inside the target Hyper file
+- source-table: The table name inside the source database
+- source-schema: The name of a schema inside the uploaded source Hyper payload
+- condition: the condition used to select the columns to be modified (applicable for update, delete, and upsert actions)
+
+.PARAMETER DatasourceId
+The LUID of the data source to update.
+
+.PARAMETER ConnectionId
+(Optional) The LUID of the data source connection to update.
+
+.PARAMETER InFile
+(Optional) The filename (incl. path) of the hyper file payload.
+
+.PARAMETER RequestId
+(Optional) A user-generated identifier that uniquely identifies a request.
+If this parameter is not supplied, the request ID will be generated randomly.
+Purpose: If the server receives more than one request with the same ID within 24 hours,
+all subsequent requests will be treated as duplicates and ignored by the server.
+This can be used to guarantee idempotency of requests.
+
+.EXAMPLE
+$job = Update-TSDataHyper -InFile upload.hyper -Action $action -DatasourceId $datasource.id
+
+.EXAMPLE
+$job = Update-TSDataHyper -InFile upload.hyper -DatasourceId $datasourceId -Action $action1,$action2  -ConnectionId $connectionId
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sources.htm#update_data_in_hyper_data_source
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sources.htm#update_data_source_now
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][hashtable[]] $Action,
+    [Parameter(Mandatory)][string] $DatasourceId,
+    [Parameter()][string] $ConnectionId,
+    [Parameter()][string] $InFile,
+    [Parameter()][string] $RequestId
+)
+    Assert-TSRestApiVersion -AtLeast 3.12
+    if ($ConnectionId) {
+        $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/connections/$ConnectionId/data
+        $shouldProcessItem = "datasource:{0}, connection:{1}" -f $DatasourceId, $ConnectionId
+    } else {
+        $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/data
+        $shouldProcessItem = "datasource:{0}" -f $DatasourceId
+    }
+    if (-Not $RequestId) {
+        $RequestId = New-Guid # alternative: (New-Guid).ToString("N")
+    }
+    if ($InFile) {
+        $fileItem = Get-Item -LiteralPath $InFile
+        $FileName = $fileItem.Name -replace '["`]','' # remove special chars
+        $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName
+        $uri += "?uploadSessionId=$uploadSessionId"
+    }
+    $actionsArray = @()
+    foreach ($ac in $Action) {
+        $actionsArray += $ac
+    }
+    $jsonBody = @{actions=$actionsArray} | ConvertTo-Json -Compress -Depth 4 # should be enough for condition cases
+    Write-Debug $jsonBody
+
+    if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
+        $response = Invoke-TSRestApiMethod -Uri $uri -Body $jsonBody -Method Patch -ContentType "application/json" -AddHeaders @{RequestID=$RequestId}
+        # Write-Debug ($response.tsResponse.job | Format-List -Force | Out-String)
         return $response.tsResponse.job
     }
 }

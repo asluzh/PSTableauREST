@@ -4,7 +4,7 @@ BeforeAll {
     . ./Tests/Test.Functions.ps1
     # InModuleScope 'PSTableauREST' { $script:VerbosePreference = 'Continue' } # display verbose output of module functions
     $script:VerbosePreference = 'Continue' # display verbose output of the tests
-    # InModuleScope 'PSTableauREST' { $script:DebugPreference = 'Continue' } # display debug output
+    # InModuleScope 'PSTableauREST' { $script:DebugPreference = 'Continue' } # display debug output of the module
     # InModuleScope 'PSTableauREST' { $script:ProgressPreference = 'SilentlyContinue' } # suppress progress for upload/download operations
     # see also: https://stackoverflow.com/questions/18770723/hide-progress-of-invoke-webrequest
 }
@@ -1166,6 +1166,77 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                         Export-TSDatasource -DatasourceId $sampleDatasourceId -OutFile "Tests/Output/download.tdsx"
                         Test-Path -Path "Tests/Output/download.tdsx" | Should -BeTrue
                         Remove-Item -Path "Tests/Output/download.tdsx"
+                    }
+                }
+                Context "Publish live-to-Hyper assets on <ConfigFile.server>"  -Tag Hyper {
+                    It "Publish initial Hyper file" {
+                        $datasource = Publish-TSDatasource -Name "World Indicators Data" -InFile './Tests/Assets/Misc/World Indicators.hyper' -ProjectId $samplesProjectId -Overwrite
+                        $datasource.id | Should -BeOfType String
+                        $script:hyperDatasourceId = $datasource.id
+                    }
+                    It "Conditional delete for published Hyper file" {
+                        $action = @{action='delete';
+                            'target-table'='Extract'; 'target-schema'='Extract';
+                            'condition'=@{op='eq'; 'target-col'='Region'; const=@{type='string'; v='Europe'}}
+                        }
+                        $job = Update-TSHyperData -InFile './Tests/Assets/Misc/World Indicators.hyper' -Action $action -DatasourceId $hyperDatasourceId
+                        $job | Should -Not -BeNullOrEmpty
+                        $job.type | Should -Be "updateUploadedFile"
+                        $job.mode | Should -Be "Asynchronous"
+                        $jobFinished = Wait-TSJob -JobId $job.id -Timeout 300
+                        Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobFinished.completedAt, $jobFinished.finishCode)
+                        if ($jobFinished.extractRefreshJob.notes) {
+                            Write-Verbose ("Job notes: {0}" -f $jobFinished.extractRefreshJob.notes)
+                        }
+                        if ($jobFinished.statusNotes) {
+                            $jobFinished.statusNotes.statusNote | ForEach-Object {
+                                Write-Verbose ("Job status notes: {0}" -f $_.text)
+                            }
+                        }
+                        $jobFinished.finishCode | Should -Be 0
+                    }
+                    It "Incremental insert for published Hyper file" {
+                        $action = @{action='insert';
+                            'source-table'='Extract'; 'source-schema'='Extract';
+                            'target-table'='Extract'; 'target-schema'='Extract'
+                        }
+                        $job = Update-TSHyperData -InFile './Tests/Assets/Misc/World Indicators.hyper' -Action $action -DatasourceId $hyperDatasourceId
+                        $job | Should -Not -BeNullOrEmpty
+                        $job.type | Should -Be "updateUploadedFile"
+                        $job.mode | Should -Be "Asynchronous"
+                        $jobFinished = Wait-TSJob -JobId $job.id -Timeout 300
+                        Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobFinished.completedAt, $jobFinished.finishCode)
+                        if ($jobFinished.extractRefreshJob.notes) {
+                            Write-Verbose ("Job notes: {0}" -f $jobFinished.extractRefreshJob.notes)
+                        }
+                        if ($jobFinished.statusNotes) {
+                            $jobFinished.statusNotes.statusNote | ForEach-Object {
+                                Write-Verbose ("Job status notes: {0}" -f $_.text)
+                            }
+                        }
+                        $jobFinished.finishCode | Should -Be 0
+                    }
+                    It "Incremental insert for published Hyper file (connection)" {
+                        $connection = Get-TSDatasourceConnection -DatasourceId $hyperDatasourceId
+                        $action = @{action='insert';
+                            'source-table'='Extract'; 'source-schema'='Extract';
+                            'target-table'='Extract'; 'target-schema'='Extract'
+                        }
+                        $job = Update-TSHyperData -InFile './Tests/Assets/Misc/World Indicators.hyper' -Action $action -DatasourceId $hyperDatasourceId -ConnectionId $connection.id
+                        $job | Should -Not -BeNullOrEmpty
+                        $job.type | Should -Be "updateUploadedFile"
+                        $job.mode | Should -Be "Asynchronous"
+                        $jobFinished = Wait-TSJob -JobId $job.id -Timeout 300
+                        Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobFinished.completedAt, $jobFinished.finishCode)
+                        if ($jobFinished.extractRefreshJob.notes) {
+                            Write-Verbose ("Job notes: {0}" -f $jobFinished.extractRefreshJob.notes)
+                        }
+                        if ($jobFinished.statusNotes) {
+                            $jobFinished.statusNotes.statusNote | ForEach-Object {
+                                Write-Verbose ("Job status notes: {0}" -f $_.text)
+                            }
+                        }
+                        $jobFinished.finishCode | Should -Be 0
                     }
                 }
             }

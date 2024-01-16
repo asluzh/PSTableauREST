@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.2.1'
+ModuleVersion = '0.3.0'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -82,7 +82,7 @@ FunctionsToExport = @(
 ### Site methods
 'Get-TSSite', 'Add-TSSite', 'Update-TSSite', 'Remove-TSSite',
 'Get-TSRecentlyViewedContent', 'Get-TSSettingsForEmbedding', 'Update-TSSettingsForEmbedding',
-# Get Data Acceleration Report for a Site - feature deprecated in 2022.1 (API 3.16)
+# Get Data Acceleration Report for a Site - feature deprecated in API 3.16
 
 ### Projects methods
 'Get-TSProject', 'Add-TSProject', 'Update-TSProject', 'Remove-TSProject', 'Get-TSDefaultProject',
@@ -104,9 +104,7 @@ FunctionsToExport = @(
 
 ### Datasources methods
 'Get-TSDatasource', 'Export-TSDatasource', 'Publish-TSDatasource', 'Update-TSDatasource', 'Remove-TSDatasource',
-'Get-TSDatasourceConnection', 'Update-TSDatasourceConnection', 'Update-TSDatasourceNow',
-# Update Data in Hyper Connection - requires json body - API 3.12
-# Update Data in Hyper Data Source - requires json body - API 3.12
+'Get-TSDatasourceConnection', 'Update-TSDatasourceConnection', 'Update-TSDatasourceNow', 'Update-TSHyperData',
 
 ### Views methods
 'Get-TSView', 'Export-TSViewPreviewImage', 'Export-TSViewToFormat', 'Get-TSViewUrl',
@@ -122,7 +120,7 @@ FunctionsToExport = @(
 'Get-TSContentPermission', 'Set-TSContentPermission', 'Add-TSContentPermission', 'Remove-TSContentPermission',
 'ConvertTo-TSPermissionTable',
 'Get-TSDefaultPermission', 'Set-TSDefaultPermission', 'Remove-TSDefaultPermission',
-# List/Add/Delete Ask Data Lens Permissions - will be retired in 2024.2 (API 3.22)
+# List/Add/Delete Ask Data Lens Permissions - retired in API 3.22
 
 ### Tags methods
 'Add-TSTagsToContent', 'Remove-TSTagFromContent',
@@ -145,22 +143,14 @@ FunctionsToExport = @(
 ### Subscription methods
 'Get-TSSubscription', 'Add-TSSubscription', 'Update-TSSubscription', 'Remove-TSSubscription',
 
-### Dashboard Extensions Settings methods - API 3.8
-# List settings for dashboard extensions on server
-# List allowed dashboard extensions on site
-# List blocked dashboard extensions on server
-# List dashboard extension settings of site
-# Update dashboard extensions settings of server
-# Get allowed dashboard extension on site
-# Get blocked dashboard extension on server
-# Allow dashboard extension on site
-# Disallow dashboard extension on site
-# Block dashboard extension on server
-# Unblock dashboard extension on server
-# Update settings for allowed dashboard extension on site
-# Update dashboard extension settings of site
+### Dashboard Extensions Settings methods - API 3.8, retired in API 3.21
+### Tableau Extensions Settings Methods - introduced in API 3.21
+# List Tableau extensions server settings
+# List Tableau extensions site settings
+# Update Tableau extensions server settings
+# Update Tableau extensions site settings
 
-### Analytics Extensions Settings methods - API 3.8
+### Analytics Extensions Settings methods - introduced in API 3.8
 # List analytics extension connections on site
 # Add analytics extension connection to site
 # Update analytics extension connection of site
@@ -208,19 +198,8 @@ FunctionsToExport = @(
 # Get batch content usage statistics
 # Get usage statistics for content item
 
-### Ask Data Lens methods
-# List ask data lenses in site
-# Get ask data lens
-# Create ask data lens
-# Import ask data lens
-# Delete ask data lens
-
-### Metrics methods
-# List Metrics for Site
-# Get Metric
-# Get Metric Data
-# Update Metric
-# Delete Metric
+### Ask Data Lens methods - retired in API 3.22
+### Metrics methods - retired in API 3.22
 
 ### Identity Pools methods
 # List Authentication Configurations
@@ -243,7 +222,7 @@ FunctionsToExport = @(
 # List Virtual Connection Database Connections
 # Update Virtual Connection Database Connections
 
-### Metadata methods - require API API 3.5
+### Metadata methods - introduced in API API 3.5
 'Get-TSDatabase', 'Get-TSTable', 'Get-TSTableColumn', 'Get-TSMetadataGraphQL'
 # Query Data Quality Warning by ID
 # Query Data Quality Warning by Content
@@ -301,8 +280,34 @@ FunctionsToExport = @(
 # Update Labels
 # Update labelValue
 # Update Table
-)
+
+### Tableau Pulse methods - introduced in API 3.21
+# Metric definitions
+# - Create, update, and delete metric definitions
+# - Get a list of metric definitions for a site
+# - Get a list of metrics for a metric definition
+# - Get a specified batch of metric definitions
+# Metrics
+# - Get the details of a metric
+# - Get a metric if it exists or create it if it doesn't
+# - Create, update, and delete a metric
+# - Get a specified batch of metrics
+# Metric Insights
+# - Generate a basic insight bundle for a metric
+# - Generate a springboard insight bundle for a metric
+# - Generate a detail insight bundle for a metric
+# Metric Subscriptions
+# - Get the details of a subscription to a metric
+# - Get a list of subscriptions to a metric for a user
+# - Create or delete a subscription to a metric
+# - Update the followers of a metric
+# - Get a specified batch of subscriptions to a metric
+# - Create subscriptions for a batch of users or groups to a metric
+# - Get a count of followers for a specified batch of subscriptions to a metric
+
 # see also: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_whats_new.htm#added-in-rest-api-315-for-tableau-server-20221-and-tableau-cloud
+
+)
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
 CmdletsToExport = @()
