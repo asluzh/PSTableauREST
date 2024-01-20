@@ -4,7 +4,7 @@ BeforeAll {
     . ./Tests/Test.Functions.ps1
     # InModuleScope 'PSTableauREST' { $script:VerbosePreference = 'Continue' } # display verbose output of module functions
     $script:VerbosePreference = 'Continue' # display verbose output of the tests
-    # InModuleScope 'PSTableauREST' { $script:DebugPreference = 'Continue' } # display debug output of the module
+    InModuleScope 'PSTableauREST' { $script:DebugPreference = 'Continue' } # display debug output of the module
     # InModuleScope 'PSTableauREST' { $script:ProgressPreference = 'SilentlyContinue' } # suppress progress for upload/download operations
     # see also: https://stackoverflow.com/questions/18770723/hide-progress-of-invoke-webrequest
 }
@@ -459,6 +459,48 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 $response = Remove-TSUser -UserId $script:testUserId
                 $response | Should -BeOfType String
                 $script:testUserId = $null
+            }
+            It "Import users via CSV file on <ConfigFile.server>" {
+                if ($ConfigFile.tableau_cloud) {
+                    $job = Import-TSUsersWithCSV -CsvFile './Tests/Assets/Misc/users_to_add_cloud.csv' -AuthSetting ServerDefault
+                } else {
+                    $job = Import-TSUsersWithCSV -CsvFile './Tests/Assets/Misc/users_to_add.csv'
+                }
+                $job | Should -Not -BeNullOrEmpty
+                $job.type | Should -Be "UserImport"
+                $job.mode | Should -Be "Asynchronous"
+                $jobFinished = Wait-TSJob -JobId $job.id -Timeout 300
+                Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobFinished.completedAt, $jobFinished.finishCode)
+                if ($jobFinished.extractRefreshJob.notes) {
+                    Write-Verbose ("Job notes: {0}" -f $jobFinished.extractRefreshJob.notes)
+                }
+                if ($jobFinished.statusNotes) {
+                    $jobFinished.statusNotes.statusNote | ForEach-Object {
+                        Write-Verbose ("Job status notes: {0}" -f $_.text)
+                    }
+                }
+                $jobFinished.finishCode | Should -Be 0
+            }
+            It "Remove users via CSV file on <ConfigFile.server>" {
+                if ($ConfigFile.tableau_cloud) {
+                    $job = Remove-TSUsersWithCSV -CsvFile './Tests/Assets/Misc/users_to_remove_cloud.csv'
+                } else { # TODO test this method on Tableau Server, on Tableau Cloud this doesn't work for some reason
+                    $job = Remove-TSUsersWithCSV -CsvFile './Tests/Assets/Misc/users_to_remove.csv'
+                }
+                $job | Should -Not -BeNullOrEmpty
+                $job.type | Should -Be "UserDelete"
+                $job.mode | Should -Be "Asynchronous"
+                $jobFinished = Wait-TSJob -JobId $job.id -Timeout 300
+                Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobFinished.completedAt, $jobFinished.finishCode)
+                if ($jobFinished.extractRefreshJob.notes) {
+                    Write-Verbose ("Job notes: {0}" -f $jobFinished.extractRefreshJob.notes)
+                }
+                if ($jobFinished.statusNotes) {
+                    $jobFinished.statusNotes.statusNote | ForEach-Object {
+                        Write-Verbose ("Job status notes: {0}" -f $_.text)
+                    }
+                }
+                $jobFinished.finishCode | Should -Be 0
             }
         }
         Context "Group operations" -Tag Group {
@@ -985,6 +1027,10 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $datasource = Publish-TSDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/append.hyper" -ProjectId $samplesProjectId -Append -Chunked
                     $datasource.id | Should -BeOfType String
                 }
+                It "Publish a Parquet file on <ConfigFile.server>" {
+                    $datasource = Publish-TSDatasource -Name "Titanic" -InFile './Tests/Assets/Misc/Titanic.parquet' -ProjectId $samplesProjectId -Overwrite
+                    $datasource.id | Should -BeOfType String
+                }
                 It "Add/remove tags for sample datasource on <ConfigFile.server>" {
                     Add-TSTagsToContent -DatasourceId $sampleDatasourceId -Tags "active","test"
                     ((Get-TSDatasource -DatasourceId $sampleDatasourceId).tags.tag | Measure-Object).Count | Should -Be 2
@@ -1195,7 +1241,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                         }
                         $jobFinished.finishCode | Should -Be 0
                     }
-                    It "Incremental insert for published Hyper file" {
+                    It "Single table append for published Hyper file" {
                         $action = @{action='insert';
                             'source-table'='Extract'; 'source-schema'='Extract';
                             'target-table'='Extract'; 'target-schema'='Extract'
@@ -1216,7 +1262,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                         }
                         $jobFinished.finishCode | Should -Be 0
                     }
-                    It "Incremental insert for published Hyper file (connection)" {
+                    It "Single table append for published Hyper file (with connection)" {
                         $connection = Get-TSDatasourceConnection -DatasourceId $hyperDatasourceId
                         $action = @{action='insert';
                             'source-table'='Extract'; 'source-schema'='Extract';
@@ -1238,6 +1284,8 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                         }
                         $jobFinished.finishCode | Should -Be 0
                     }
+                    # TODO more examples for different actions, see below:
+                    # https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_how_to_update_data_to_hyper.htm#action-examples
                 }
             }
         }

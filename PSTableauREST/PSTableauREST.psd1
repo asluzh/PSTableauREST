@@ -91,8 +91,7 @@ FunctionsToExport = @(
 'Get-TSUser', 'Add-TSUser', 'Update-TSUser', 'Remove-TSUser',
 'Get-TSGroup', 'Add-TSGroup', 'Update-TSGroup', 'Remove-TSGroup',
 'Add-TSUserToGroup', 'Remove-TSUserFromGroup', 'Get-TSUsersInGroup', 'Get-TSGroupsForUser',
-# Import Users to Site from CSV - request body with multipart
-# Delete Users from Site with CSV - request body with multipart
+'Import-TSUsersWithCSV', 'Remove-TSUsersWithCSV',
 
 ### Publishing methods
 'Send-TSFileUpload',
@@ -138,12 +137,12 @@ FunctionsToExport = @(
 
 ### Favorites methods
 'Get-TSUserFavorite', 'Add-TSUserFavorite', 'Remove-TSUserFavorite', 'Move-TSUserFavorite',
-# Add Metric to Favorites - will be retired in 2024.2 (API 3.22)
+# Add Metric to Favorites - retired in API 3.22
 
 ### Subscription methods
 'Get-TSSubscription', 'Add-TSSubscription', 'Update-TSSubscription', 'Remove-TSSubscription',
 
-### Dashboard Extensions Settings methods - API 3.8, retired in API 3.21
+### Dashboard Extensions Settings methods - introduced in API 3.8, retired in API 3.21
 ### Tableau Extensions Settings Methods - introduced in API 3.21
 # List Tableau extensions server settings
 # List Tableau extensions site settings
@@ -183,7 +182,7 @@ FunctionsToExport = @(
 ### Notifications methods
 'Get-TSDataAlert', 'Add-TSDataAlert', 'Update-TSDataAlert', 'Remove-TSDataAlert',
 'Add-TSUserToDataAlert', 'Remove-TSUserFromDataAlert',
-# List Webhooks - API 3.6
+# List Webhooks - introduced in API 3.6
 # Get a Webhook
 # Create a Webhook
 # Test a Webhook
@@ -304,10 +303,8 @@ FunctionsToExport = @(
 # - Get a specified batch of subscriptions to a metric
 # - Create subscriptions for a batch of users or groups to a metric
 # - Get a count of followers for a specified batch of subscriptions to a metric
-
-# see also: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_whats_new.htm#added-in-rest-api-315-for-tableau-server-20221-and-tableau-cloud
-
 )
+# see also: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_whats_new.htm#added-in-rest-api-315-for-tableau-server-20221-and-tableau-cloud
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
 CmdletsToExport = @()

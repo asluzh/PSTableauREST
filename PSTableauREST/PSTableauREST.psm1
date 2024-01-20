@@ -1794,6 +1794,129 @@ Param(
     } until ($PageSize*$pageNumber -ge $totalAvailable)
 }
 
+function Import-TSUsersWithCSV {
+<#
+.SYNOPSIS
+Import Users to Site from CSV file
+
+.DESCRIPTION
+Creates a job to import the users listed in a specified .csv file to a site, and assign their roles and authorization settings.
+
+.PARAMETER CsvFile
+The CSV file with users to import.
+The .csv file should comply with the rules described in the CSV import file guidelines:
+https://help.tableau.com/current/server/en-us/csvguidelines.htm
+
+.PARAMETER AuthSetting
+The auth setting that will be applied for all imported users.
+The setting should be one of the values: ServerDefault, SAML, OpenID, TableauIDWithMFA
+
+.PARAMETER UserAuthSettings
+The hashtable array with user names (key) and their individual auth setting (value).
+
+.EXAMPLE
+Import-TSUsersWithCSV -CsvFile users_to_add.csv
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#import_users_to_site_from_csv
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory,ParameterSetName='OnlyCsv')]
+    [Parameter(Mandatory,ParameterSetName='AuthSetting')]
+    [Parameter(Mandatory,ParameterSetName='UserAuthSettings')]
+    [string] $CsvFile,
+    [Parameter(Mandatory,ParameterSetName='AuthSetting')]
+    [ValidateSet('ServerDefault','SAML','OpenID','TableauIDWithMFA')]
+    [string] $AuthSetting,
+    [Parameter(Mandatory,ParameterSetName='UserAuthSettings')][hashtable] $UserAuthSettings
+)
+    Assert-TSRestApiVersion -AtLeast 3.15
+    $fileItem = Get-Item -LiteralPath $CsvFile
+    $fileName = $fileItem.Name -replace '["`]','' # remove special chars
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_user = $tsRequest.AppendChild($xml.CreateElement("user"))
+    if ($AuthSetting) {
+        $el_user.SetAttribute("authSetting", $AuthSetting)
+    } elseif ($UserAuthSettings) {
+        $UserAuthSettings.GetEnumerator() | ForEach-Object {
+            $el_user.SetAttribute("name", $_.Key)
+            $el_user.SetAttribute("authSetting", $_.Value)
+        }
+    }
+    Write-Debug $xml.OuterXml
+    $boundaryString = (New-Guid).ToString("N")
+    $bodyLines = @(
+        "--$boundaryString",
+        "Content-Type: text/csv",
+        "Content-Disposition: form-data; name=tableau_user_import; filename=`"$FileName`"",
+        "",
+        [System.Text.Encoding]::GetEncoding("ISO-8859-1").GetString([System.IO.File]::ReadAllBytes($fileItem.FullName)),
+        "--$boundaryString",
+        "Content-Type: text/xml; charset=utf-8",
+        "Content-Disposition: form-data; name=request_payload",
+        "",
+        $xml.OuterXml
+        "--$boundaryString--"
+        )
+    $multipartContent = $bodyLines -join "`r`n"
+    Write-Debug $multipartContent
+
+    $uri = Get-TSRequestUri -Endpoint User -Param import
+    if ($PSCmdlet.ShouldProcess("import users using file $fileName")) {
+        $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post -ContentType "multipart/mixed; boundary=$boundaryString"
+        return $response.tsResponse.job
+    }
+}
+
+function Remove-TSUsersWithCSV {
+<#
+.SYNOPSIS
+Delete Users from Site with CSV file
+
+.DESCRIPTION
+Creates a job to remove a list of users, specified in a .csv file, from a site.
+
+.PARAMETER CsvFile
+The CSV file with users to remove.
+The .csv file should comply with the rules described in the CSV import file guidelines:
+https://help.tableau.com/current/server/en-us/csvguidelines.htm
+
+.EXAMPLE
+Remove-TSUsersWithCSV -CsvFile users_to_remove.csv
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#delete_users_from_site_with_csv
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $CsvFile
+)
+    Assert-TSRestApiVersion -AtLeast 3.15
+    $fileItem = Get-Item -LiteralPath $CsvFile
+    $fileName = $fileItem.Name -replace '["`]','' # remove special chars
+    $boundaryString = (New-Guid).ToString("N")
+    $bodyLines = @(
+        "--$boundaryString",
+        "Content-Type: text/csv",
+        "Content-Disposition: form-data; name=tableau_user_delete; filename=`"$FileName`"",
+        "",
+        [System.Text.Encoding]::GetEncoding("ISO-8859-1").GetString([System.IO.File]::ReadAllBytes($fileItem.FullName)),
+        "--$boundaryString--"
+        )
+    $multipartContent = $bodyLines -join "`r`n"
+    Write-Debug $multipartContent
+
+    $uri = Get-TSRequestUri -Endpoint User -Param delete
+    if ($PSCmdlet.ShouldProcess("delete users using file $fileName")) {
+        $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post -ContentType "multipart/mixed; boundary=$boundaryString"
+        return $response.tsResponse.job
+    }
+}
+
 ### Publishing methods
 function Send-TSFileUpload {
 <#
@@ -3433,10 +3556,10 @@ all subsequent requests will be treated as duplicates and ignored by the server.
 This can be used to guarantee idempotency of requests.
 
 .EXAMPLE
-$job = Update-TSDataHyper -InFile upload.hyper -Action $action -DatasourceId $datasource.id
+$job = Update-TSHyperData -InFile upload.hyper -Action $action -DatasourceId $datasource.id
 
 .EXAMPLE
-$job = Update-TSDataHyper -InFile upload.hyper -DatasourceId $datasourceId -Action $action1,$action2  -ConnectionId $connectionId
+$job = Update-TSHyperData -InFile upload.hyper -DatasourceId $datasourceId -Action $action1,$action2  -ConnectionId $connectionId
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sources.htm#update_data_in_hyper_data_source
@@ -3466,8 +3589,8 @@ Param(
     }
     if ($InFile) {
         $fileItem = Get-Item -LiteralPath $InFile
-        $FileName = $fileItem.Name -replace '["`]','' # remove special chars
-        $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName
+        $fileName = $fileItem.Name -replace '["`]','' # remove special chars
+        $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $fileName
         $uri += "?uploadSessionId=$uploadSessionId"
     }
     $actionsArray = @()
