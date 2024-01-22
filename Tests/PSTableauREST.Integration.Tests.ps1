@@ -1,10 +1,11 @@
 BeforeAll {
+    #Requires -Modules Assert
+    # Import-Module Assert
     Import-Module ./PSTableauREST -Force
-    Import-Module Assert
     . ./Tests/Test.Functions.ps1
     # InModuleScope 'PSTableauREST' { $script:VerbosePreference = 'Continue' } # display verbose output of module functions
     $script:VerbosePreference = 'Continue' # display verbose output of the tests
-    InModuleScope 'PSTableauREST' { $script:DebugPreference = 'Continue' } # display debug output of the module
+    # InModuleScope 'PSTableauREST' { $script:DebugPreference = 'Continue' } # display debug output of the module
     # InModuleScope 'PSTableauREST' { $script:ProgressPreference = 'SilentlyContinue' } # suppress progress for upload/download operations
     # see also: https://stackoverflow.com/questions/18770723/hide-progress-of-invoke-webrequest
 }
@@ -483,24 +484,33 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             }
             It "Remove users via CSV file on <ConfigFile.server>" {
                 if ($ConfigFile.tableau_cloud) {
-                    $job = Remove-TSUsersWithCSV -CsvFile './Tests/Assets/Misc/users_to_remove_cloud.csv'
-                } else { # TODO test this method on Tableau Server, on Tableau Cloud this doesn't work for some reason
+                    # $job = Remove-TSUsersWithCSV -CsvFile './Tests/Assets/Misc/users_to_remove_cloud.csv'
+                    $user = Get-TSUser -Filter "name:eq:user1@domain.com"
+                    $response = Remove-TSUser -UserId $user.id
+                    $response | Should -BeOfType String
+                    $user = Get-TSUser -Filter "name:eq:user2@domain.com"
+                    $response = Remove-TSUser -UserId $user.id
+                    $response | Should -BeOfType String
+                } else {
+                    # TODO test this method on Tableau Server, on Tableau Cloud this doesn't work for some reason
                     $job = Remove-TSUsersWithCSV -CsvFile './Tests/Assets/Misc/users_to_remove.csv'
+                    $job | Should -Not -BeNullOrEmpty
                 }
-                $job | Should -Not -BeNullOrEmpty
-                $job.type | Should -Be "UserDelete"
-                $job.mode | Should -Be "Asynchronous"
-                $jobFinished = Wait-TSJob -JobId $job.id -Timeout 300
-                Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobFinished.completedAt, $jobFinished.finishCode)
-                if ($jobFinished.extractRefreshJob.notes) {
-                    Write-Verbose ("Job notes: {0}" -f $jobFinished.extractRefreshJob.notes)
-                }
-                if ($jobFinished.statusNotes) {
-                    $jobFinished.statusNotes.statusNote | ForEach-Object {
-                        Write-Verbose ("Job status notes: {0}" -f $_.text)
+                if ($job) {
+                    $job.type | Should -Be "UserDelete"
+                    $job.mode | Should -Be "Asynchronous"
+                    $jobFinished = Wait-TSJob -JobId $job.id -Timeout 300
+                    Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobFinished.completedAt, $jobFinished.finishCode)
+                    if ($jobFinished.extractRefreshJob.notes) {
+                        Write-Verbose ("Job notes: {0}" -f $jobFinished.extractRefreshJob.notes)
                     }
+                    if ($jobFinished.statusNotes) {
+                        $jobFinished.statusNotes.statusNote | ForEach-Object {
+                            Write-Verbose ("Job status notes: {0}" -f $_.text)
+                        }
+                    }
+                    $jobFinished.finishCode | Should -Be 0
                 }
-                $jobFinished.finishCode | Should -Be 0
             }
         }
         Context "Group operations" -Tag Group {
@@ -1329,7 +1339,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     # Start-Sleep -s 3
                 }
                 It "Get sample view id from <ConfigFile.server>" {
-                    $view = Get-TSView -Filter "workbookName:eq:Superstore","projectName:eq:$samplesProjectName" | Select-Object -First 1
+                    $view = Get-TSView -Filter "workbookName:eq:World Indicators","projectName:eq:$samplesProjectName","name:eq:Population" | Select-Object -First 1
                     # if (-not $view) { # fallback: perform filter in PS
                     #     $workbook = Get-TSWorkbook | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId -and $_.name -eq "Superstore"} | Select-Object -First 1
                     #     $view = Get-TSView | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId -and $_.workbook.id -eq $workbook.id} | Select-Object -First 1
@@ -1395,7 +1405,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     (Get-TSView -ViewId $sampleViewId).tags | Should -BeNullOrEmpty
                 }
                 It "Update sample workbook (showTabs=false) on <ConfigFile.server>" {
-                    $workbook = Get-TSWorkbook -Filter "name:eq:Superstore","projectName:eq:$samplesProjectName"
+                    $workbook = Get-TSWorkbook -Filter "name:eq:World Indicators","projectName:eq:$samplesProjectName"
                     # if (-not $workbook) { # fallback: perform filter in PS
                     #     $workbook = Get-TSWorkbook | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId -and $_.name -eq "Superstore"} | Select-Object -First 1
                     # }
@@ -1739,7 +1749,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 }
             }
         }
-        Context "Content filtering on <ConfigFile.server>" -Tag QueryFilter {
+        Context "Content filtering" -Tag QueryFilter {
             BeforeAll {
                 $project = Add-TSProject -Name (New-Guid)
                 $script:samplesProjectId = $project.id

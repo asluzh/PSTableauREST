@@ -1,13 +1,14 @@
 Import-Module ./PSTableauREST -Force
 . ./Tests/Test.Functions.ps1
 
-# $ConfigFile = 'Tests/Config/test_tableau_cloud.json'
-
 # $script:VerbosePreference = 'Continue' # display verbose output of the module functions
 Write-Host "This script runs a suite of tests with various REST API calls. The temporary content objects are then removed."
 
 try {
     $Config = Get-Content $ConfigFile | ConvertFrom-Json
+    if ($Config.username -eq '') {
+        $Config.username = $env:USERNAME
+    }
     if ($Config.username) {
         $Config | Add-Member -MemberType NoteProperty -Name "secure_password" -Value (Test-GetSecurePassword -Namespace $Config.server -Username $Config.username)
     }
@@ -25,7 +26,7 @@ try {
         $credentials = Open-TSSignIn -Server $Config.server -Site $Config.site -Username $Config.username -SecurePassword $Config.secure_password
     }
     $user = Get-TSUser -UserId $credentials.user.id
-    Write-Host ("Successfully logged in as user id: {0} ({1})" -f $credentials.user.id, $user.fullName)
+    Write-Host ("Successfully logged in as user: {0} ({1})" -f $user.name, $user.fullName)
 
     $project = Add-TSProject -Name (New-Guid)
     $testProjectId = $project.id
@@ -63,7 +64,7 @@ try {
         Write-Host "Testing update functionality"
         $workbook = Update-TSWorkbook -WorkbookId $testWorkbookId -ShowTabs:$false
         if ((Get-TSRestApiVersion) -ge 3.21) {
-            $description = "Testing sample workbook - description 456" # - special symbols äöü©®!?
+            $description = "Testing sample workbook - description 456"
             $workbook = Update-TSWorkbook -WorkbookId $testWorkbookId -Description $description
         }
 

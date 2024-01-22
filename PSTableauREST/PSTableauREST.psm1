@@ -1,8 +1,8 @@
 ### Module variables and helper functions
-$TSRestApiVersion = [version] 2.4 # initial/minimum supported version
+$TSRestApiVersion = [version] 2.4 # selected REST API version, initially the minumum supported version
 $TSRestApiMinVersion = [version] 2.4 # supported version for initial sign-in calls
-$TSRestApiFileSizeLimit = 64*1048576 # 64MB
-$TSRestApiChunkSize = 2*1048576 # 2MB or 5MB or 50MB
+$TSRestApiFileSizeLimit = 64*1048576 # 64MB is the maximum file size for single publishing request
+$TSRestApiChunkSize = 2*1048576 # 2MB (or change for example to 5MB, 10MB, 50MB)
 
 function Invoke-TSRestApiMethod {
 <#
