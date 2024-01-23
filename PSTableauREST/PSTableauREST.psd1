@@ -75,9 +75,7 @@ FunctionsToExport = @(
 
 ### Authentication / Server methods
 'Get-TSServerInfo', 'Open-TSSignIn', 'Switch-TSSite', 'Close-TSSignOut', 'Revoke-TSServerAdminPAT', 'Get-TSCurrentUserId',
-'Get-TSCurrentSession', 'Remove-TSSession',
-# List Server Active Directory Domains
-# Update Server Active Directory Domain
+'Get-TSCurrentSession', 'Remove-TSSession', 'Get-TSActiveDirectoryDomain', 'Update-TSActiveDirectoryDomain',
 
 ### Site methods
 'Get-TSSite', 'Add-TSSite', 'Update-TSSite', 'Remove-TSSite',
@@ -144,10 +142,8 @@ FunctionsToExport = @(
 
 ### Dashboard Extensions Settings methods - introduced in API 3.8, retired in API 3.21
 ### Tableau Extensions Settings Methods - introduced in API 3.21
-# List Tableau extensions server settings
-# List Tableau extensions site settings
-# Update Tableau extensions server settings
-# Update Tableau extensions site settings
+'Get-TSExtensionSettingsServer', 'Update-TSExtensionSettingsServer',
+'Get-TSExtensionSettingsSite', 'Update-TSExtensionSettingsSite',
 
 ### Analytics Extensions Settings methods - introduced in API 3.8
 # List analytics extension connections on site

@@ -96,49 +96,43 @@ Expand ValidateSet to add support for more Endpoints.
 #>
 [OutputType([string])]
 Param(
-    [Parameter(Mandatory)][ValidateSet('Auth','Site','Session','Project','User','Group','Workbook','Datasource','View','Flow','FileUpload',
-        'Recommendation','CustomView','Favorite','OrderFavorites','Schedule','ServerSchedule','Job','Task','Subscription','DataAlert',
+    [Parameter(Mandatory)][ValidateSet('Auth','Site','Session','Domain','Setting','ServerSetting',
+        'Project','User','Group','Workbook','Datasource','View','Flow','FileUpload',
+        'Recommendation','CustomView','Favorite','OrderFavorite',
+        'Schedule','ServerSchedule','Job','Task','Subscription','DataAlert',
         'Database','Table','GraphQL')][string] $Endpoint,
     [Parameter()][string] $Param
 )
-    $Uri = "$script:TSServerUrl/api/$script:TSRestApiVersion/"
+    $uri = "$script:TSServerUrl/api/$script:TSRestApiVersion/"
     switch ($Endpoint) {
         'Auth' {
-            $Uri += "auth/$Param"
+            $uri += "auth/$Param"
         }
         'Site' {
-            $Uri += "sites"
-            if ($Param) { $Uri += "/$Param" }
+            $uri += "sites"
+            if ($Param) { $uri += "/$Param" }
         }
         'Session' {
-            $Uri += "sessions"
-            if ($Param) { $Uri += "/$Param" }
+            $uri += "sessions"
+            if ($Param) { $uri += "/$Param" }
         }
         'ServerSchedule' {
-            $Uri += "schedules"
-            if ($Param) { $Uri += "/$Param" }
+            $uri += "schedules"
+            if ($Param) { $uri += "/$Param" }
         }
-        'FileUpload' {
-            $Uri += "sites/$script:TSSiteId/fileUploads"
-            if ($Param) { $Uri += "/$Param" }
-        }
-        'OrderFavorites' {
-            $Uri += "sites/$script:TSSiteId/orderFavorites"
-            if ($Param) { $Uri += "/$Param" }
-        }
-        'DataAlert' {
-            $Uri += "sites/$script:TSSiteId/dataAlerts"
-            if ($Param) { $Uri += "/$Param" }
+        'ServerSetting' {
+            $uri += "settings"
+            if ($Param) { $uri += "/$Param" }
         }
         'GraphQL' {
-            $Uri = "$script:TSServerUrl/api/metadata/graphql"
+            $uri = "$script:TSServerUrl/api/metadata/graphql"
         }
         default {
-            $Uri += "sites/$script:TSSiteId/" + $Endpoint.ToLower() + "s" # User -> users, etc.
-            if ($Param) { $Uri += "/$Param" }
+            $uri += "sites/$script:TSSiteId/" + $Endpoint.ToLower() + "s" # User -> users, etc.
+            if ($Param) { $uri += "/$Param" }
         }
     }
-    return $Uri
+    return $uri
 }
 
 function Add-TSCredentialsElement {
@@ -586,6 +580,73 @@ Param(
     if ($PSCmdlet.ShouldProcess($SessionId)) {
         Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Session -Param $SessionId) -Method Delete
     }
+}
+
+function Get-TSActiveDirectoryDomain {
+<#
+.SYNOPSIS
+List Server Active Directory Domains
+
+.DESCRIPTION
+Returns the details of the Active Directory domains that are in use on the server, including their full domain names, nicknames and IDs.
+If the server is configured to use local authentication, the command returns only the domain name local.
+
+.EXAMPLE
+$domains = Get-TSActiveDirectoryDomain
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_server.htm#list_server_active_directory_domains
+#>
+[OutputType([PSCustomObject])]
+Param()
+    Assert-TSRestApiVersion -AtLeast 3.11
+    $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Domain) -Method Get
+    return $response.tsResponse.domainList.domain
+}
+
+function Update-TSActiveDirectoryDomain {
+<#
+.SYNOPSIS
+Update Server Active Directory Domain
+
+.DESCRIPTION
+Changes the nickname or full domain name of an Active Directory domain on the server.
+This method can only be called by server administrators; it is not available on Tableau Cloud.
+
+.PARAMETER DomainId
+The integer ID of the of the Active Directory domain being updated.
+
+.PARAMETER Name
+A new full domain name you are using to replace the existing one.
+
+.PARAMETER ShortName
+A new domain nickname you are using to replace the existing one.
+
+.EXAMPLE
+$domain = Update-TSActiveDirectoryDomain
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_server.htm#update_server_active_directory_domain
+#>
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $DomainId,
+    [Parameter()][string] $Name,
+    [Parameter()][string] $ShortName
+)
+    Assert-TSRestApiVersion -AtLeast 3.11
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_domain = $tsRequest.AppendChild($xml.CreateElement("domain"))
+    $el_domain.SetAttribute("id", $DomainId)
+    if ($Name) {
+        $el_domain.SetAttribute("name", $Name)
+    }
+    if ($ShortName) {
+        $el_domain.SetAttribute("shortName", $ShortName)
+    }
+    $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Domain) -Method Put -Body $xml.OuterXml
+    return $response.tsResponse.domain
 }
 
 ### Site methods
@@ -7811,7 +7872,7 @@ Param(
     $el_fo.SetAttribute("favoriteIdMoveAfter", $AfterFavoriteId)
     $el_fo.SetAttribute("favoriteTypeMoveAfter", $AfterFavoriteType.ToLower()) # note: needs to be lowercase, otherwise TS will return error 400
     if ($PSCmdlet.ShouldProcess("user:$UserId, favorite($FavoriteType):$FavoriteId, after($AfterFavoriteType):$AfterFavoriteId")) {
-        Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint OrderFavorites -Param $UserId) -Body $xml.OuterXml -Method Put
+        Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint OrderFavorite -Param $UserId) -Body $xml.OuterXml -Method Put
     }
 }
 
@@ -8322,6 +8383,153 @@ Param(
     if ($PSCmdlet.ShouldProcess($SubscriptionId)) {
         Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Subscription -Param $SubscriptionId) -Method Delete
     }
+}
+
+### Tableau Extensions Settings Methods
+function Get-TSExtensionSettingsServer {
+<#
+.SYNOPSIS
+List Tableau extensions server settings
+
+.DESCRIPTION
+Lists the settings for extensions of a server.
+This method can only be called by server administrators; it is not available on Tableau Cloud.
+
+.EXAMPLE
+$settings = Get-TSExtensionSettingsServer
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_tableau_extensions_settings.htm#list_tableau_extensions_server_settings
+#>
+[OutputType([PSCustomObject])]
+Param()
+    Assert-TSRestApiVersion -AtLeast 3.21
+    $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint ServerSetting -Param extensions) -Method Get
+    return $response.tsResponse.extensionsServerSettings
+}
+
+function Update-TSExtensionSettingsServer {
+<#
+.SYNOPSIS
+Update Tableau extensions server settings
+
+.DESCRIPTION
+Updates the settings for extensions of a server.
+This method can only be called by server administrators; it is not available on Tableau Cloud.
+
+.PARAMETER Enabled
+True/false. True: extensions are allowed to run on the server. False: all extendions are disabled on the server.
+
+.PARAMETER BlockList
+(Optional) List of domains that are not allowed to serve extensions to the Tableau Server. Domains are in the form of https://blocked_example.com
+
+.EXAMPLE
+$settings = Update-TSExtensionSettingsServer -Enabled true -BlockList 'https://test.com'
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_tableau_extensions_settings.htm#update_tableau_extensions_server_settings
+#>
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][ValidateSet('true','false')][string] $Enabled,
+    [Parameter()][string[]] $BlockList
+)
+    Assert-TSRestApiVersion -AtLeast 3.21
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_settings = $tsRequest.AppendChild($xml.CreateElement("extensionsServerSettings"))
+    $el_enabled = $el_settings.AppendChild($xml.CreateElement("extensionsGloballyEnabled"))
+    $el_enabled.InnerText = $Enabled
+    if ($BlockList) {
+        foreach ($blockext in $BlockList) {
+            $el_block = $el_settings.AppendChild($xml.CreateElement("blockList"))
+            $el_block.InnerText = $blockext
+        }
+    }
+    $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint ServerSetting -Param extensions) -Method Put -Body $xml.OuterXml
+    return $response.tsResponse.extensionsServerSettings
+}
+
+function Get-TSExtensionSettingsSite {
+<#
+.SYNOPSIS
+List Tableau extensions site settings
+
+.DESCRIPTION
+Lists the settings for extensions of a site.
+This method can only be called by site or server administrators.
+
+.EXAMPLE
+$settings = Get-TSExtensionSettingsSite
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_tableau_extensions_settings.htm#list_tableau_extensions_site_settings
+#>
+[OutputType([PSCustomObject])]
+Param()
+    Assert-TSRestApiVersion -AtLeast 3.21
+    $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Setting -Param extensions) -Method Get
+    return $response.tsResponse.extensionsSiteSettings
+}
+
+function Update-TSExtensionSettingsSite {
+<#
+.SYNOPSIS
+Update Tableau extensions site settings
+
+.DESCRIPTION
+Updates the settings for extensions of a site.
+This method can only be called by site or server administrators.
+
+.PARAMETER Enabled
+True/false. True: extensions are allowed to run on the site. False: no extensions are allowed to run on the site even if their URL is in the site safelist.
+
+.PARAMETER UseDefaultSetting
+(Optional) True/false. If extensions are enabled on the server, the default settings allow extensions to run on a site,
+provided the extension is not specifically blocked on the server.
+
+.PARAMETER SafeList
+(Optional) List of URLs of the extensions that are allowed to run on the site and their properties (full data access, prompt to run).
+An extension permissions to run an a site are also dependent on the domain of the URL not being present on the server blocklist,
+and server and site extension enablement being true.
+Note that updating the safelist replaces the existing list with the new list.
+If you want to add a URL to the existing list, you must also include the existing URLs in the new list.
+
+.EXAMPLE
+$settings = Update-TSExtensionSettingsSite -Enabled true -SafeList @{url='https://test.com';fullDataAllowed='true';promptNeeded='true'}
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_tableau_extensions_settings.htm#update_tableau_extensions_site_settings
+#>
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][ValidateSet('true','false')][string] $Enabled,
+    [Parameter()][ValidateSet('true','false')][string] $UseDefaultSetting,
+    [Parameter()][hashtable[]] $SafeList
+)
+    Assert-TSRestApiVersion -AtLeast 3.21
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_settings = $tsRequest.AppendChild($xml.CreateElement("extensionsSiteSettings"))
+    $el_enabled = $el_settings.AppendChild($xml.CreateElement("extensionsEnabled"))
+    $el_enabled.InnerText = $Enabled
+    if ($UseDefaultSetting) {
+        $el_default = $el_settings.AppendChild($xml.CreateElement("useDefaultSetting"))
+        $el_default.InnerText = $UseDefaultSetting
+    }
+    if ($SafeList) {
+        foreach ($safeext in $SafeList) {
+            $el_safe = $el_settings.AppendChild($xml.CreateElement("safeList"))
+            $el_url = $el_safe.AppendChild($xml.CreateElement("url"))
+            $el_url.InnerText = $safeext.url
+            $el_fulldata = $el_safe.AppendChild($xml.CreateElement("fullDataAllowed"))
+            $el_fulldata.InnerText = $safeext.fullDataAllowed
+            $el_prompt = $el_safe.AppendChild($xml.CreateElement("promptNeeded"))
+            $el_prompt.InnerText = $safeext.promptNeeded
+        }
+    }
+    $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Setting -Param extensions) -Method Put -Body $xml.OuterXml
+    return $response.tsResponse.extensionsSiteSettings
 }
 
 ### Notifications methods

@@ -86,6 +86,69 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             }
             Close-TSSignOut
         }
+        Context "Server operations" -Tag Server {
+            It "Get server info on <ConfigFile.server>" {
+                $serverInfo = Get-TSServerInfo
+                $serverInfo.productVersion | Should -Not -BeNullOrEmpty
+                $serverInfo.restApiVersion | Should -Not -BeNullOrEmpty
+            }
+            It "Get current session on <ConfigFile.server>" {
+                $session = Get-TSCurrentSession
+                $session | Should -Not -BeNullOrEmpty
+                $session.site | Should -Not -BeNullOrEmpty
+                $session.user | Should -Not -BeNullOrEmpty
+            }
+            It "List AD Domains on <ConfigFile.server>" {
+                if ($ConfigFile.server_admin) {
+                    $domains = Get-TSActiveDirectoryDomain
+                    $domains.id | Should -BeOfType String
+                } else {
+                    Set-ItResult -Skipped -Because "Server admin privileges required"
+                }
+            }
+        }
+        Context "Tableau extensions operations" -Tag Extension {
+            It "Get Tableau extensions setting (server) on <ConfigFile.server>" {
+                if ($ConfigFile.server_admin) {
+                    $settings = Get-TSExtensionSettingsServer
+                    $settings.extensionsGloballyEnabled | Should -BeOfType String
+                    $script:ServerExtensionsGloballyEnabled = $settings.extensionsGloballyEnabled
+                } else {
+                    Set-ItResult -Skipped -Because "Server admin privileges required"
+                }
+            }
+            It "Update Tableau extensions setting (server) on <ConfigFile.server>" {
+                if ($ConfigFile.server_admin -and $script:ServerExtensionsGloballyEnabled) {
+                    $settings = Update-TSExtensionSettingsServer -Enabled true -BlockList 'https://test123.com'
+                    $settings.extensionsGloballyEnabled | Should -Be true
+                    $settings = Update-TSExtensionSettingsServer -Enabled $script:ServerExtensionsGloballyEnabled
+                } else {
+                    Set-ItResult -Skipped -Because "Server admin privileges required"
+                }
+            }
+            It "Get Tableau extensions setting (site) on <ConfigFile.server>" {
+                $settings = Get-TSExtensionSettingsSite
+                $settings.extensionsEnabled | Should -BeOfType String
+                $settings.useDefaultSetting | Should -BeOfType String
+                $script:SiteExtensionsEnabled = $settings.extensionsEnabled
+                $script:SiteUseDefaultSetting = $settings.useDefaultSetting
+                $script:SiteSafeList = @()
+                foreach ($safeext in $settings.safeList) {
+                    $ht = @{}
+                    $safeext.ChildNodes | ForEach-Object { $ht[$_.Name] = $_.InnerText }
+                    $script:SiteSafeList += $ht
+                }
+            }
+            It "Update Tableau extensions setting (site) on <ConfigFile.server>" {
+                if ($script:SiteExtensionsEnabled) {
+                    $settings = Update-TSExtensionSettingsSite -Enabled true -SafeList @{url='https://tableau.com';fullDataAllowed='false';promptNeeded='true'}
+                    $settings.extensionsEnabled | Should -Be true
+                    $settings = Update-TSExtensionSettingsSite -Enabled $script:SiteExtensionsEnabled -UseDefaultSetting $script:SiteUseDefaultSetting -SafeList $script:SiteSafeList
+                } else {
+                    Set-ItResult -Skipped -Because "Site extension settings were not saved in the previous test"
+                }
+            }
+        }
         Context "Site operations" -Tag Site {
             It "Create new site on <ConfigFile.server>" {
                 if ($ConfigFile.server_admin -and $ConfigFile.test_site_name) {
@@ -851,14 +914,30 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 It "Publish workbook with invalid contents on <ConfigFile.server>" {
                     {Publish-TSWorkbook -Name "invalid" -InFile "Tests/Assets/Misc/invalid.twbx" -ProjectId $samplesProjectId} | Should -Throw
                 }
+                It "Publish TWB workbook with embed credentials on <ConfigFile.server>" -Tag WorkbookP {
+                    # this request/test is done first to unsuspend the database (free SQL tier, suspended after 1h of inactivity)
+                    $securePw = Test-GetSecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
+                    $credentials = @{username="sqladmin"; password=$securePw; embed="true" }
+                    try {
+                        $workbook = Publish-TSWorkbook -Name "AW Customer Address" -InFile "Tests/Assets/Misc/AW_Customer_Address.twb" -ProjectId $samplesProjectId -Credentials $credentials
+                        $workbook | Should -Not -BeNullOrEmpty
+                        $view = Get-TSView -Filter "workbookName:eq:AW Customer Address","projectName:eq:$samplesProjectName" | Select-Object -First 1
+                        $view | Should -Not -BeNullOrEmpty
+                        Export-TSViewToFormat -ViewId $view.id -Format image -OutFile "Tests/Output/Sheet1.png"
+                    } catch [Microsoft.PowerShell.Commands.WriteErrorException] {
+                        # Write-Verbose $_.Exception.Message
+                        Write-Verbose "The workbook couldn't be published, but the SQL database is now starting for other tests."
+                    }
+                }
                 It "Publish workbook without embed credentials on <ConfigFile.server>" -Tag WorkbookP {
-                    $workbook = Publish-TSWorkbook -Name "AW Customer Address 0" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId
+                    $workbook = Publish-TSWorkbook -Name "AW Customer Address 1" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId
                     $workbook | Should -Not -BeNullOrEmpty
+                    # Remove-TSWorkbook -WorkbookId $workbook.id
                 }
                 It "Publish workbook with embed credentials on <ConfigFile.server>" -Tag WorkbookP {
                     $securePw = Test-GetSecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
                     $credentials = @{username="sqladmin"; password=$securePw; embed="true" }
-                    $workbook = Publish-TSWorkbook -Name "AW Customer Address 1" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -Credentials $credentials
+                    $workbook = Publish-TSWorkbook -Name "AW Customer Address 2" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -Credentials $credentials
                     $workbook | Should -Not -BeNullOrEmpty
                     Write-Verbose "Queueing extract refresh job"
                     $job = Update-TSWorkbookNow -WorkbookId $workbook.id
@@ -881,7 +960,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 It "Publish workbook with connections on <ConfigFile.server>" -Tag WorkbookP {
                     $securePw = Test-GetSecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
                     $connections = @( @{serverAddress="asl-tableau-testsql.database.windows.net"; serverPort="3389"; credentials=@{username="sqladmin"; password=$securePw; embed="true" }} )
-                    $workbook = Publish-TSWorkbook -Name "AW Customer Address 2" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -Connections $connections
+                    $workbook = Publish-TSWorkbook -Name "AW Customer Address 3" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -Connections $connections
                     $workbook | Should -Not -BeNullOrEmpty
                     Write-Verbose "Queueing extract refresh job"
                     $job = Update-TSWorkbookNow -WorkbookId $workbook.id
@@ -902,7 +981,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     # Remove-TSWorkbook -WorkbookId $workbook.id
                 }
                 It "Publish workbook as background job on <ConfigFile.server>" -Tag WorkbookP {
-                    $job = Publish-TSWorkbook -Name "AW Customer Address 3" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -BackgroundTask
+                    $job = Publish-TSWorkbook -Name "AW Customer Address 4" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -BackgroundTask
                     $job | Should -Not -BeNullOrEmpty
                     $jobFinished = Wait-TSJob -JobId $job.id -Timeout 60
                     Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobFinished.completedAt, $jobFinished.finishCode)
