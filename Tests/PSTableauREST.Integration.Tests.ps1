@@ -1,6 +1,6 @@
 BeforeAll {
     # Requires -Modules Assert
-    Import-Module Assert
+    # Import-Module Assert
     Import-Module ./PSTableauREST -Force
     . ./Tests/Test.Functions.ps1
     # InModuleScope 'PSTableauREST' { $script:VerbosePreference = 'Continue' } # display verbose output of module functions
@@ -257,6 +257,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             }
             It "Query projects with options on <ConfigFile.server>" {
                 $projectName = Get-TableauProject | Where-Object id -eq $testProjectId | Select-Object -First 1 -ExpandProperty name
+                $projectName | Should -Not -BeNullOrEmpty
                 $projects = Get-TableauProject -Filter "name:eq:$projectName" -Sort name:asc -Fields id,name,description
                 ($projects | Measure-Object).Count | Should -Be 1
                 ($projects | Get-Member -MemberType Property | Measure-Object).Count | Should -Be 3
@@ -267,21 +268,35 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 $script:testProjectId = $null
             }
             It "Create/update new project with samples on <ConfigFile.server>" {
-                if ($ConfigFile.test_username) {
-                    $userName = $ConfigFile.test_username
-                } else {
-                    $userName = New-Guid
-                }
-                $user = New-TableauUser -Name $userName -SiteRole Explorer
-                $user.id | Should -BeOfType String
                 $projectNameSamples = New-Guid
-                $project = New-TableauProject -Name $projectNameSamples -OwnerId (Get-TableauCurrentUserId) #$user.id
-                # Note: testing with a different OwnerId doesn't work with Dev Sandbox on Tableau Cloud
+                $project = New-TableauProject -Name $projectNameSamples
                 $project.id | Should -BeOfType String
                 $script:testProjectId = $project.id
-                $project = Set-TableauProject -ProjectId $testProjectId -Name $projectNameSamples -PublishSamples -OwnerId (Get-TableauCurrentUserId)
+                $project = Set-TableauProject -ProjectId $testProjectId -Name $projectNameSamples -PublishSamples
                 $project.id | Should -BeOfType String
-                Remove-TableauUser -UserId $user.id
+            }
+            It "Create project with different owner on <ConfigFile.server>" {
+                if (-Not $Config.tableau_cloud -and (Get-TableauRestVersion) -ge [version]3.21) {
+                    $userName = New-Guid
+                    try {
+                        $user = New-TableauUser -Name $userName -SiteRole Unlicensed
+                        $user.id | Should -BeOfType String
+                        $projectNameSamples = New-Guid
+                        # (Get-TableauRestVersion) -ge [version]3.21
+                        $project = New-TableauProject -Name $projectNameSamples -OwnerId ($user.id)
+                        $project.owner.id | Should -Be $user.id
+                        # Note: testing with a different OwnerId doesn't work with Dev Sandbox on Tableau Cloud
+                        $project = Set-TableauProject -ProjectId $project.id -OwnerId (Get-TableauCurrentUserId)
+                        $project.owner.id | Should -Be (Get-TableauCurrentUserId)
+                    } finally {
+                        if ($user) {
+                            Remove-TableauUser -UserId $user.id
+                        }
+                        if ($project) {
+                            Remove-TableauProject -ProjectId $project.id
+                        }
+                    }
+                }
             }
             It "Initial project permissions & default permissions on <ConfigFile.server>" {
                 $defaultProject = Get-TableauDefaultProject
@@ -487,14 +502,16 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
         }
         Context "User operations" -Tag User {
             It "Add new user on <ConfigFile.server>" {
-                if ($ConfigFile.test_username) {
-                    $userName = $ConfigFile.test_username
-                } else {
-                    $userName = New-Guid
+                if (-Not $script:testUserId) {
+                    if ($ConfigFile.test_username) {
+                        $userName = $ConfigFile.test_username
+                    } else {
+                        $userName = New-Guid
+                    }
+                    $user = New-TableauUser -Name $userName -SiteRole Unlicensed
+                    $user.id | Should -BeOfType String
+                    $script:testUserId = $user.id
                 }
-                $user = New-TableauUser -Name $userName -SiteRole Unlicensed
-                $user.id | Should -BeOfType String
-                $script:testUserId = $user.id
             }
             It "Update user <testUserId> on <ConfigFile.server>" {
                 $user = Set-TableauUser -UserId $script:testUserId -SiteRole Viewer
@@ -608,14 +625,16 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
         }
         Context "User/Group operations" -Tag UserGroup {
             It "Add new user/group on <ConfigFile.server>" {
-                if ($ConfigFile.test_username) {
-                    $userName = $ConfigFile.test_username
-                } else {
-                    $userName = New-Guid
+                if (-Not $script:testUserId) {
+                    if ($ConfigFile.test_username) {
+                        $userName = $ConfigFile.test_username
+                    } else {
+                        $userName = New-Guid
+                    }
+                    $user = New-TableauUser -Name $userName -SiteRole Unlicensed -AuthSetting "ServerDefault"
+                    $user.id | Should -BeOfType String
+                    $script:testUserId = $user.id
                 }
-                $user = New-TableauUser -Name $userName -SiteRole Unlicensed -AuthSetting "ServerDefault"
-                $user.id | Should -BeOfType String
-                $script:testUserId = $user.id
                 $groupName = New-Guid
                 $group = New-TableauGroup -Name $groupName -MinimumSiteRole Viewer -GrantLicenseMode onLogin
                 $group.id | Should -BeOfType String
