@@ -1,10 +1,10 @@
 ### Module variables and helper functions
-$TSRestApiVersion = [version] 2.4 # selected REST API version, initially the minumum supported version
-$TSRestApiMinVersion = [version] 2.4 # supported version for initial sign-in calls
-$TSRestApiFileSizeLimit = 64*1048576 # 64MB is the maximum file size for single publishing request
-$TSRestApiChunkSize = 2*1048576 # 2MB (or change for example to 5MB, 10MB, 50MB)
+$TableauRestVersion = [version] 2.4 # selected REST API version, initially the minumum supported version
+$TableauRestMinVersion = [version] 2.4 # supported version for initial sign-in calls
+$TableauRestFileSizeLimit = 64*1048576 # 64MB is the maximum file size for single publishing request
+$TableauRestChunkSize = 2*1048576 # 2MB (or change for example to 5MB, 10MB, 50MB)
 
-function Invoke-TSRestApiMethod {
+function Invoke-TableauRestMethod {
 <#
 .SYNOPSIS
 Proxy function to call Tableau Server REST API with Invoke-RestMethod
@@ -43,8 +43,8 @@ Param(
             $PSBoundParameters.Remove('NoStandardHeader')
         } else {
             $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-            if ($script:TSAuthToken) {
-                $headers.Add('X-Tableau-Auth', $script:TSAuthToken)
+            if ($script:TableauAuthToken) {
+                $headers.Add('X-Tableau-Auth', $script:TableauAuthToken)
             }
             # ContentType header not needed, already considered via the param to Invoke-RestMethod
             if ($AddHeaders) {
@@ -76,7 +76,7 @@ Param(
     end {}
 }
 
-function Get-TSRequestUri {
+function Get-TableauRequestUri {
 <#
 .SYNOPSIS
 Generates and returns specific Tableau Server REST API call URL
@@ -103,7 +103,7 @@ Param(
         'Database','Table','GraphQL')][string] $Endpoint,
     [Parameter()][string] $Param
 )
-    $uri = "$script:TSServerUrl/api/$script:TSRestApiVersion/"
+    $uri = "$script:TableauServerUrl/api/$script:TableauRestVersion/"
     switch ($Endpoint) {
         'Auth' {
             $uri += "auth/$Param"
@@ -125,17 +125,17 @@ Param(
             if ($Param) { $uri += "/$Param" }
         }
         'GraphQL' {
-            $uri = "$script:TSServerUrl/api/metadata/graphql"
+            $uri = "$script:TableauServerUrl/api/metadata/graphql"
         }
         default {
-            $uri += "sites/$script:TSSiteId/" + $Endpoint.ToLower() + "s" # User -> users, etc.
+            $uri += "sites/$script:TableauSiteId/" + $Endpoint.ToLower() + "s" # User -> users, etc.
             if ($Param) { $uri += "/$Param" }
         }
     }
     return $uri
 }
 
-function Add-TSCredentialsElement {
+function Add-TableauRequestCredentialsElement {
 <#
 .SYNOPSIS
 Helper function for generating XML element connectionCredentials
@@ -168,7 +168,7 @@ Param(
     }
 }
 
-function Add-TSConnectionsElement {
+function Add-TableauRequestConnectionsElement {
 <#
 .SYNOPSIS
 Helper function for generating XML element connections
@@ -195,9 +195,9 @@ Param(
             $el_connection.SetAttribute("serverPort", $connection["serverPort"])
         }
         if ($connection["credentials"] -and ($connection["credentials"] -is [hashtable])) {
-            Add-TSCredentialsElement -Element $el_connection -Credentials $connection["credentials"]
+            Add-TableauRequestCredentialsElement -Element $el_connection -Credentials $connection["credentials"]
         } elseif ($connection["username"] -and $connection["password"] -and $connection["embed"]) {
-            Add-TSCredentialsElement -Element $el_connection -Credentials @{
+            Add-TableauRequestCredentialsElement -Element $el_connection -Credentials @{
                 username = $connection["username"]
                 password = $connection["password"]
                 embed = $connection["embed"]
@@ -207,7 +207,7 @@ Param(
 }
 
 ### API version methods
-function Assert-TSRestApiVersion {
+function Assert-TableauRestVersion {
 <#
 .SYNOPSIS
 Assert check for Tableau Server REST API version
@@ -225,7 +225,7 @@ Demands that the REST API version has to be less than this version number.
 This is needed for compatibility when a specific functionality has been decommissioned.
 
 .EXAMPLE
-Assert-TSRestApiVersion -AtLeast 3.16
+Assert-TableauRestVersion -AtLeast 3.16
 
 .NOTES
 Version mapping: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_versions.htm
@@ -236,15 +236,15 @@ Param(
     [Parameter()][version] $AtLeast,
     [Parameter()][version] $LessThan
 )
-    if ($AtLeast -and $script:TSRestApiVersion -lt $AtLeast) {
+    if ($AtLeast -and $script:TableauRestVersion -lt $AtLeast) {
         Write-Error "Method or Parameter not supported, needs API version >= $AtLeast" -Category NotImplemented -ErrorAction Stop
     }
-    if ($LessThan -and $script:TSRestApiVersion -ge $LessThan) {
+    if ($LessThan -and $script:TableauRestVersion -ge $LessThan) {
         Write-Error "Method or Parameter not supported, needs API version < $LessThan" -Category NotImplemented -ErrorAction Stop
     }
 }
 
-function Get-TSRestApiVersion {
+function Get-TableauRestVersion {
 <#
 .SYNOPSIS
 Returns currently selected Tableau Server REST API version
@@ -253,14 +253,14 @@ Returns currently selected Tableau Server REST API version
 Returns currently selected Tableau Server REST API version (stored in module variable).
 
 .EXAMPLE
-$apiVer = Get-TSRestApiVersion
+$apiVer = Get-TableauRestVersion
 #>
 [OutputType([version])]
 Param()
-    return $script:TSRestApiVersion
+    return $script:TableauRestVersion
 }
 
-function Set-TSRestApiVersion {
+function Set-TableauRestVersion {
 <#
 .SYNOPSIS
 Selects Tableau Server REST API version for future calls
@@ -272,7 +272,7 @@ Selects Tableau Server REST API version for future calls (stored in module varia
 The specific API version to switch to.
 
 .EXAMPLE
-Set-TSRestApiVersion -ApiVersion 3.20
+Set-TableauRestVersion -ApiVersion 3.20
 #>
 [CmdletBinding(SupportsShouldProcess)]
 [OutputType()]
@@ -280,12 +280,12 @@ Param(
     [Parameter()][version] $ApiVersion
 )
     if ($PSCmdlet.ShouldProcess($ApiVersion)) {
-        $script:TSRestApiVersion = $ApiVersion
+        $script:TableauRestVersion = $ApiVersion
     }
 }
 
 ### Authentication / Server methods
-function Get-TSServerInfo {
+function Get-TableauServerInfo {
 <#
 .SYNOPSIS
 Retrieves the object with Tableau Server info
@@ -297,7 +297,7 @@ Retrieves the object with Tableau Server info, such as build number, product ver
 Optional parameter with Tableau Server URL. If not provided, the current Server URL (when signed-in) is used.
 
 .EXAMPLE
-$serverInfo = Get-TSServerInfo
+$serverInfo = Get-TableauServerInfo
 
 .NOTES
 This API can be called by anyone, even non-authenticated, so it doesn't require X-Tableau-Auth header.
@@ -309,19 +309,19 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_server.htm
 Param(
     [Parameter()][string] $ServerUrl
 )
-    # Assert-TSRestApiVersion -AtLeast 2.4
+    # Assert-TableauRestVersion -AtLeast 2.4
     if (-Not $ServerUrl) {
-        $ServerUrl = $script:TSServerUrl
+        $ServerUrl = $script:TableauServerUrl
     }
-    $apiVersion = $script:TSRestApiMinVersion
-    if ($script:TSRestApiVersion) {
-        $apiVersion = $script:TSRestApiVersion
+    $apiVersion = $script:TableauRestMinVersion
+    if ($script:TableauRestVersion) {
+        $apiVersion = $script:TableauRestVersion
     }
-    $response = Invoke-TSRestApiMethod -Uri $ServerUrl/api/$apiVersion/serverinfo -Method Get -NoStandardHeader
+    $response = Invoke-TableauRestMethod -Uri $ServerUrl/api/$apiVersion/serverinfo -Method Get -NoStandardHeader
     return $response.tsResponse.serverInfo
 }
 
-function Open-TSSignIn {
+function Connect-TableauServer {
 <#
 .SYNOPSIS
 Sign In (using username and password, or using PAT)
@@ -362,10 +362,10 @@ Boolean, if true, sets current REST API version to the latest version supported 
 If false, the minimum supported version 2.4 is retained.
 
 .EXAMPLE
-$credentials = Open-TSSignIn -Server https://tableau.myserver.com -Username $user -SecurePassword $securePw
+$credentials = Connect-TableauServer -Server https://tableau.myserver.com -Username $user -SecurePassword $securePw
 
 .EXAMPLE
-$credentials = Open-TSSignIn -Server https://10ay.online.tableau.com -Site sandboxXXXXXXNNNNNN -PersonalAccessTokenName $pat_name -PersonalAccessTokenSecret $pat_secret
+$credentials = Connect-TableauServer -Server https://10ay.online.tableau.com -Site sandboxXXXXXXNNNNNN -PersonalAccessTokenName $pat_name -PersonalAccessTokenSecret $pat_secret
 
 .NOTES
 This function has to be called prior to other REST API function calls.
@@ -386,16 +386,16 @@ Param(
     [Parameter()][string] $ImpersonateUserId,
     [Parameter()][bool] $UseServerVersion = $true
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
-    $script:TSServerUrl = $ServerUrl
-    $serverInfo = Get-TSServerInfo
+    # Assert-TableauRestVersion -AtLeast 2.0
+    $script:TableauServerUrl = $ServerUrl
+    $serverInfo = Get-TableauServerInfo
     $script:TSProductVersion = $serverInfo.productVersion.InnerText
     $script:TSProductVersionBuild = $serverInfo.productVersion.build
     # $serverInfo.prepConductorVersion
     if ($UseServerVersion) {
-        $script:TSRestApiVersion = [version]$serverInfo.restApiVersion
+        $script:TableauRestVersion = [version]$serverInfo.restApiVersion
     } else {
-        $script:TSRestApiVersion = [version]$script:TSRestApiMinVersion
+        $script:TableauRestVersion = [version]$script:TableauRestMinVersion
     }
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -410,24 +410,24 @@ Param(
         $private:PlainPassword = (New-Object System.Net.NetworkCredential("", $SecurePassword)).Password
         $el_credentials.SetAttribute("name", $Username)
         $el_credentials.SetAttribute("password", $private:PlainPassword)
-        # if ($ImpersonateUserId) { Assert-TSRestApiVersion -AtLeast 2.0 }
+        # if ($ImpersonateUserId) { Assert-TableauRestVersion -AtLeast 2.0 }
     } elseif ($PersonalAccessTokenName -and $PersonalAccessTokenSecret) {
-        Assert-TSRestApiVersion -AtLeast 3.6
+        Assert-TableauRestVersion -AtLeast 3.6
         $private:PlainSecret = (New-Object System.Net.NetworkCredential("", $PersonalAccessTokenSecret)).Password
         $el_credentials.SetAttribute("personalAccessTokenName", $PersonalAccessTokenName)
         $el_credentials.SetAttribute("personalAccessTokenSecret", $private:PlainSecret)
-        if ($ImpersonateUserId) { Assert-TSRestApiVersion -AtLeast 3.11 }
+        if ($ImpersonateUserId) { Assert-TableauRestVersion -AtLeast 3.11 }
     } else {
         Write-Error "Sign-in parameters not provided (needs either username/password or PAT)" -Category InvalidArgument -ErrorAction Stop
     }
-    $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Auth -Param signin) -Body $xml.OuterXml -Method Post -NoStandardHeader
-    $script:TSAuthToken = $response.tsResponse.credentials.token
-    $script:TSSiteId = $response.tsResponse.credentials.site.id
-    $script:TSUserId = $response.tsResponse.credentials.user.id
+    $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Auth -Param signin) -Body $xml.OuterXml -Method Post -NoStandardHeader
+    $script:TableauAuthToken = $response.tsResponse.credentials.token
+    $script:TableauSiteId = $response.tsResponse.credentials.site.id
+    $script:TableauUserId = $response.tsResponse.credentials.user.id
     return $response.tsResponse.credentials
 }
 
-function Switch-TSSite {
+function Switch-TableauSite {
 <#
 .SYNOPSIS
 Switch Site
@@ -440,7 +440,7 @@ The permanent name of the site to sign in to (aka content URL). E.g. mySite is t
 http://<server or cloud URL>/#/site/mySite/explore
 
 .EXAMPLE
-$credentials = Switch-TSSite -Site 'mySite'
+$credentials = Switch-TableauSite -Site 'mySite'
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_authentication.htm#switch_site
@@ -449,50 +449,50 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_authentica
 Param(
     [Parameter()][string] $Site = ''
 )
-    Assert-TSRestApiVersion -AtLeast 2.6
+    Assert-TableauRestVersion -AtLeast 2.6
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_site = $tsRequest.AppendChild($xml.CreateElement("site"))
     $el_site.SetAttribute("contentUrl", $Site)
-    $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Auth -Param switchSite) -Body $xml.OuterXml -Method Post
-    $script:TSAuthToken = $response.tsResponse.credentials.token
-    $script:TSSiteId = $response.tsResponse.credentials.site.id
-    $script:TSUserId = $response.tsResponse.credentials.user.id
+    $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Auth -Param switchSite) -Body $xml.OuterXml -Method Post
+    $script:TableauAuthToken = $response.tsResponse.credentials.token
+    $script:TableauSiteId = $response.tsResponse.credentials.site.id
+    $script:TableauUserId = $response.tsResponse.credentials.user.id
     return $response.tsResponse.credentials
 }
 
-function Close-TSSignOut {
+function Disconnect-TableauServer {
 <#
 .SYNOPSIS
 Sign Out
 
 .DESCRIPTION
-Signs you out of the current session. This call invalidates the authentication token that is created by a call to Open-TSSignIn.
+Signs you out of the current session. This call invalidates the authentication token that is created by a call to Connect-TableauServer.
 
 .EXAMPLE
-Close-TSSignOut
+Disconnect-TableauServer
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_authentication.htm#sign_out
 #>
 [OutputType([PSCustomObject])]
 Param()
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     $response = $null
-    if ($null -ne $script:TSServerUrl -and $null -ne $script:TSAuthToken) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Auth -Param signout) -Method Post
-        $script:TSServerUrl = $null
-        $script:TSAuthToken = $null
-        $script:TSSiteId = $null
-        $script:TSUserId = $null
-        $script:TSRestApiVersion = $script:TSRestApiMinVersion # reset to minimum supported version
+    if ($null -ne $script:TableauServerUrl -and $null -ne $script:TableauAuthToken) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Auth -Param signout) -Method Post
+        $script:TableauServerUrl = $null
+        $script:TableauAuthToken = $null
+        $script:TableauSiteId = $null
+        $script:TableauUserId = $null
+        $script:TableauRestVersion = $script:TableauRestMinVersion # reset to minimum supported version
     } else {
         Write-Warning "Currently not signed in."
     }
     return $response
 }
 
-function Revoke-TSServerAdminPAT {
+function Revoke-TableauServerAdminPAT {
 <#
 .SYNOPSIS
 Revoke Administrator Personal Access Tokens
@@ -502,7 +502,7 @@ Revokes all personal access tokens created by server administrators.
 This method is not available for Tableau Cloud.
 
 .EXAMPLE
-$response = Revoke-TSServerAdminPAT
+$response = Revoke-TableauServerAdminPAT
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_authentication.htm#revoke_administrator_personal_access_tokens
@@ -510,13 +510,13 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_authentica
 [CmdletBinding(SupportsShouldProcess)]
 [OutputType([PSCustomObject])]
 Param()
-    Assert-TSRestApiVersion -AtLeast 3.10
+    Assert-TableauRestVersion -AtLeast 3.10
     if ($PSCmdlet.ShouldProcess()) {
-        Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Auth -Param serverAdminAccessTokens) -Method Delete
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Auth -Param serverAdminAccessTokens) -Method Delete
     }
 }
 
-function Get-TSCurrentUserId {
+function Get-TableauCurrentUserId {
 <#
 .SYNOPSIS
 Returns the current user ID
@@ -525,14 +525,14 @@ Returns the current user ID
 Returns the user ID of the currently signed in user (stored in an internal module variable)
 
 .EXAMPLE
-$userId = Get-TSCurrentUserId
+$userId = Get-TableauCurrentUserId
 #>
 [OutputType([string])]
 Param()
-    return $script:TSUserId
+    return $script:TableauUserId
 }
 
-function Get-TSCurrentSession {
+function Get-TableauSession {
 <#
 .SYNOPSIS
 Get Current Server Session
@@ -541,19 +541,19 @@ Get Current Server Session
 Returns details of the current session of Tableau Server.
 
 .EXAMPLE
-$session = Get-TSCurrentSession
+$session = Get-TableauSession
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_server.htm#get-current-server-session
 #>
 [OutputType([PSCustomObject])]
 Param()
-    Assert-TSRestApiVersion -AtLeast 3.1
-    $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Session -Param current) -Method Get
+    Assert-TableauRestVersion -AtLeast 3.1
+    $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Session -Param current) -Method Get
     return $response.tsResponse.session
 }
 
-function Remove-TSSession {
+function Remove-TableauSession {
 <#
 .SYNOPSIS
 Delete Server Session
@@ -566,7 +566,7 @@ This method is not available for Tableau Cloud and is typically used in programm
 The session ID to be deleted.
 
 .EXAMPLE
-$response = Remove-TSSession -SessionId $id
+$response = Remove-TableauSession -SessionId $id
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_server.htm#delete_server_session
@@ -576,13 +576,13 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_server.htm
 Param(
     [Parameter(Mandatory)][string] $SessionId
 )
-    Assert-TSRestApiVersion -AtLeast 3.9
+    Assert-TableauRestVersion -AtLeast 3.9
     if ($PSCmdlet.ShouldProcess($SessionId)) {
-        Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Session -Param $SessionId) -Method Delete
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Session -Param $SessionId) -Method Delete
     }
 }
 
-function Get-TSActiveDirectoryDomain {
+function Get-TableauActiveDirectoryDomain {
 <#
 .SYNOPSIS
 List Server Active Directory Domains
@@ -592,19 +592,19 @@ Returns the details of the Active Directory domains that are in use on the serve
 If the server is configured to use local authentication, the command returns only the domain name local.
 
 .EXAMPLE
-$domains = Get-TSActiveDirectoryDomain
+$domains = Get-TableauActiveDirectoryDomain
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_server.htm#list_server_active_directory_domains
 #>
 [OutputType([PSCustomObject])]
 Param()
-    Assert-TSRestApiVersion -AtLeast 3.11
-    $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Domain) -Method Get
+    Assert-TableauRestVersion -AtLeast 3.11
+    $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Domain) -Method Get
     return $response.tsResponse.domainList.domain
 }
 
-function Update-TSActiveDirectoryDomain {
+function Set-TableauActiveDirectoryDomain {
 <#
 .SYNOPSIS
 Update Server Active Directory Domain
@@ -623,18 +623,19 @@ A new full domain name you are using to replace the existing one.
 A new domain nickname you are using to replace the existing one.
 
 .EXAMPLE
-$domain = Update-TSActiveDirectoryDomain
+$domain = Set-TableauActiveDirectoryDomain
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_server.htm#update_server_active_directory_domain
 #>
+[CmdletBinding(SupportsShouldProcess)]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $DomainId,
     [Parameter()][string] $Name,
     [Parameter()][string] $ShortName
 )
-    Assert-TSRestApiVersion -AtLeast 3.11
+    Assert-TableauRestVersion -AtLeast 3.11
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_domain = $tsRequest.AppendChild($xml.CreateElement("domain"))
@@ -645,12 +646,14 @@ Param(
     if ($ShortName) {
         $el_domain.SetAttribute("shortName", $ShortName)
     }
-    $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Domain) -Method Put -Body $xml.OuterXml
-    return $response.tsResponse.domain
+    if ($PSCmdlet.ShouldProcess($DomainId)) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Domain) -Method Put -Body $xml.OuterXml
+        return $response.tsResponse.domain
+    }
 }
 
 ### Site methods
-function Get-TSSite {
+function Get-TableauSite {
 <#
 .SYNOPSIS
 Query Site / Query Sites
@@ -672,7 +675,7 @@ Boolean switch, specifies if site usage statistics should be included in the res
 (Optional) Page size when paging through results.
 
 .EXAMPLE
-$site = Get-TSSite -Current
+$site = Get-TableauSite -Current
 
 .NOTES
 Notes on API query options: it's also possible to use ?key=contentUrl to get site, but also works only with current site.
@@ -691,28 +694,28 @@ Param(
     [Parameter(ParameterSetName='CurrentSite')][switch] $IncludeUsageStatistics,
     [Parameter(ParameterSetName='Sites')][ValidateRange(1,100)][int] $PageSize = 100
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     if ($Current) { # get single (current) site
-        $uri = Get-TSRequestUri -Endpoint Site -Param $script:TSSiteId
+        $uri = Get-TableauRequestUri -Endpoint Site -Param $script:TableauSiteId
         if ($IncludeUsageStatistics) {
             $uri += "?includeUsageStatistics=true"
         }
-        $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
+        $response = Invoke-TableauRestMethod -Uri $uri -Method Get
         return $response.tsResponse.site
     } else { # get all sites
         $pageNumber = 0
         do {
             $pageNumber++
-            $uri = Get-TSRequestUri -Endpoint Site
+            $uri = Get-TableauRequestUri -Endpoint Site
             $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-            $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
+            $response = Invoke-TableauRestMethod -Uri $uri -Method Get
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.sites.site
         } until ($PageSize*$pageNumber -ge $totalAvailable)
     }
 }
 
-function Add-TSSite {
+function New-TableauSite {
 <#
 .SYNOPSIS
 Create Site
@@ -743,7 +746,7 @@ Currently supported SiteParams:
 - autoSuspendRefreshEnabled, autoSuspendRefreshInactivityWindow
 
 .EXAMPLE
-$site = Add-TSSite -Name "Test Site" -ContentUrl TestSite -SiteParams @{adminMode='ContentOnly'; revisionLimit=20}
+$site = New-TableauSite -Name "Test Site" -ContentUrl TestSite -SiteParams @{adminMode='ContentOnly'; revisionLimit=20}
 
 .NOTES
 This method can only be called by server administrators.
@@ -759,7 +762,7 @@ Param(
     [Parameter(Mandatory)][string] $ContentUrl,
     [Parameter()][hashtable] $SiteParams
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     if ($SiteParams.Keys -contains 'adminMode' -and $SiteParams.Keys -contains 'userQuota' -and $SiteParams["adminMode"] -eq "ContentOnly") {
         Write-Error "You cannot set admin_mode to ContentOnly and also set a user quota" -Category InvalidArgument -ErrorAction Stop
     }
@@ -772,12 +775,12 @@ Param(
         $el_site.SetAttribute($param, $SiteParams[$param])
     }
     if ($PSCmdlet.ShouldProcess($Name)) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Site) -Body $xml.OuterXml -Method Post
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Site) -Body $xml.OuterXml -Method Post
         return $response.tsResponse.site
     }
 }
 
-function Update-TSSite {
+function Set-TableauSite {
 <#
 .SYNOPSIS
 Update Site
@@ -796,10 +799,10 @@ The new name of the site.
 .PARAMETER SiteParams
 (Optional)
 Hashtable with site options. Please check the linked help page for up-to-date supported options.
-See also Add-TSSite
+See also New-TableauSite
 
 .EXAMPLE
-$site = Update-TSSite -SiteId $siteId -Name "New Site" -SiteParams @{adminMode="ContentAndUsers"; userQuota="1"}
+$site = Set-TableauSite -SiteId $siteId -Name "New Site" -SiteParams @{adminMode="ContentAndUsers"; userQuota="1"}
 
 .NOTES
 You must be signed in to a site in order to update it.
@@ -815,7 +818,7 @@ Param(
     [Parameter()][string] $Name,
     [Parameter()][hashtable] $SiteParams
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     if ($SiteParams.Keys -contains 'adminMode' -and $SiteParams.Keys -contains 'userQuota' -and $SiteParams["adminMode"] -eq "ContentOnly") {
         Write-Error "You cannot set admin_mode to ContentOnly and also set a user quota" -Category InvalidArgument -ErrorAction Stop
     }
@@ -829,8 +832,8 @@ Param(
         $el_site.SetAttribute($param, $SiteParams[$param])
     }
     if ($PSCmdlet.ShouldProcess($SiteId)) {
-        if ($SiteId -eq $script:TSSiteId) {
-            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Site -Param $SiteId) -Body $xml.OuterXml -Method Put
+        if ($SiteId -eq $script:TableauSiteId) {
+            $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Site -Param $SiteId) -Body $xml.OuterXml -Method Put
             return $response.tsResponse.site
         } else {
             Write-Error "You can only update the site for which you are currently authenticated" -Category PermissionDenied -ErrorAction Stop
@@ -838,7 +841,7 @@ Param(
     }
 }
 
-function Remove-TSSite {
+function Remove-TableauSite {
 <#
 .SYNOPSIS
 Delete Site
@@ -853,7 +856,7 @@ The LUID of the site to be deleted. Should be the current site's ID.
 (Introduced in API 3.18) If you set this to true, the process runs asynchronously.
 
 .EXAMPLE
-$response = Remove-TSSite -SiteId $testSiteId
+$response = Remove-TableauSite -SiteId $testSiteId
 
 .NOTES
 You must be signed in to a site in order to update it.
@@ -868,23 +871,23 @@ Param(
     [Parameter(Mandatory)][string] $SiteId,
     [Parameter()][switch] $BackgroundTask
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
-    $uri = Get-TSRequestUri -Endpoint Site -Param $SiteId
+    # Assert-TableauRestVersion -AtLeast 2.0
+    $uri = Get-TableauRequestUri -Endpoint Site -Param $SiteId
     if ($BackgroundTask) {
-        # Assert-TSRestApiVersion -AtLeast 3.18
+        # Assert-TableauRestVersion -AtLeast 3.18
         # no restriction by the Tableau Server implied, don't need to assert API version
         $uri += "?asJob=true"
     }
-    if ($SiteId -eq $script:TSSiteId) {
+    if ($SiteId -eq $script:TableauSiteId) {
         if ($PSCmdlet.ShouldProcess($SiteId)) {
-            Invoke-TSRestApiMethod -Uri $uri -Method Delete
+            Invoke-TableauRestMethod -Uri $uri -Method Delete
         }
     } else {
         Write-Error "You can only remove the site for which you are currently authenticated" -Category PermissionDenied -ErrorAction Stop
     }
 }
 
-function Get-TSRecentlyViewedContent {
+function Get-TableauRecentlyViewedContent {
 <#
 .SYNOPSIS
 Get Recently Viewed for Site
@@ -894,19 +897,19 @@ Gets the details of the views and workbooks on a site that have been most recent
 The 24 most recently viewed items are returned, though it may take some minutes after being viewed for an item to appear in the results.
 
 .EXAMPLE
-$recents = Get-TSRecentlyViewedContent
+$recents = Get-TableauRecentlyViewedContent
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_site.htm#get_recently_viewed
 #>
 [OutputType([PSCustomObject[]])]
 Param()
-    Assert-TSRestApiVersion -AtLeast 3.5
-    $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Site -Param $SiteId/content/recent) -Method Get
+    Assert-TableauRestVersion -AtLeast 3.5
+    $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Site -Param $SiteId/content/recent) -Method Get
     return $response.tsResponse.recents.recent
 }
 
-function Get-TSSettingsForEmbedding {
+function Get-TableauSiteSettingsEmbedding {
 <#
 .SYNOPSIS
 Get Embedding Settings for a Site
@@ -915,19 +918,19 @@ Get Embedding Settings for a Site
 Returns the current embedding settings for the current site.
 
 .EXAMPLE
-$settings = Get-TSSettingsForEmbedding
+$settings = Get-TableauSiteSettingsEmbedding
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_site.htm#embedding_settings_for_site
 #>
 [OutputType([PSCustomObject[]])]
 Param()
-    Assert-TSRestApiVersion -AtLeast 3.16
-    $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Site -Param $SiteId/settings/embedding) -Method Get
+    Assert-TableauRestVersion -AtLeast 3.16
+    $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Site -Param $SiteId/settings/embedding) -Method Get
     return $response.tsResponse.site.settings
 }
 
-function Update-TSSettingsForEmbedding {
+function Set-TableauSiteSettingsEmbedding {
 <#
 .SYNOPSIS
 Update Embedding Settings for Site
@@ -944,7 +947,7 @@ When supplied, Tableau views on this site can be embedded in any domain.
 Use this setting with UnrestrictedEmbedding set to false, to restrict embedding functionality to only certain domains.
 
 .EXAMPLE
-$result = Update-TSSettingsForEmbedding -Unrestricted false -Allow "mydomain.com"
+$result = Set-TableauSiteSettingsEmbedding -Unrestricted false -Allow "mydomain.com"
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_site.htm#update_embedding_settings_for_site
@@ -966,13 +969,13 @@ Param(
         $el_settings.SetAttribute("allowList", $AllowDomains)
     }
     if ($PSCmdlet.ShouldProcess("Unrestricted embedding: $UnrestrictedEmbedding, allow domains: $AllowDomains")) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Site -Param $SiteId/settings/embedding) -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Site -Param $SiteId/settings/embedding) -Method Put
         return $response.tsResponse.site.settings
     }
 }
 
 ### Projects methods
-function Get-TSProject {
+function Get-TableauProject {
 <#
 .SYNOPSIS
 Query Projects
@@ -999,7 +1002,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_field
 (Optional) Page size when paging through results.
 
 .EXAMPLE
-$defaultProject = Get-TSProject -Filter "name:eq:Default","topLevelProject:eq:true"
+$defaultProject = Get-TableauProject -Filter "name:eq:Default","topLevelProject:eq:true"
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_projects.htm#query_projects
@@ -1011,11 +1014,11 @@ Param(
     [Parameter()][string[]] $Fields, # https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_fields.htm#query_projects
     [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     $pageNumber = 0
     do {
         $pageNumber++
-        $uri = Get-TSRequestUri -Endpoint Project
+        $uri = Get-TableauRequestUri -Endpoint Project
         $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
         $uriParam.Add("pageSize", $PageSize)
         $uriParam.Add("pageNumber", $pageNumber)
@@ -1030,13 +1033,13 @@ Param(
         }
         $uriRequest = [System.UriBuilder]$uri
         $uriRequest.Query = $uriParam.ToString()
-        $response = Invoke-TSRestApiMethod -Uri $uriRequest.Uri.OriginalString -Method Get
+        $response = Invoke-TableauRestMethod -Uri $uriRequest.Uri.OriginalString -Method Get
         $totalAvailable = $response.tsResponse.pagination.totalAvailable
         $response.tsResponse.projects.project
     } until ($PageSize*$pageNumber -ge $totalAvailable)
 }
 
-function Add-TSProject {
+function New-TableauProject {
 <#
 .SYNOPSIS
 Create Project
@@ -1061,7 +1064,7 @@ The name for the project.
 If omitted, the project is created at the top level.
 
 .EXAMPLE
-$project = Add-TSProject -Name $projectName
+$project = New-TableauProject -Name $projectName
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_projects.htm#create_project
@@ -1075,7 +1078,7 @@ Param(
     [Parameter()][string] $OwnerId,
     [Parameter()][string] $ParentProjectId
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_project = $tsRequest.AppendChild($xml.CreateElement("project"))
@@ -1090,18 +1093,18 @@ Param(
         $el_project.SetAttribute("parentProjectId", $ParentProjectId)
     }
     if ($OwnerId) {
-        Assert-TSRestApiVersion -AtLeast 3.21
+        Assert-TableauRestVersion -AtLeast 3.21
         $el_owner = $el_project.AppendChild($xml.CreateElement("owner"))
         $el_owner.SetAttribute("id", $OwnerId)
     }
     if ($PSCmdlet.ShouldProcess($Name)) {
-        $uri = Get-TSRequestUri -Endpoint Project
-        $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Post
+        $uri = Get-TableauRequestUri -Endpoint Project
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Post
         $response.tsResponse.project
     }
 }
 
-function Update-TSProject {
+function Set-TableauProject {
 <#
 .SYNOPSIS
 Update Project
@@ -1131,7 +1134,7 @@ The LUID of the project being updated.
 (Optional) Boolean switch value that specifies whether to publish the sample workbooks provided by Tableau to the project when you update the project.
 
 .EXAMPLE
-$project = Update-TSProject -ProjectId $testProjectId -Name $projectNewName -PublishSamples
+$project = Set-TableauProject -ProjectId $testProjectId -Name $projectNewName -PublishSamples
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_projects.htm#update_project
@@ -1147,7 +1150,7 @@ Param(
     [Parameter()][string] $OwnerId,
     [Parameter()][switch] $PublishSamples
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_project = $tsRequest.AppendChild($xml.CreateElement("project"))
@@ -1164,21 +1167,21 @@ Param(
         $el_project.SetAttribute("parentProjectId", $ParentProjectId)
     }
     if ($OwnerId) {
-        Assert-TSRestApiVersion -AtLeast 3.21
+        Assert-TableauRestVersion -AtLeast 3.21
         $el_owner = $el_project.AppendChild($xml.CreateElement("owner"))
         $el_owner.SetAttribute("id", $OwnerId)
     }
-    $uri = Get-TSRequestUri -Endpoint Project -Param $ProjectId
+    $uri = Get-TableauRequestUri -Endpoint Project -Param $ProjectId
     if ($PublishSamples) {
         $uri += "?publishSamples=true"
     }
     if ($PSCmdlet.ShouldProcess($ProjectId)) {
-        $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put
         $response.tsResponse.project
     }
 }
 
-function Remove-TSProject {
+function Remove-TableauProject {
 <#
 .SYNOPSIS
 Delete Project
@@ -1191,7 +1194,7 @@ When a project is deleted, all Tableau assets inside of it are also deleted, inc
 The LUID of the project to delete.
 
 .EXAMPLE
-$response = Remove-TSProject -ProjectId $testProjectId
+$response = Remove-TableauProject -ProjectId $testProjectId
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_projects.htm#delete_project
@@ -1201,13 +1204,13 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_projects.h
 Param(
     [Parameter(Mandatory)][string] $ProjectId
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     if ($PSCmdlet.ShouldProcess($ProjectId)) {
-        Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Project -Param $ProjectId) -Method Delete
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Project -Param $ProjectId) -Method Delete
     }
 }
 
-function Get-TSDefaultProject {
+function Get-TableauDefaultProject {
 <#
 .SYNOPSIS
 Get Default Project
@@ -1216,15 +1219,15 @@ Get Default Project
 Helper function that queries the projects with filter and returns the Default project.
 
 .EXAMPLE
-$defaultProject = Get-TSDefaultProject
+$defaultProject = Get-TableauDefaultProject
 #>
 [OutputType([PSCustomObject[]])]
 Param()
-    Get-TSProject -Filter "name:eq:Default","topLevelProject:eq:true"
+    Get-TableauProject -Filter "name:eq:Default","topLevelProject:eq:true"
 }
 
 ### Users and Groups methods
-function Get-TSUser {
+function Get-TableauUser {
 <#
 .SYNOPSIS
 Query User On Site / Get Users on Site
@@ -1254,7 +1257,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_field
 (Optional, Get Users on Site) Page size when paging through results.
 
 .EXAMPLE
-$user = Get-TSUser -Filter "name:eq:$userName"
+$user = Get-TableauUser -Filter "name:eq:$userName"
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#query_user_on_site
@@ -1270,15 +1273,15 @@ Param(
     [Parameter(ParameterSetName='Users')][string[]] $Fields,
     [Parameter(ParameterSetName='Users')][ValidateRange(1,100)][int] $PageSize = 100
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     if ($UserId) { # Query User On Site
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint User -Param $UserId) -Method Get
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint User -Param $UserId) -Method Get
         $response.tsResponse.user
     } else { # Get Users on Site
         $pageNumber = 0
         do {
             $pageNumber++
-            $uri = Get-TSRequestUri -Endpoint User
+            $uri = Get-TableauRequestUri -Endpoint User
             $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
             $uriParam.Add("pageSize", $PageSize)
             $uriParam.Add("pageNumber", $pageNumber)
@@ -1293,14 +1296,14 @@ Param(
             }
             $uriRequest = [System.UriBuilder]$uri
             $uriRequest.Query = $uriParam.ToString()
-            $response = Invoke-TSRestApiMethod -Uri $uriRequest.Uri.OriginalString -Method Get
+            $response = Invoke-TableauRestMethod -Uri $uriRequest.Uri.OriginalString -Method Get
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.users.user
         } until ($PageSize*$pageNumber -ge $totalAvailable)
     }
 }
 
-function Add-TSUser {
+function New-TableauUser {
 <#
 .SYNOPSIS
 Add User to Site
@@ -1322,7 +1325,7 @@ You can assign the following roles: Creator, Explorer, ExplorerCanPublish, SiteA
 (Optional) The authentication type for the user, e.g. if site-specific SAML is enabled.
 
 .EXAMPLE
-$user = Add-TSUser -Name $userName -SiteRole Viewer
+$user = New-TableauUser -Name $userName -SiteRole Viewer
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#add_user_to_site
@@ -1334,7 +1337,7 @@ Param(
     [Parameter(Mandatory)][ValidateSet('Creator','Explorer','ExplorerCanPublish','SiteAdministratorExplorer','SiteAdministratorCreator','Viewer','Unlicensed')][string] $SiteRole,
     [Parameter()][string] $AuthSetting
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_user = $tsRequest.AppendChild($xml.CreateElement("user"))
@@ -1344,12 +1347,12 @@ Param(
         $el_user.SetAttribute("authSetting", $AuthSetting)
     }
     if ($PSCmdlet.ShouldProcess($Name)) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint User) -Body $xml.OuterXml -Method Post
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint User) -Body $xml.OuterXml -Method Post
         return $response.tsResponse.user
     }
 }
 
-function Update-TSUser {
+function Set-TableauUser {
 <#
 .SYNOPSIS
 Update User
@@ -1376,7 +1379,7 @@ The LUID of the user to update.
 (Optional) The authentication type for the user (e.g. if site-specific SAML is enabled)
 
 .EXAMPLE
-$user = Update-TSUser -UserId $userId -SiteRole Explorer -FullName "John Doe"
+$user = Set-TableauUser -UserId $userId -SiteRole Explorer -FullName "John Doe"
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#update_user
@@ -1391,7 +1394,7 @@ Param(
     [Parameter()][ValidateSet('Creator','Explorer','ExplorerCanPublish','SiteAdministratorExplorer','SiteAdministratorCreator','Viewer','Unlicensed')][string] $SiteRole,
     [Parameter()][string] $AuthSetting
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_user = $tsRequest.AppendChild($xml.CreateElement("user"))
@@ -1412,12 +1415,12 @@ Param(
         $el_user.SetAttribute("authSetting", $AuthSetting)
     }
     if ($PSCmdlet.ShouldProcess($UserId)) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint User -Param $UserId) -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint User -Param $UserId) -Body $xml.OuterXml -Method Put
         return $response.tsResponse.user
     }
 }
 
-function Remove-TSUser {
+function Remove-TableauUser {
 <#
 .SYNOPSIS
 Remove User from Site
@@ -1432,7 +1435,7 @@ The LUID of the user to remove.
 (Optional) The LUID of a user that receives ownership of contents of the user being removed.
 
 .EXAMPLE
-Remove-TSUser -UserId $userId
+Remove-TableauUser -UserId $userId
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#remove_user_from_site
@@ -1443,17 +1446,17 @@ Param(
     [Parameter(Mandatory)][string] $UserId,
     [Parameter()][string] $MapAssetsToUserId
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
-    $uri = Get-TSRequestUri -Endpoint User -Param $UserId
+    # Assert-TableauRestVersion -AtLeast 2.0
+    $uri = Get-TableauRequestUri -Endpoint User -Param $UserId
     if ($MapAssetsToUserId) {
         $uri += "?mapAssetsTo=$MapAssetsToUserId"
     }
     if ($PSCmdlet.ShouldProcess($UserId)) {
-        Invoke-TSRestApiMethod -Uri $uri -Method Delete
+        Invoke-TableauRestMethod -Uri $uri -Method Delete
     }
 }
 
-function Get-TSGroup {
+function Get-TableauGroup {
 <#
 .SYNOPSIS
 Query Groups
@@ -1480,7 +1483,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_field
 (Optional) Page size when paging through results.
 
 .EXAMPLE
-$group = Get-TSGroup -Filter "name:eq:$groupName"
+$group = Get-TableauGroup -Filter "name:eq:$groupName"
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#query_groups
@@ -1492,11 +1495,11 @@ Param(
     [Parameter()][string[]] $Fields,
     [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     $pageNumber = 0
     do {
         $pageNumber++
-        $uri = Get-TSRequestUri -Endpoint Group
+        $uri = Get-TableauRequestUri -Endpoint Group
         $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
         $uriParam.Add("pageSize", $PageSize)
         $uriParam.Add("pageNumber", $pageNumber)
@@ -1511,13 +1514,13 @@ Param(
         }
         $uriRequest = [System.UriBuilder]$uri
         $uriRequest.Query = $uriParam.ToString()
-        $response = Invoke-TSRestApiMethod -Uri $uriRequest.Uri.OriginalString -Method Get
+        $response = Invoke-TableauRestMethod -Uri $uriRequest.Uri.OriginalString -Method Get
         $totalAvailable = $response.tsResponse.pagination.totalAvailable
         $response.tsResponse.groups.group
     } until ($PageSize*$pageNumber -ge $totalAvailable)
 }
 
-function Add-TSGroup {
+function New-TableauGroup {
 <#
 .SYNOPSIS
 Create Group
@@ -1547,7 +1550,7 @@ Tableau Cloud site is licensed with Embedded Analytics(Link opens in a new windo
 (Optional) Boolean switch, if true, the import process runs as an asynchronous process.
 
 .EXAMPLE
-$group = Add-TSGroup -Name $groupName -MinimumSiteRole Viewer -GrantLicenseMode onLogin
+$group = New-TableauGroup -Name $groupName -MinimumSiteRole Viewer -GrantLicenseMode onLogin
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#create_group
@@ -1562,7 +1565,7 @@ Param(
     [Parameter()][switch] $EphemeralUsersEnabled,
     [Parameter()][switch] $BackgroundTask
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_group = $tsRequest.AppendChild($xml.CreateElement("group"))
@@ -1580,16 +1583,16 @@ Param(
             $el_group.SetAttribute("minimumSiteRole", $MinimumSiteRole)
         }
         if ($EphemeralUsersEnabled) {
-            Assert-TSRestApiVersion -AtLeast 3.21
+            Assert-TableauRestVersion -AtLeast 3.21
             $el_group.SetAttribute("ephemeralUsersEnabled", "true")
         }
     }
-    $uri = Get-TSRequestUri -Endpoint Group
+    $uri = Get-TableauRequestUri -Endpoint Group
     if ($BackgroundTask) {
         $uri += "?asJob=true"
     }
     if ($PSCmdlet.ShouldProcess($Name)) {
-        $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Post
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Post
         if ($BackgroundTask) {
             return $response.tsResponse.job
         } else {
@@ -1598,7 +1601,7 @@ Param(
     }
 }
 
-function Update-TSGroup {
+function Set-TableauGroup {
 <#
 .SYNOPSIS
 Update Group
@@ -1631,7 +1634,7 @@ Tableau Cloud site is licensed with Embedded Analytics(Link opens in a new windo
 (Optional) Boolean switch, if true, the import process runs as an asynchronous process.
 
 .EXAMPLE
-$group = Update-TSGroup -GroupId $groupId -Name $groupNewName
+$group = Set-TableauGroup -GroupId $groupId -Name $groupNewName
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#update_group
@@ -1647,7 +1650,7 @@ Param(
     [Parameter()][switch] $EphemeralUsersEnabled,
     [Parameter()][switch] $BackgroundTask
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_group = $tsRequest.AppendChild($xml.CreateElement("group"))
@@ -1665,16 +1668,16 @@ Param(
             $el_group.SetAttribute("minimumSiteRole", $MinimumSiteRole)
         }
         if ($PSBoundParameters.ContainsKey('EphemeralUsersEnabled')) {
-            Assert-TSRestApiVersion -AtLeast 3.21
+            Assert-TableauRestVersion -AtLeast 3.21
             $el_group.SetAttribute("ephemeralUsersEnabled", $EphemeralUsersEnabled)
         }
     }
-    $uri = Get-TSRequestUri -Endpoint Group -Param $GroupId
+    $uri = Get-TableauRequestUri -Endpoint Group -Param $GroupId
     if ($BackgroundTask) {
         $uri += "?asJob=true"
     }
     if ($PSCmdlet.ShouldProcess($GroupId)) {
-        $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put
         if ($BackgroundTask) {
             return $response.tsResponse.job
         } else {
@@ -1683,7 +1686,7 @@ Param(
     }
 }
 
-function Remove-TSGroup {
+function Remove-TableauGroup {
 <#
 .SYNOPSIS
 Delete Group
@@ -1696,7 +1699,7 @@ Deleting a group does not delete the users in group, but users are no longer mem
 The LUID of the group to delete.
 
 .EXAMPLE
-$response = Remove-TSGroup -GroupId $testGroupId
+$response = Remove-TableauGroup -GroupId $testGroupId
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#delete_group
@@ -1706,13 +1709,13 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_
 Param(
     [Parameter(Mandatory)][string] $GroupId
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     if ($PSCmdlet.ShouldProcess($GroupId)) {
-        Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Group -Param $GroupId) -Method Delete
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Group -Param $GroupId) -Method Delete
     }
 }
 
-function Add-TSUserToGroup {
+function Add-TableauUserToGroup {
 <#
 .SYNOPSIS
 Add User to Group
@@ -1727,7 +1730,7 @@ The LUID of the user to add.
 The LUID of the group to add the user to.
 
 .EXAMPLE
-$user = Add-TSUserToGroup -UserId $userId -GroupId $adminGroupId
+$user = Add-TableauUserToGroup -UserId $userId -GroupId $adminGroupId
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#add_user_to_group
@@ -1738,18 +1741,18 @@ Param(
     [Parameter(Mandatory)][string] $UserId,
     [Parameter(Mandatory)][string] $GroupId
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_user = $tsRequest.AppendChild($xml.CreateElement("user"))
     $el_user.SetAttribute("id", $UserId)
     if ($PSCmdlet.ShouldProcess("user:$UserId, group:$GroupId")) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Group -Param $GroupId/users) -Body $xml.OuterXml -Method Post
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Group -Param $GroupId/users) -Body $xml.OuterXml -Method Post
         return $response.tsResponse.user
     }
 }
 
-function Remove-TSUserFromGroup {
+function Remove-TableauUserFromGroup {
 <#
 .SYNOPSIS
 Remove User from Group
@@ -1764,7 +1767,7 @@ The LUID of the user to remove.
 The LUID of the group to remove the user from.
 
 .EXAMPLE
-$response = Remove-TSUserFromGroup -UserId $userId -GroupId $adminGroupId
+$response = Remove-TableauUserFromGroup -UserId $userId -GroupId $adminGroupId
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#remove_user_to_group
@@ -1775,13 +1778,13 @@ Param(
     [Parameter(Mandatory)][string] $UserId,
     [Parameter(Mandatory)][string] $GroupId
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     if ($PSCmdlet.ShouldProcess("user:$UserId, group:$GroupId")) {
-        Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Group -Param $GroupId/users/$UserId) -Method Delete
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Group -Param $GroupId/users/$UserId) -Method Delete
     }
 }
 
-function Get-TSUsersInGroup {
+function Get-TableauUsersInGroup {
 <#
 .SYNOPSIS
 Get Users in Group
@@ -1796,7 +1799,7 @@ The LUID of the group to get the users for.
 (Optional) Page size when paging through results.
 
 .EXAMPLE
-$users = Get-TSUsersInGroup -GroupId $groupId
+$users = Get-TableauUsersInGroup -GroupId $groupId
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#get_users_in_group
@@ -1806,19 +1809,19 @@ Param(
     [Parameter(Mandatory)][string] $GroupId,
     [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     $pageNumber = 0
     do {
         $pageNumber++
-        $uri = Get-TSRequestUri -Endpoint Group -Param $GroupId/users
+        $uri = Get-TableauRequestUri -Endpoint Group -Param $GroupId/users
         $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-        $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
+        $response = Invoke-TableauRestMethod -Uri $uri -Method Get
         $totalAvailable = $response.tsResponse.pagination.totalAvailable
         $response.tsResponse.users.user
     } until ($PageSize*$pageNumber -ge $totalAvailable)
 }
 
-function Get-TSGroupsForUser {
+function Get-TableauGroupsForUser {
 <#
 .SYNOPSIS
 Get Groups for a User
@@ -1833,7 +1836,7 @@ The LUID of the user whose group memberships are listed.
 (Optional) Page size when paging through results.
 
 .EXAMPLE
-$groups = Get-TSGroupsForUser -UserId $selectedUserId
+$groups = Get-TableauGroupsForUser -UserId $selectedUserId
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#get_groups_for_a_user
@@ -1843,19 +1846,19 @@ Param(
     [Parameter(Mandatory)][string] $UserId,
     [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
 )
-    Assert-TSRestApiVersion -AtLeast 3.7
+    Assert-TableauRestVersion -AtLeast 3.7
     $pageNumber = 0
     do {
         $pageNumber++
-        $uri = Get-TSRequestUri -Endpoint User -Param $UserId/groups
+        $uri = Get-TableauRequestUri -Endpoint User -Param $UserId/groups
         $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-        $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
+        $response = Invoke-TableauRestMethod -Uri $uri -Method Get
         $totalAvailable = $response.tsResponse.pagination.totalAvailable
         $response.tsResponse.groups.group
     } until ($PageSize*$pageNumber -ge $totalAvailable)
 }
 
-function Import-TSUsersWithCSV {
+function Import-TableauUsersCsv {
 <#
 .SYNOPSIS
 Import Users to Site from CSV file
@@ -1876,7 +1879,7 @@ The setting should be one of the values: ServerDefault, SAML, OpenID, TableauIDW
 The hashtable array with user names (key) and their individual auth setting (value).
 
 .EXAMPLE
-Import-TSUsersWithCSV -CsvFile users_to_add.csv
+Import-TableauUsersCsv -CsvFile users_to_add.csv
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#import_users_to_site_from_csv
@@ -1893,7 +1896,7 @@ Param(
     [string] $AuthSetting,
     [Parameter(Mandatory,ParameterSetName='UserAuthSettings')][hashtable] $UserAuthSettings
 )
-    Assert-TSRestApiVersion -AtLeast 3.15
+    Assert-TableauRestVersion -AtLeast 3.15
     $fileItem = Get-Item -LiteralPath $CsvFile
     $fileName = $fileItem.Name -replace '["`]','' # remove special chars
     $xml = New-Object System.Xml.XmlDocument
@@ -1925,14 +1928,14 @@ Param(
     $multipartContent = $bodyLines -join "`r`n"
     Write-Debug $multipartContent
 
-    $uri = Get-TSRequestUri -Endpoint User -Param import
+    $uri = Get-TableauRequestUri -Endpoint User -Param import
     if ($PSCmdlet.ShouldProcess("import users using file $fileName")) {
-        $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post -ContentType "multipart/mixed; boundary=$boundaryString"
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $multipartContent -Method Post -ContentType "multipart/mixed; boundary=$boundaryString"
         return $response.tsResponse.job
     }
 }
 
-function Remove-TSUsersWithCSV {
+function Remove-TableauUsersCsv {
 <#
 .SYNOPSIS
 Delete Users from Site with CSV file
@@ -1946,7 +1949,7 @@ The .csv file should comply with the rules described in the CSV import file guid
 https://help.tableau.com/current/server/en-us/csvguidelines.htm
 
 .EXAMPLE
-Remove-TSUsersWithCSV -CsvFile users_to_remove.csv
+Remove-TableauUsersCsv -CsvFile users_to_remove.csv
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#delete_users_from_site_with_csv
@@ -1956,7 +1959,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_
 Param(
     [Parameter(Mandatory)][string] $CsvFile
 )
-    Assert-TSRestApiVersion -AtLeast 3.15
+    Assert-TableauRestVersion -AtLeast 3.15
     $fileItem = Get-Item -LiteralPath $CsvFile
     $fileName = $fileItem.Name -replace '["`]','' # remove special chars
     $boundaryString = (New-Guid).ToString("N")
@@ -1971,15 +1974,15 @@ Param(
     $multipartContent = $bodyLines -join "`r`n"
     Write-Debug $multipartContent
 
-    $uri = Get-TSRequestUri -Endpoint User -Param delete
+    $uri = Get-TableauRequestUri -Endpoint User -Param delete
     if ($PSCmdlet.ShouldProcess("delete users using file $fileName")) {
-        $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post -ContentType "multipart/mixed; boundary=$boundaryString"
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $multipartContent -Method Post -ContentType "multipart/mixed; boundary=$boundaryString"
         return $response.tsResponse.job
     }
 }
 
 ### Publishing methods
-function Send-TSFileUpload {
+function Send-TableauFileUpload {
 <#
 .SYNOPSIS
 Perform File Upload in Chunks
@@ -1998,7 +2001,7 @@ This usually doesn't matter for Tableau Server uploads.
 By default, the filename is sent as "file".
 
 .EXAMPLE
-$uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName
+$uploadSessionId = Send-TableauFileUpload -InFile $InFile -FileName $FileName
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_publishing.htm#initiate_file_upload
@@ -2011,21 +2014,21 @@ Param(
     [Parameter(Mandatory)][string] $InFile,
     [Parameter()][string] $FileName = "file"
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     if ($FileName -match '[^\x20-\x7e]') { # special non-ASCII characters in the filename cause issues on some API versions
         Write-Verbose "Filename $FileName contains special characters, replacing with tableau_file"
         $FileName = "tableau_file" # fallback to standard filename (doesn't matter for file upload)
     }
     $fileItem = Get-Item -LiteralPath $InFile
-    $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint FileUpload) -Method Post
+    $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint FileUpload) -Method Post
     $uploadSessionId = $response.tsResponse.fileUpload.GetAttribute("uploadSessionId")
     $chunkNumber = 0
-    $buffer = New-Object System.Byte[]($script:TSRestApiChunkSize)
+    $buffer = New-Object System.Byte[]($script:TableauRestChunkSize)
     $fileStream = New-Object System.IO.FileStream($fileItem.FullName, [System.IO.FileMode]::Open)
     $byteReader = $null
     try {
         $byteReader = New-Object System.IO.BinaryReader($fileStream)
-        # $totalChunks = [Math]::Ceiling($fileItem.Length / $script:TSRestApiChunkSize) # not required here
+        # $totalChunks = [Math]::Ceiling($fileItem.Length / $script:TableauRestChunkSize) # not required here
         $totalSizeMb = [Math]::Round($fileItem.Length / 1048576)
         $bytesUploaded = 0
         $startTime = Get-Date
@@ -2049,7 +2052,7 @@ Param(
                 $fileContent.Headers.ContentDisposition.Name = "tableau_file"
                 $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`""
                 $multipartContent.Add($fileContent)
-                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint FileUpload -Param $uploadSessionId) -Body $multipartContent -Method Put
+                $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint FileUpload -Param $uploadSessionId) -Body $multipartContent -Method Put
             } else {
                 Write-Verbose "Using String as -Body in Invoke-RestMethod (PS5.x)"
                 $bodyLines = @(
@@ -2066,7 +2069,7 @@ Param(
                     "--$boundaryString--"
                     )
                 $multipartContent = $bodyLines -join "`r`n"
-                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint FileUpload -Param $uploadSessionId) -Body $multipartContent -Method Put -ContentType "multipart/mixed; boundary=$boundaryString"
+                $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint FileUpload -Param $uploadSessionId) -Body $multipartContent -Method Put -ContentType "multipart/mixed; boundary=$boundaryString"
             }
             $bytesUploaded += $bytesRead
             $elapsedTime = $(Get-Date) - $startTime
@@ -2076,7 +2079,7 @@ Param(
             $uploadedSizeMb = [Math]::Round($bytesUploaded / 1048576)
             $percentCompleted = [Math]::Round($bytesUploaded / $fileItem.Length * 100)
             Write-Progress -Activity "Uploading file $FileName" -Status "$uploadedSizeMb / $totalSizeMb MB uploaded ($percentCompleted%)" -PercentComplete $percentCompleted -SecondsRemaining $remainingTime.TotalSeconds
-        } until ($script:TSRestApiChunkSize*$chunkNumber -ge $fileItem.Length)
+        } until ($script:TableauRestChunkSize*$chunkNumber -ge $fileItem.Length)
     } finally {
         if ($byteReader) {
             $byteReader.Dispose()
@@ -2091,7 +2094,7 @@ Param(
 }
 
 ### Workbooks methods
-function Get-TSWorkbook {
+function Get-TableauWorkbook {
 <#
 .SYNOPSIS
 Get Workbook / Workbooks on Site / Workbook Revisions
@@ -2127,13 +2130,13 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_field
 (Optional) Page size when paging through results.
 
 .EXAMPLE
-$workbook = Get-TSWorkbook -WorkbookId $workbookId
+$workbook = Get-TableauWorkbook -WorkbookId $workbookId
 
 .EXAMPLE
-$workbookRevisions = Get-TSWorkbook -WorkbookId $workbookId -Revisions
+$workbookRevisions = Get-TableauWorkbook -WorkbookId $workbookId -Revisions
 
 .EXAMPLE
-$workbooks = Get-TSWorkbook -Filter "name:eq:$workbookName" -Sort name:asc -Fields id,name
+$workbooks = Get-TableauWorkbook -Filter "name:eq:$workbookName" -Sort name:asc -Fields id,name
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#query_workbooks_for_site
@@ -2158,34 +2161,34 @@ Param(
     [Parameter(ParameterSetName='WorkbookRevisions')]
     [ValidateRange(1,100)][int] $PageSize = 100
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     if ($ContentUrl) {
-        Assert-TSRestApiVersion -AtLeast 3.17
+        Assert-TableauRestVersion -AtLeast 3.17
     }
     if ($Revisions) { # Get Workbook Revisions
-        # Assert-TSRestApiVersion -AtLeast 2.3
+        # Assert-TableauRestVersion -AtLeast 2.3
         $pageNumber = 0
         do {
             $pageNumber++
-            $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/revisions
+            $uri = Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId/revisions
             $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-            $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
+            $response = Invoke-TableauRestMethod -Uri $uri -Method Get
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.revisions.revision
         } until ($PageSize*$pageNumber -ge $totalAvailable)
     } elseif ($WorkbookId) { # Get Workbook by Id
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId) -Method Get
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId) -Method Get
         $response.tsResponse.workbook
     } elseif ($ContentUrl) { # Get Workbook by ContentUrl
-        $uri = Get-TSRequestUri -Endpoint Workbook -Param $ContentUrl
+        $uri = Get-TableauRequestUri -Endpoint Workbook -Param $ContentUrl
         $uri += "?key=contentUrl"
-        $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
+        $response = Invoke-TableauRestMethod -Uri $uri -Method Get
         $response.tsResponse.workbook
     } else { # Query Workbooks on Site
         $pageNumber = 0
         do {
             $pageNumber++
-            $uri = Get-TSRequestUri -Endpoint Workbook
+            $uri = Get-TableauRequestUri -Endpoint Workbook
             $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
             $uriParam.Add("pageSize", $PageSize)
             $uriParam.Add("pageNumber", $pageNumber)
@@ -2200,14 +2203,14 @@ Param(
             }
             $uriRequest = [System.UriBuilder]$uri
             $uriRequest.Query = $uriParam.ToString()
-            $response = Invoke-TSRestApiMethod -Uri $uriRequest.Uri.OriginalString -Method Get
+            $response = Invoke-TableauRestMethod -Uri $uriRequest.Uri.OriginalString -Method Get
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.workbooks.workbook
         } until ($PageSize*$pageNumber -ge $totalAvailable)
     }
 }
 
-function Get-TSWorkbooksForUser {
+function Get-TableauWorkbooksForUser {
 <#
 .SYNOPSIS
 Query Workbooks for User
@@ -2225,7 +2228,7 @@ The LUID of the user to get workbooks for.
 (Optional) Page size when paging through results.
 
 .EXAMPLE
-$workbooks = Get-TSWorkbooksForUser -UserId (Get-TSCurrentUserId)
+$workbooks = Get-TableauWorkbooksForUser -UserId (Get-TableauCurrentUserId)
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#query_workbooks_for_user
@@ -2236,20 +2239,20 @@ Param(
     [Parameter()][switch] $IsOwner,
     [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     $pageNumber = 0
     do {
         $pageNumber++
-        $uri = Get-TSRequestUri -Endpoint User -Param $UserId/workbooks
+        $uri = Get-TableauRequestUri -Endpoint User -Param $UserId/workbooks
         $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
         if ($IsOwner) { $uri += "&ownedBy=true" }
-        $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
+        $response = Invoke-TableauRestMethod -Uri $uri -Method Get
         $totalAvailable = $response.tsResponse.pagination.totalAvailable
         $response.tsResponse.workbooks.workbook
     } until ($PageSize*$pageNumber -ge $totalAvailable)
 }
 
-function Get-TSWorkbookConnection {
+function Get-TableauWorkbookConnection {
 <#
 .SYNOPSIS
 Query Workbook Connections
@@ -2261,7 +2264,7 @@ Returns a list of data connections for the specific workbook.
 The LUID of the workbook to return connection information about.
 
 .EXAMPLE
-$workbookConnections = Get-TSWorkbookConnection -WorkbookId $workbookId
+$workbookConnections = Get-TableauWorkbookConnection -WorkbookId $workbookId
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#query_workbook_connections
@@ -2270,12 +2273,12 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_
 Param(
     [Parameter(Mandatory)][string] $WorkbookId
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
-    $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/connections) -Method Get
+    # Assert-TableauRestVersion -AtLeast 2.0
+    $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId/connections) -Method Get
     return $response.tsResponse.connections.connection
 }
 
-function Export-TSWorkbook {
+function Export-TableauWorkbook {
 <#
 .SYNOPSIS
 Download Workbook / Download Workbook Revision
@@ -2297,10 +2300,10 @@ If not provided, the downloaded content is piped to the output.
 (Optional) If revision number is specified, this revision will be downloaded.
 
 .EXAMPLE
-Export-TSWorkbook -WorkbookId $sampleWorkbookId -OutFile "Superstore.twbx"
+Export-TableauWorkbook -WorkbookId $sampleWorkbookId -OutFile "Superstore.twbx"
 
 .EXAMPLE
-Export-TSWorkbook -WorkbookId $sampleWorkbookId -OutFile "Superstore_1.twbx" -Revision 1
+Export-TableauWorkbook -WorkbookId $sampleWorkbookId -OutFile "Superstore_1.twbx" -Revision 1
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#download_workbook
@@ -2315,15 +2318,15 @@ Param(
     [Parameter()][switch] $ExcludeExtract,
     [Parameter()][int] $Revision
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     $OutFileParam = @{}
     if ($OutFile) {
         $OutFileParam.Add("OutFile", $OutFile)
     }
-    $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId
+    $uri = Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId
     if ($Revision) {
-        # Assert-TSRestApiVersion -AtLeast 2.3
-        $lastRevision = Get-TSWorkbook -WorkbookId $WorkbookId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
+        # Assert-TableauRestVersion -AtLeast 2.3
+        $lastRevision = Get-TableauWorkbook -WorkbookId $WorkbookId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
         # Note that the current revision of a workbook cannot be accessed by the /revisions endpoint; in this case we ignore the -Revision parameter
         if ($Revision -lt $lastRevision) {
             $uri += "/revisions/$Revision"
@@ -2331,13 +2334,13 @@ Param(
     }
     $uri += "/content"
     if ($ExcludeExtract) {
-        Assert-TSRestApiVersion -AtLeast 2.5
+        Assert-TableauRestVersion -AtLeast 2.5
         $uri += "?includeExtract=false"
     }
-    Invoke-TSRestApiMethod -Uri $uri -Method Get -TimeoutSec 600 @OutFileParam
+    Invoke-TableauRestMethod -Uri $uri -Method Get -TimeoutSec 600 @OutFileParam
 }
 
-function Publish-TSWorkbook {
+function Publish-TableauWorkbook {
 <#
 .SYNOPSIS
 Publish Workbook
@@ -2397,10 +2400,10 @@ This can be helpful if timeouts occur during upload.
 (Optional) Hashtable array containing connection attributes and credentials (see online help).
 
 .EXAMPLE
-$workbook = Publish-TSWorkbook -Name $sampleWorkbookName -InFile "Superstore.twbx" -ProjectId $samplesProjectId
+$workbook = Publish-TableauWorkbook -Name $sampleWorkbookName -InFile "Superstore.twbx" -ProjectId $samplesProjectId
 
 .EXAMPLE
-$workbook = Publish-TSWorkbook -Name $sampleWorkbookName -InFile "Superstore.twbx" -ProjectId $samplesProjectId -Overwrite -HideViews @{Shipping="true";Performance="true";Forecast="true"}
+$workbook = Publish-TableauWorkbook -Name $sampleWorkbookName -InFile "Superstore.twbx" -ProjectId $samplesProjectId -Overwrite -HideViews @{Shipping="true";Performance="true";Forecast="true"}
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#publish_workbook
@@ -2424,7 +2427,7 @@ Param(
     [Parameter()][hashtable[]] $Connections
     # [Parameter()][switch] $EncryptExtracts,
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     $fileItem = Get-Item -LiteralPath $InFile
     if (-Not $FileName) {
         $FileName = $fileItem.Name -replace '["`]','' # remove special chars
@@ -2446,10 +2449,10 @@ Param(
         Write-Verbose "Filename $FileName contains special characters, replacing with tableau_workbook.$FileType"
         $FileName = "tableau_workbook.$FileType" # fallback to standard filename (doesn't matter for file upload)
     }
-    if ($fileItem.Length -ge $script:TSRestApiFileSizeLimit) {
+    if ($fileItem.Length -ge $script:TableauRestFileSizeLimit) {
         $Chunked = $true
     }
-    $uri = Get-TSRequestUri -Endpoint Workbook
+    $uri = Get-TableauRequestUri -Endpoint Workbook
     $uri += "?workbookType=$FileType"
     if ($Overwrite) {
         $uri += "&overwrite=true"
@@ -2458,7 +2461,7 @@ Param(
         $uri += "&skipConnectionCheck=true"
     }
     if ($BackgroundTask) {
-        Assert-TSRestApiVersion -AtLeast 3.0
+        Assert-TableauRestVersion -AtLeast 3.0
         $uri += "&asJob=true"
     }
     $xml = New-Object System.Xml.XmlDocument
@@ -2466,7 +2469,7 @@ Param(
     $el_workbook = $tsRequest.AppendChild($xml.CreateElement("workbook"))
     $el_workbook.SetAttribute("name", $Name)
     if ($Description) {
-        Assert-TSRestApiVersion -AtLeast 3.21
+        Assert-TableauRestVersion -AtLeast 3.21
         $el_workbook.SetAttribute("description", $Description)
     }
     $el_workbook.SetAttribute("showTabs", $ShowTabs)
@@ -2474,11 +2477,11 @@ Param(
         $el_workbook.SetAttribute("thumbnailsUserId", $ThumbnailsUserId)
     }
     if ($Credentials) {
-        Add-TSCredentialsElement -Element $el_workbook -Credentials $Credentials
+        Add-TableauRequestCredentialsElement -Element $el_workbook -Credentials $Credentials
     }
     if ($Connections) {
-        Assert-TSRestApiVersion -AtLeast 2.8
-        Add-TSConnectionsElement -Element $el_workbook -Connections $Connections
+        Assert-TableauRestVersion -AtLeast 2.8
+        Add-TableauRequestConnectionsElement -Element $el_workbook -Connections $Connections
     }
     if ($ProjectId) {
         $el_project = $el_workbook.AppendChild($xml.CreateElement("project"))
@@ -2506,9 +2509,9 @@ Param(
         $stringContent.Headers.ContentDisposition.Name = "request_payload"
         $multipartContent.Add($stringContent)
         if ($Chunked) {
-            $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName
+            $uploadSessionId = Send-TableauFileUpload -InFile $InFile -FileName $FileName
             $uri += "&uploadSessionId=$uploadSessionId"
-            $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post
+            $response = Invoke-TableauRestMethod -Uri $uri -Body $multipartContent -Method Post
         } else {
             $fileStream = New-Object System.IO.FileStream($fileItem.FullName, [System.IO.FileMode]::Open)
             try {
@@ -2518,7 +2521,7 @@ Param(
                 $fileContent.Headers.ContentDisposition.Name = "tableau_workbook"
                 $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`""
                 $multipartContent.Add($fileContent)
-                $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post
+                $response = Invoke-TableauRestMethod -Uri $uri -Body $multipartContent -Method Post
             } finally {
                 $fileStream.Dispose()
             }
@@ -2537,7 +2540,7 @@ Param(
             $xml.OuterXml
         )
         if ($Chunked) {
-            $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName
+            $uploadSessionId = Send-TableauFileUpload -InFile $InFile -FileName $FileName
             $uri += "&uploadSessionId=$uploadSessionId"
         } else {
             $bodyLines += @(
@@ -2550,7 +2553,7 @@ Param(
         }
         $bodyLines += "--$boundaryString--"
         $multipartContent = $bodyLines -join "`r`n"
-        $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post -ContentType "multipart/mixed; boundary=$boundaryString"
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $multipartContent -Method Post -ContentType "multipart/mixed; boundary=$boundaryString"
     }
     if ($BackgroundTask) {
         return $response.tsResponse.job
@@ -2559,7 +2562,7 @@ Param(
     }
 }
 
-function Update-TSWorkbook {
+function Set-TableauWorkbook {
 <#
 .SYNOPSIS
 Update Workbook
@@ -2600,7 +2603,7 @@ Note: this feature is not supported anymore in API 3.16 and higher.
 Note: this feature is not supported anymore in API 3.16 and higher.
 
 .EXAMPLE
-$workbook = Update-TSWorkbook -WorkbookId $sampleWorkbookId -ShowTabs:$false
+$workbook = Set-TableauWorkbook -WorkbookId $sampleWorkbookId -ShowTabs:$false
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#update_workbook
@@ -2619,7 +2622,7 @@ Param(
     [Parameter()][switch] $EnableDataAcceleration,
     [Parameter()][switch] $AccelerateNow
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_workbook = $tsRequest.AppendChild($xml.CreateElement("workbook"))
@@ -2627,7 +2630,7 @@ Param(
         $el_workbook.SetAttribute("name", $Name)
     }
     if ($Description) {
-        Assert-TSRestApiVersion -AtLeast 3.21
+        Assert-TableauRestVersion -AtLeast 3.21
         $el_workbook.SetAttribute("description", $Description)
     }
     if ($PSBoundParameters.ContainsKey('ShowTabs')) {
@@ -2648,21 +2651,21 @@ Param(
         $el_owner.SetAttribute("id", $NewOwnerId)
     }
     if ($PSBoundParameters.ContainsKey('EnableDataAcceleration')) {
-        Assert-TSRestApiVersion -AtLeast 3.16
+        Assert-TableauRestVersion -AtLeast 3.16
         $el_dataaccel = $el_workbook.AppendChild($xml.CreateElement("dataAccelerationConfig"))
         $el_dataaccel.SetAttribute("accelerationEnabled", $EnableDataAcceleration)
         if ($PSBoundParameters.ContainsKey('AccelerateNow')) {
             $el_dataaccel.SetAttribute("accelerateNow", $AccelerateNow)
         }
     }
-    $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId
+    $uri = Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId
     if ($PSCmdlet.ShouldProcess($WorkbookId)) {
-        $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put
         return $response.tsResponse.workbook
     }
 }
 
-function Update-TSWorkbookConnection {
+function Set-TableauWorkbookConnection {
 <#
 .SYNOPSIS
 Update Workbook Connection
@@ -2696,7 +2699,7 @@ The LUID of the connection to update.
 https://help.tableau.com/current/pro/desktop/en-us/performance_tips.htm
 
 .EXAMPLE
-$workbookConnection = Update-TSWorkbookConnection -WorkbookId $sampleWorkbookId -ConnectionId $connectionId -ServerAddress myserver.com
+$workbookConnection = Set-TableauWorkbookConnection -WorkbookId $sampleWorkbookId -ConnectionId $connectionId -ServerAddress myserver.com
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#update_workbook_connection
@@ -2713,7 +2716,7 @@ Param(
     [Parameter()][switch] $EmbedPassword,
     [Parameter()][switch] $QueryTagging
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_connection = $tsRequest.AppendChild($xml.CreateElement("connection"))
@@ -2734,17 +2737,17 @@ Param(
         $el_connection.SetAttribute("embedPassword", $EmbedPassword)
     }
     if ($PSBoundParameters.ContainsKey('QueryTagging')) {
-        Assert-TSRestApiVersion -AtLeast 3.13
+        Assert-TableauRestVersion -AtLeast 3.13
         $el_connection.SetAttribute("queryTaggingEnabled", $QueryTagging)
     }
-    $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/connections/$ConnectionId
+    $uri = Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId/connections/$ConnectionId
     if ($PSCmdlet.ShouldProcess($ConnectionId)) {
-        $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put
         return $response.tsResponse.connection
     }
 }
 
-function Remove-TSWorkbook {
+function Remove-TableauWorkbook {
 <#
 .SYNOPSIS
 Delete Workbook / Delete Workbook Revision
@@ -2761,10 +2764,10 @@ The LUID of the workbook to remove.
 (Delete Workbook Revision) The revision number of the workbook to delete.
 
 .EXAMPLE
-Remove-TSWorkbook -WorkbookId $sampleWorkbookId
+Remove-TableauWorkbook -WorkbookId $sampleWorkbookId
 
 .EXAMPLE
-Remove-TSWorkbook -WorkbookId $sampleWorkbookId -Revision 2
+Remove-TableauWorkbook -WorkbookId $sampleWorkbookId -Revision 2
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#delete_workbook
@@ -2778,20 +2781,20 @@ Param(
     [Parameter(Mandatory)][string] $WorkbookId,
     [Parameter()][int] $Revision
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     if ($Revision) { # Remove Workbook Revision
-        # Assert-TSRestApiVersion -AtLeast 2.3
+        # Assert-TableauRestVersion -AtLeast 2.3
         if ($PSCmdlet.ShouldProcess("$WorkbookId, revision $Revision")) {
-            Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/revisions/$Revision) -Method Delete
+            Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId/revisions/$Revision) -Method Delete
         }
     } else { # Remove Workbook
         if ($PSCmdlet.ShouldProcess($WorkbookId)) {
-            Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId) -Method Delete
+            Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId) -Method Delete
         }
     }
 }
 
-function Get-TSWorkbookDowngradeInfo {
+function Get-TableauWorkbookDowngradeInfo {
 <#
 .SYNOPSIS
 Get Workbook Downgrade Info
@@ -2807,7 +2810,7 @@ The LUID of the workbook which would be downgraded.
 The Tableau release version number the workbook would be downgraded to.
 
 .EXAMPLE
-$downgradeInfo = Get-TSWorkbookDowngradeInfo -WorkbookId $sampleWorkbookId -DowngradeVersion 2019.3
+$downgradeInfo = Get-TableauWorkbookDowngradeInfo -WorkbookId $sampleWorkbookId -DowngradeVersion 2019.3
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#get_workbook_downgrade_info
@@ -2817,12 +2820,12 @@ Param(
     [Parameter(Mandatory)][string] $WorkbookId,
     [Parameter(Mandatory)][version] $DowngradeVersion
 )
-    Assert-TSRestApiVersion -AtLeast 3.5
-    $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/downGradeInfo?productVersion=$DowngradeVersion) -Method Get
+    Assert-TableauRestVersion -AtLeast 3.5
+    $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId/downGradeInfo?productVersion=$DowngradeVersion) -Method Get
     return $response.tsResponse.downgradeInfo
 }
 
-function Export-TSWorkbookToFormat {
+function Export-TableauWorkbookToFormat {
 <#
 .SYNOPSIS
 Download Workbook as PDF / PowerPoint / Image
@@ -2857,13 +2860,13 @@ Default is Portrait.
 If not provided, the downloaded content is piped to the output.
 
 .EXAMPLE
-Export-TSWorkbookToFormat -WorkbookId $sampleWorkbookId -Format pdf -PageOrientation Landscape -OutFile "export.pdf"
+Export-TableauWorkbookToFormat -WorkbookId $sampleWorkbookId -Format pdf -PageOrientation Landscape -OutFile "export.pdf"
 
 .EXAMPLE
-Export-TSWorkbookToFormat -WorkbookId $sampleWorkbookId -Format powerpoint -OutFile "export.pptx"
+Export-TableauWorkbookToFormat -WorkbookId $sampleWorkbookId -Format powerpoint -OutFile "export.pptx"
 
 .EXAMPLE
-Export-TSWorkbookToFormat -WorkbookId $sampleWorkbookId -Format image -OutFile "export.png"
+Export-TableauWorkbookToFormat -WorkbookId $sampleWorkbookId -Format image -OutFile "export.png"
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#download_workbook_pdf
@@ -2887,30 +2890,30 @@ Param(
     if ($OutFile) {
         $OutFileParam.Add("OutFile", $OutFile)
     }
-    $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId
+    $uri = Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId
     if ($Format -eq 'pdf') {
-        Assert-TSRestApiVersion -AtLeast 3.4
+        Assert-TableauRestVersion -AtLeast 3.4
         $uri += "/pdf?type=$PageType&orientation=$PageOrientation"
         if ($MaxAge) {
             $uri += "&maxAge=$MaxAge"
         }
         # $fileType = 'pdf'
     } elseif ($Format -eq 'powerpoint') {
-        Assert-TSRestApiVersion -AtLeast 3.8
+        Assert-TableauRestVersion -AtLeast 3.8
         $uri += "/powerpoint"
         if ($MaxAge) {
             $uri += "?maxAge=$MaxAge"
         }
         # $fileType = 'pptx'
     } elseif ($Format -eq 'image') {
-        # Assert-TSRestApiVersion -AtLeast 2.0
+        # Assert-TableauRestVersion -AtLeast 2.0
         $uri += "/previewImage"
         # $fileType = 'png'
     }
-    Invoke-TSRestApiMethod -Uri $uri -Method Get -TimeoutSec 600 @OutFileParam
+    Invoke-TableauRestMethod -Uri $uri -Method Get -TimeoutSec 600 @OutFileParam
 }
 
-function Update-TSWorkbookNow {
+function Update-TableauWorkbookNow {
 <#
 .SYNOPSIS
 Update Workbook Now
@@ -2922,7 +2925,7 @@ Performs an immediate extract refresh for the specified workbook.
 The LUID of the workbook to refresh.
 
 .EXAMPLE
-$job = Update-TSWorkbookNow -WorkbookId $workbook.id
+$job = Update-TableauWorkbookNow -WorkbookId $workbook.id
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#update_workbook_now
@@ -2932,16 +2935,16 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_
 Param(
     [Parameter(Mandatory)][string] $WorkbookId
 )
-    Assert-TSRestApiVersion -AtLeast 2.8
-    $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/refresh
+    Assert-TableauRestVersion -AtLeast 2.8
+    $uri = Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId/refresh
     if ($PSCmdlet.ShouldProcess($WorkbookId)) {
-        $response = Invoke-TSRestApiMethod -Uri $uri -Body "<tsRequest />" -Method Post -ContentType "application/xml"
+        $response = Invoke-TableauRestMethod -Uri $uri -Body "<tsRequest />" -Method Post -ContentType "application/xml"
         return $response.tsResponse.job
     }
 }
 
 ### Datasources methods
-function Get-TSDatasource {
+function Get-TableauDatasource {
 <#
 .SYNOPSIS
 Query Data Source / Query Data Sources / Get Data Source Revisions
@@ -2974,13 +2977,13 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_field
 (Optional) Page size when paging through results.
 
 .EXAMPLE
-$datasource = Get-TSDatasource -DatasourceId $datasourceId
+$datasource = Get-TableauDatasource -DatasourceId $datasourceId
 
 .EXAMPLE
-$dsRevisions = Get-TSDatasource -DatasourceId $datasourceId -Revisions
+$dsRevisions = Get-TableauDatasource -DatasourceId $datasourceId -Revisions
 
 .EXAMPLE
-$datasources = Get-TSDatasource -Filter "name:eq:$datasourceName" -Sort name:asc -Fields id,name
+$datasources = Get-TableauDatasource -Filter "name:eq:$datasourceName" -Sort name:asc -Fields id,name
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sources.htm#query_data_source
@@ -3004,26 +3007,26 @@ Param(
     [Parameter(ParameterSetName='DatasourceRevisions')]
     [ValidateRange(1,100)][int] $PageSize = 100
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     if ($Revisions) { # Get Data Source Revisions
-        # Assert-TSRestApiVersion -AtLeast 2.3
+        # Assert-TableauRestVersion -AtLeast 2.3
         $pageNumber = 0
         do {
             $pageNumber++
-            $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/revisions
+            $uri = Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId/revisions
             $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-            $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
+            $response = Invoke-TableauRestMethod -Uri $uri -Method Get
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.revisions.revision
         } until ($PageSize*$pageNumber -ge $totalAvailable)
     } elseif ($DatasourceId) { # Query Data Source
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId) -Method Get
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId) -Method Get
         $response.tsResponse.datasource
     } else { # Query Data Sources
         $pageNumber = 0
         do {
             $pageNumber++
-            $uri = Get-TSRequestUri -Endpoint Datasource
+            $uri = Get-TableauRequestUri -Endpoint Datasource
             $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
             $uriParam.Add("pageSize", $PageSize)
             $uriParam.Add("pageNumber", $pageNumber)
@@ -3038,14 +3041,14 @@ Param(
             }
             $uriRequest = [System.UriBuilder]$uri
             $uriRequest.Query = $uriParam.ToString()
-            $response = Invoke-TSRestApiMethod -Uri $uriRequest.Uri.OriginalString -Method Get
+            $response = Invoke-TableauRestMethod -Uri $uriRequest.Uri.OriginalString -Method Get
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.datasources.datasource
         } until ($PageSize*$pageNumber -ge $totalAvailable)
     }
 }
 
-function Get-TSDatasourceConnection {
+function Get-TableauDatasourceConnection {
 <#
 .SYNOPSIS
 Query Data Source Connections
@@ -3057,7 +3060,7 @@ Returns a list of data connections for the specific data source.
 The LUID of the data source to return connection information about.
 
 .EXAMPLE
-$dsConnections = Get-TSDatasourceConnection -DatasourceId $datasourceId
+$dsConnections = Get-TableauDatasourceConnection -DatasourceId $datasourceId
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sources.htm#query_data_source_connections
@@ -3066,12 +3069,12 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sourc
 Param(
     [Parameter(Mandatory)][string] $DatasourceId
 )
-    # Assert-TSRestApiVersion -AtLeast 2.3
-    $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/connections) -Method Get
+    # Assert-TableauRestVersion -AtLeast 2.3
+    $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId/connections) -Method Get
     return $response.tsResponse.connections.connection
 }
 
-function Export-TSDatasource {
+function Export-TableauDatasource {
 <#
 .SYNOPSIS
 Download Data Source / Download Data Source Revision
@@ -3093,10 +3096,10 @@ If not provided, the downloaded content is piped to the output.
 (Optional) If revision number is specified, this revision will be downloaded.
 
 .EXAMPLE
-Export-TSDatasource -DatasourceId $sampleDatasourceId -OutFile "Superstore_Data.tdsx" -ExcludeExtract
+Export-TableauDatasource -DatasourceId $sampleDatasourceId -OutFile "Superstore_Data.tdsx" -ExcludeExtract
 
 .EXAMPLE
-Export-TSDatasource -DatasourceId $sampleDatasourceId -OutFile "Superstore_Data_1.tdsx" -Revision 1
+Export-TableauDatasource -DatasourceId $sampleDatasourceId -OutFile "Superstore_Data_1.tdsx" -Revision 1
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sources.htm#download_data_source
@@ -3111,15 +3114,15 @@ Param(
     [Parameter()][switch] $ExcludeExtract,
     [Parameter()][int] $Revision
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     $OutFileParam = @{}
     if ($OutFile) {
         $OutFileParam.Add("OutFile", $OutFile)
     }
-    $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId
+    $uri = Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId
     if ($Revision) {
-        # Assert-TSRestApiVersion -AtLeast 2.3
-        $lastRevision = Get-TSDatasource -DatasourceId $DatasourceId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
+        # Assert-TableauRestVersion -AtLeast 2.3
+        $lastRevision = Get-TableauDatasource -DatasourceId $DatasourceId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
         # Note that the current revision of a datasource cannot be accessed by the /revisions endpoint; in this case we ignore the -Revision parameter
         if ($Revision -lt $lastRevision) {
             $uri += "/revisions/$Revision"
@@ -3127,13 +3130,13 @@ Param(
     }
     $uri += "/content"
     if ($ExcludeExtract) {
-        Assert-TSRestApiVersion -AtLeast 2.5
+        Assert-TableauRestVersion -AtLeast 2.5
         $uri += "?includeExtract=false"
     }
-    Invoke-TSRestApiMethod -Uri $uri -Method Get -TimeoutSec 600 @OutFileParam
+    Invoke-TableauRestMethod -Uri $uri -Method Get -TimeoutSec 600 @OutFileParam
 }
 
-function Publish-TSDatasource {
+function Publish-TableauDatasource {
 <#
 .SYNOPSIS
 Publish Data Source
@@ -3189,10 +3192,10 @@ Bridge allows you to maintain data sources with live connections to supported on
 (Optional) Hashtable array containing connection attributes and credentials (see online help).
 
 .EXAMPLE
-$datasource = Publish-TSDatasource -Name $sampleDatasourceName -InFile "Superstore_2023.tdsx" -ProjectId $samplesProjectId -Overwrite
+$datasource = Publish-TableauDatasource -Name $sampleDatasourceName -InFile "Superstore_2023.tdsx" -ProjectId $samplesProjectId -Overwrite
 
 .EXAMPLE
-$datasource = Publish-TSDatasource -Name "Datasource" -InFile "data.hyper" -ProjectId $samplesProjectId -Append -Chunked
+$datasource = Publish-TableauDatasource -Name "Datasource" -InFile "data.hyper" -ProjectId $samplesProjectId -Append -Chunked
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sources.htm#publish_data_source
@@ -3213,7 +3216,7 @@ Param(
     [Parameter()][hashtable] $Credentials,
     [Parameter()][hashtable[]] $Connections
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     $fileItem = Get-Item -LiteralPath $InFile
     if (-Not $FileName) {
         $FileName = $fileItem.Name -replace '["`]','' # remove special chars
@@ -3235,10 +3238,10 @@ Param(
         Write-Verbose "Filename $FileName contains special characters, replacing with tableau_datasource.$FileType"
         $FileName = "tableau_datasource.$FileType" # fallback to standard filename (doesn't matter for file upload)
     }
-    if ($fileItem.Length -ge $script:TSRestApiFileSizeLimit) {
+    if ($fileItem.Length -ge $script:TableauRestFileSizeLimit) {
         $Chunked = $true
     }
-    $uri = Get-TSRequestUri -Endpoint Datasource
+    $uri = Get-TableauRequestUri -Endpoint Datasource
     $uri += "?datasourceType=$FileType"
     if ($Append) {
         $uri += "&append=true"
@@ -3247,7 +3250,7 @@ Param(
         $uri += "&overwrite=true"
     }
     if ($BackgroundTask) {
-        Assert-TSRestApiVersion -AtLeast 3.0
+        Assert-TableauRestVersion -AtLeast 3.0
         $uri += "&asJob=true"
     }
     $xml = New-Object System.Xml.XmlDocument
@@ -3264,11 +3267,11 @@ Param(
         Write-Error "You cannot provide both Connections and Credentials inputs" -Category InvalidArgument -ErrorAction Stop
     }
     if ($Credentials) {
-        Add-TSCredentialsElement -Element $el_datasource -Credentials $Credentials
+        Add-TableauRequestCredentialsElement -Element $el_datasource -Credentials $Credentials
     }
     if ($Connections) {
-        Assert-TSRestApiVersion -AtLeast 2.8
-        Add-TSConnectionsElement -Element $el_datasource -Connections $Connections
+        Assert-TableauRestVersion -AtLeast 2.8
+        Add-TableauRequestConnectionsElement -Element $el_datasource -Connections $Connections
     }
     if ($ProjectId) {
         $el_project = $el_datasource.AppendChild($xml.CreateElement("project"))
@@ -3285,9 +3288,9 @@ Param(
         $stringContent.Headers.ContentDisposition.Name = "request_payload"
         $multipartContent.Add($stringContent)
         if ($Chunked) {
-            $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName
+            $uploadSessionId = Send-TableauFileUpload -InFile $InFile -FileName $FileName
             $uri += "&uploadSessionId=$uploadSessionId"
-            $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post
+            $response = Invoke-TableauRestMethod -Uri $uri -Body $multipartContent -Method Post
         } else {
             $fileStream = New-Object System.IO.FileStream($fileItem.FullName, [System.IO.FileMode]::Open)
             try {
@@ -3297,7 +3300,7 @@ Param(
                 $fileContent.Headers.ContentDisposition.Name = "tableau_datasource"
                 $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`""
                 $multipartContent.Add($fileContent)
-                $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post
+                $response = Invoke-TableauRestMethod -Uri $uri -Body $multipartContent -Method Post
             } finally {
                 $fileStream.Dispose()
             }
@@ -3312,7 +3315,7 @@ Param(
             $xml.OuterXml
         )
         if ($Chunked) {
-            $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName
+            $uploadSessionId = Send-TableauFileUpload -InFile $InFile -FileName $FileName
             $uri += "&uploadSessionId=$uploadSessionId"
         } else {
             $bodyLines += @(
@@ -3325,7 +3328,7 @@ Param(
         }
         $bodyLines += "--$boundaryString--"
         $multipartContent = $bodyLines -join "`r`n"
-        $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post -ContentType "multipart/mixed; boundary=$boundaryString"
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $multipartContent -Method Post -ContentType "multipart/mixed; boundary=$boundaryString"
     }
     if ($BackgroundTask) {
         return $response.tsResponse.job
@@ -3334,7 +3337,7 @@ Param(
     }
 }
 
-function Update-TSDatasource {
+function Set-TableauDatasource {
 <#
 .SYNOPSIS
 Update Data Source
@@ -3368,7 +3371,7 @@ The LUID of the data source to update.
 Note: This attribute is removed in API 3.12 and later (Tableau Cloud September 2021 / Server 2021.3).
 
 .EXAMPLE
-$datasource = Update-TSDatasource -DatasourceId $sampleDatasourceId -Certified
+$datasource = Set-TableauDatasource -DatasourceId $sampleDatasourceId -Certified
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sources.htm#update_data_source
@@ -3385,7 +3388,7 @@ Param(
     [Parameter()][switch] $EncryptExtracts,
     [Parameter()][switch] $EnableAskData
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_datasource = $tsRequest.AppendChild($xml.CreateElement("datasource"))
@@ -3410,18 +3413,18 @@ Param(
         $el_owner.SetAttribute("id", $NewOwnerId)
     }
     if ($PSBoundParameters.ContainsKey('EnableAskData')) {
-        Assert-TSRestApiVersion -LessThan 3.12
+        Assert-TableauRestVersion -LessThan 3.12
         $el_askdata = $el_datasource.AppendChild($xml.CreateElement("askData"))
         $el_askdata.SetAttribute("enablement", $EnableAskData)
     }
-    $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId
+    $uri = Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId
     if ($PSCmdlet.ShouldProcess($DatasourceId)) {
-        $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put
         return $response.tsResponse.datasource
     }
 }
 
-function Update-TSDatasourceConnection {
+function Set-TableauDatasourceConnection {
 <#
 .SYNOPSIS
 Update Data Source Connection
@@ -3455,7 +3458,7 @@ The LUID of the connection to update.
 https://help.tableau.com/current/pro/desktop/en-us/performance_tips.htm
 
 .EXAMPLE
-$datasourceConnection = Update-TSDatasourceConnection -DatasourceId $sampleDatasourceId -ConnectionId $connectionId -ServerAddress myserver.com
+$datasourceConnection = Set-TableauDatasourceConnection -DatasourceId $sampleDatasourceId -ConnectionId $connectionId -ServerAddress myserver.com
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sources.htm#update_data_source_connection
@@ -3472,7 +3475,7 @@ Param(
     [Parameter()][switch] $EmbedPassword,
     [Parameter()][switch] $QueryTagging
 )
-    # Assert-TSRestApiVersion -AtLeast 2.3
+    # Assert-TableauRestVersion -AtLeast 2.3
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_connection = $tsRequest.AppendChild($xml.CreateElement("connection"))
@@ -3493,17 +3496,17 @@ Param(
         $el_connection.SetAttribute("embedPassword", $EmbedPassword)
     }
     if ($PSBoundParameters.ContainsKey('QueryTagging')) {
-        Assert-TSRestApiVersion -AtLeast 3.13
+        Assert-TableauRestVersion -AtLeast 3.13
         $el_connection.SetAttribute("queryTaggingEnabled", $QueryTagging)
     }
-    $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/connections/$ConnectionId
+    $uri = Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId/connections/$ConnectionId
     if ($PSCmdlet.ShouldProcess($ConnectionId)) {
-        $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put
         return $response.tsResponse.connection
     }
 }
 
-function Remove-TSDatasource {
+function Remove-TableauDatasource {
 <#
 .SYNOPSIS
 Delete Data Source / Delete Data Source Revision
@@ -3519,10 +3522,10 @@ The LUID of the data source to remove.
 (Delete Data Source Revision) The revision number of the data source to delete.
 
 .EXAMPLE
-Remove-TSDatasource -DatasourceId $sampleDatasourceId
+Remove-TableauDatasource -DatasourceId $sampleDatasourceId
 
 .EXAMPLE
-Remove-TSDatasource -DatasourceId $sampleDatasourceId -Revision 1
+Remove-TableauDatasource -DatasourceId $sampleDatasourceId -Revision 1
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sources.htm#delete_data_source
@@ -3536,20 +3539,20 @@ Param(
     [Parameter(Mandatory)][string] $DatasourceId,
     [Parameter()][int] $Revision
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     if ($Revision) { # Remove Data Source Revision
-        # Assert-TSRestApiVersion -AtLeast 2.3
+        # Assert-TableauRestVersion -AtLeast 2.3
         if ($PSCmdlet.ShouldProcess("$DatasourceId, revision $Revision")) {
-            Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/revisions/$Revision) -Method Delete
+            Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId/revisions/$Revision) -Method Delete
         }
     } else { # Remove Data Source
         if ($PSCmdlet.ShouldProcess($DatasourceId)) {
-            Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId) -Method Delete
+            Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId) -Method Delete
         }
     }
 }
 
-function Update-TSDatasourceNow {
+function Update-TableauDatasourceNow {
 <#
 .SYNOPSIS
 Update Data Source Now
@@ -3561,7 +3564,7 @@ Performs an immediate extract refresh for the specified data source.
 The LUID of the data source to refresh.
 
 .EXAMPLE
-$job = Update-TSDatasourceNow -DatasourceId $datasource.id
+$job = Update-TableauDatasourceNow -DatasourceId $datasource.id
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sources.htm#update_data_source_now
@@ -3571,15 +3574,15 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sourc
 Param(
     [Parameter(Mandatory)][string] $DatasourceId
 )
-    Assert-TSRestApiVersion -AtLeast 2.8
-    $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/refresh
+    Assert-TableauRestVersion -AtLeast 2.8
+    $uri = Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId/refresh
     if ($PSCmdlet.ShouldProcess($DatasourceId)) {
-        $response = Invoke-TSRestApiMethod -Uri $uri -Body "<tsRequest />" -Method Post -ContentType "application/xml"
+        $response = Invoke-TableauRestMethod -Uri $uri -Body "<tsRequest />" -Method Post -ContentType "application/xml"
         return $response.tsResponse.job
     }
 }
 
-function Update-TSHyperData {
+function Update-TableauHyperData {
 <#
 .SYNOPSIS
 Update Data in Hyper Data Source or Connection
@@ -3617,10 +3620,10 @@ all subsequent requests will be treated as duplicates and ignored by the server.
 This can be used to guarantee idempotency of requests.
 
 .EXAMPLE
-$job = Update-TSHyperData -InFile upload.hyper -Action $action -DatasourceId $datasource.id
+$job = Update-TableauHyperData -InFile upload.hyper -Action $action -DatasourceId $datasource.id
 
 .EXAMPLE
-$job = Update-TSHyperData -InFile upload.hyper -DatasourceId $datasourceId -Action $action1,$action2  -ConnectionId $connectionId
+$job = Update-TableauHyperData -InFile upload.hyper -DatasourceId $datasourceId -Action $action1,$action2  -ConnectionId $connectionId
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sources.htm#update_data_in_hyper_data_source
@@ -3637,12 +3640,12 @@ Param(
     [Parameter()][string] $InFile,
     [Parameter()][string] $RequestId
 )
-    Assert-TSRestApiVersion -AtLeast 3.12
+    Assert-TableauRestVersion -AtLeast 3.12
     if ($ConnectionId) {
-        $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/connections/$ConnectionId/data
+        $uri = Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId/connections/$ConnectionId/data
         $shouldProcessItem = "datasource:{0}, connection:{1}" -f $DatasourceId, $ConnectionId
     } else {
-        $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/data
+        $uri = Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId/data
         $shouldProcessItem = "datasource:{0}" -f $DatasourceId
     }
     if (-Not $RequestId) {
@@ -3651,7 +3654,7 @@ Param(
     if ($InFile) {
         $fileItem = Get-Item -LiteralPath $InFile
         $fileName = $fileItem.Name -replace '["`]','' # remove special chars
-        $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $fileName
+        $uploadSessionId = Send-TableauFileUpload -InFile $InFile -FileName $fileName
         $uri += "?uploadSessionId=$uploadSessionId"
     }
     $actionsArray = @()
@@ -3662,14 +3665,14 @@ Param(
     Write-Debug $jsonBody
 
     if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-        $response = Invoke-TSRestApiMethod -Uri $uri -Body $jsonBody -Method Patch -ContentType "application/json" -AddHeaders @{RequestID=$RequestId}
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $jsonBody -Method Patch -ContentType "application/json" -AddHeaders @{RequestID=$RequestId}
         # Write-Debug ($response.tsResponse.job | Format-List -Force | Out-String)
         return $response.tsResponse.job
     }
 }
 
 ### Views methods
-function Get-TSView {
+function Get-TableauView {
 <#
 .SYNOPSIS
 Get View / Query Views for Site / Query Views for Workbook
@@ -3690,7 +3693,7 @@ Query Views: include this boolean switch to return usage statistics with the vie
 (Optional)
 An expression that lets you specify a subset of data records to return.
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#views
-Also: Get View by Path - use Get-TSView with filter viewUrlName:eq:<url>
+Also: Get View by Path - use Get-TableauView with filter viewUrlName:eq:<url>
 
 .PARAMETER Sort
 (Optional)
@@ -3706,13 +3709,13 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_field
 (Optional) Page size when paging through results.
 
 .EXAMPLE
-$view = Get-TSView -ViewId $viewId
+$view = Get-TableauView -ViewId $viewId
 
 .EXAMPLE
-$views = Get-TSView -Filter "name:eq:$viewName" -Sort name:asc -Fields id,name
+$views = Get-TableauView -Filter "name:eq:$viewName" -Sort name:asc -Fields id,name
 
 .EXAMPLE
-$viewsInWorkbook = Get-TSView -WorkbookId $workbookId -IncludeUsageStatistics
+$viewsInWorkbook = Get-TableauView -WorkbookId $workbookId -IncludeUsageStatistics
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#get_view
@@ -3733,26 +3736,26 @@ Param(
     [Parameter(ParameterSetName='Views')][string[]] $Fields,
     [Parameter(ParameterSetName='Views')][ValidateRange(1,100)][int] $PageSize = 100
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     if ($ViewId) { # Get View
-        Assert-TSRestApiVersion -AtLeast 3.0
+        Assert-TableauRestVersion -AtLeast 3.0
     }
     if ($ViewId) { # Get View
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint View -Param $ViewId) -Method Get
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint View -Param $ViewId) -Method Get
         $response.tsResponse.view
     } elseif ($WorkbookId) { # Query Views for Workbook
-        $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/views
+        $uri = Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId/views
         if ($IncludeUsageStatistics) {
             $uri += "?includeUsageStatistics=true"
         }
-        $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
+        $response = Invoke-TableauRestMethod -Uri $uri -Method Get
         $response.tsResponse.views.view
     } else { # Query Views for Site
-        # Assert-TSRestApiVersion -AtLeast 2.2
+        # Assert-TableauRestVersion -AtLeast 2.2
         $pageNumber = 0
         do {
             $pageNumber++
-            $uri = Get-TSRequestUri -Endpoint View
+            $uri = Get-TableauRequestUri -Endpoint View
             $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
             $uriParam.Add("pageSize", $PageSize)
             $uriParam.Add("pageNumber", $pageNumber)
@@ -3770,14 +3773,14 @@ Param(
             }
             $uriRequest = [System.UriBuilder]$uri
             $uriRequest.Query = $uriParam.ToString()
-            $response = Invoke-TSRestApiMethod -Uri $uriRequest.Uri.OriginalString -Method Get
+            $response = Invoke-TableauRestMethod -Uri $uriRequest.Uri.OriginalString -Method Get
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.views.view
         } until ($PageSize*$pageNumber -ge $totalAvailable)
     }
 }
 
-function Export-TSViewPreviewImage {
+function Export-TableauViewImage {
 <#
 .SYNOPSIS
 Query View Preview Image
@@ -3796,7 +3799,7 @@ The LUID of the workbook that contains the view to return a thumbnail image for.
 If not provided, the downloaded content is piped to the output.
 
 .EXAMPLE
-Export-TSViewPreviewImage -ViewId $view.id -WorkbookId $workbookId -OutFile "preview.png"
+Export-TableauViewImage -ViewId $view.id -WorkbookId $workbookId -OutFile "preview.png"
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#query_view_with_preview
@@ -3807,16 +3810,16 @@ Param(
     [Parameter(Mandatory)][string] $WorkbookId,
     [Parameter()][string] $OutFile
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     $OutFileParam = @{}
     if ($OutFile) {
         $OutFileParam.Add("OutFile", $OutFile)
     }
-    $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/views/$ViewId/previewImage
-    Invoke-TSRestApiMethod -Uri $uri -Method Get -TimeoutSec 600 @OutFileParam
+    $uri = Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId/views/$ViewId/previewImage
+    Invoke-TableauRestMethod -Uri $uri -Method Get -TimeoutSec 600 @OutFileParam
 }
 
-function Export-TSViewToFormat {
+function Export-TableauViewToFormat {
 <#
 .SYNOPSIS
 Query View PDF / Image / Data
@@ -3866,13 +3869,13 @@ To filter a view using a field, add one or more query parameters to your method 
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#Filter-query-views
 
 .EXAMPLE
-Export-TSViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "export.pdf" -ViewFilters @{Region="Europe"}
+Export-TableauViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "export.pdf" -ViewFilters @{Region="Europe"}
 
 .EXAMPLE
-Export-TSViewToFormat -ViewId $sampleViewId -Format image -OutFile "export.png" -Resolution high
+Export-TableauViewToFormat -ViewId $sampleViewId -Format image -OutFile "export.png" -Resolution high
 
 .EXAMPLE
-Export-TSViewToFormat -ViewId $sampleViewId -Format csv -OutFile "export.csv" -ViewFilters @{"Ease of Business (clusters)"="Low"}
+Export-TableauViewToFormat -ViewId $sampleViewId -Format csv -OutFile "export.csv" -ViewFilters @{"Ease of Business (clusters)"="Low"}
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#query_view_pdf
@@ -3900,10 +3903,10 @@ Param(
     if ($OutFile) {
         $OutFileParam.Add("OutFile", $OutFile)
     }
-    $uri = Get-TSRequestUri -Endpoint View -Param $ViewId
+    $uri = Get-TableauRequestUri -Endpoint View -Param $ViewId
     $uriParam = @{}
     if ($Format -eq 'pdf') {
-        Assert-TSRestApiVersion -AtLeast 2.8
+        Assert-TableauRestVersion -AtLeast 2.8
         $uri += "/pdf"
         $uriParam.Add('type', $PageType)
         $uriParam.Add('orientation', $PageOrientation)
@@ -3915,18 +3918,18 @@ Param(
         }
         # $fileType = 'pdf'
     } elseif ($Format -eq 'image') {
-        Assert-TSRestApiVersion -AtLeast 2.5
+        Assert-TableauRestVersion -AtLeast 2.5
         $uri += "/image"
         if ($Resolution -eq "high") {
             $uriParam.Add('resolution', $Resolution)
         }
         # $fileType = 'png'
     } elseif ($Format -eq 'csv') {
-        Assert-TSRestApiVersion -AtLeast 2.8
+        Assert-TableauRestVersion -AtLeast 2.8
         $uri += "/data"
         # $fileType = 'csv'
     } elseif ($Format -eq 'excel') {
-        Assert-TSRestApiVersion -AtLeast 3.9
+        Assert-TableauRestVersion -AtLeast 3.9
         $uri += "/crosstab/excel"
         # $fileType = 'xlsx'
     }
@@ -3938,10 +3941,10 @@ Param(
             $uriParam.Add("vf_"+$_.Key, $_.Value)
         }
     }
-    Invoke-TSRestApiMethod -Uri $uri -Body $uriParam -Method Get -TimeoutSec 600 @OutFileParam
+    Invoke-TableauRestMethod -Uri $uri -Body $uriParam -Method Get -TimeoutSec 600 @OutFileParam
 }
 
-function Get-TSViewRecommendation {
+function Get-TableauViewRecommendation {
 <#
 .SYNOPSIS
 Get Recommendations for Views
@@ -3950,20 +3953,20 @@ Get Recommendations for Views
 Gets a list of views that are recommended for a user.
 
 .EXAMPLE
-$recommendations = Get-TSViewRecommendation
+$recommendations = Get-TableauViewRecommendation
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#get_view_recommendations
 #>
 [OutputType([PSCustomObject[]])]
 Param()
-    Assert-TSRestApiVersion -AtLeast 3.7
-    $uri = Get-TSRequestUri -Endpoint Recommendation -Param "?type=view"
-    $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
+    Assert-TableauRestVersion -AtLeast 3.7
+    $uri = Get-TableauRequestUri -Endpoint Recommendation -Param "?type=view"
+    $response = Invoke-TableauRestMethod -Uri $uri -Method Get
     return $response.tsResponse.recommendations.recommendation
 }
 
-function Hide-TSViewRecommendation {
+function Hide-TableauViewRecommendation {
 <#
 .SYNOPSIS
 Hide a Recommendation for a View
@@ -3975,7 +3978,7 @@ Hides a view from being recommended by the server by adding it to a list of view
 The LUID of the view to be added to the list of views hidden from recommendation for a user.
 
 .EXAMPLE
-Hide-TSViewRecommendation -ViewId $viewId
+Hide-TableauViewRecommendation -ViewId $viewId
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#hide_view_recommendation
@@ -3984,17 +3987,17 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_
 Param(
     [Parameter(Mandatory)][string] $ViewId
 )
-    Assert-TSRestApiVersion -AtLeast 3.7
+    Assert-TableauRestVersion -AtLeast 3.7
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_rd = $tsRequest.AppendChild($xml.CreateElement("recommendationDismissal"))
     $el_view = $el_rd.AppendChild($xml.CreateElement("view"))
     $el_view.SetAttribute("id", $ViewId)
-    $uri = Get-TSRequestUri -Endpoint Recommendation -Param dismissals
-    Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Put
+    $uri = Get-TableauRequestUri -Endpoint Recommendation -Param dismissals
+    Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put
 }
 
-function Show-TSViewRecommendation {
+function Show-TableauViewRecommendation {
 <#
 .SYNOPSIS
 Unhide a Recommendation for a View
@@ -4006,7 +4009,7 @@ Unhides a view from being recommended by the server by removing it from the list
 The LUID of the view to be removed from the list of views hidden from recommendation for a user.
 
 .EXAMPLE
-Show-TSViewRecommendation -ViewId $viewId
+Show-TableauViewRecommendation -ViewId $viewId
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#unhide_view_recommendation
@@ -4015,12 +4018,12 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_
 Param(
     [Parameter(Mandatory)][string] $ViewId
 )
-    Assert-TSRestApiVersion -AtLeast 3.7
-    $uri = Get-TSRequestUri -Endpoint Recommendation -Param "dismissals/?type=view&id=$ViewId"
-    Invoke-TSRestApiMethod -Uri $uri -Method Delete
+    Assert-TableauRestVersion -AtLeast 3.7
+    $uri = Get-TableauRequestUri -Endpoint Recommendation -Param "dismissals/?type=view&id=$ViewId"
+    Invoke-TableauRestMethod -Uri $uri -Method Delete
 }
 
-function Get-TSCustomView {
+function Get-TableauCustomView {
 <#
 .SYNOPSIS
 Get Custom View / List Custom Views
@@ -4035,7 +4038,7 @@ Gets the details of a specified custom view, or a list of custom views on a site
 (Optional)
 An expression that lets you specify a subset of data records to return.
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#views
-Also: Get View by Path - use Get-TSView with filter viewUrlName:eq:<url>
+Also: Get View by Path - use Get-TableauView with filter viewUrlName:eq:<url>
 
 .PARAMETER Sort
 (Optional)
@@ -4051,10 +4054,10 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_field
 (Optional) Page size when paging through results.
 
 .EXAMPLE
-$customView = Get-TSCustomView -CustomViewId $id
+$customView = Get-TableauCustomView -CustomViewId $id
 
 .EXAMPLE
-$views = Get-TSCustomView -Filter "name:eq:Overview"
+$views = Get-TableauCustomView -Filter "name:eq:Overview"
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#get_custom_view
@@ -4070,15 +4073,15 @@ Param(
     [Parameter(ParameterSetName='CustomViews')][string[]] $Fields,
     [Parameter(ParameterSetName='CustomViews')][ValidateRange(1,100)][int] $PageSize = 100
 )
-    Assert-TSRestApiVersion -AtLeast 3.18
+    Assert-TableauRestVersion -AtLeast 3.18
     if ($CustomViewId) { # Get Custom View
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint CustomView -Param $CustomViewId) -Method Get
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint CustomView -Param $CustomViewId) -Method Get
         $response.tsResponse.customView
     } else { # List Custom Views
         $pageNumber = 0
         do {
             $pageNumber++
-            $uri = Get-TSRequestUri -Endpoint CustomView
+            $uri = Get-TableauRequestUri -Endpoint CustomView
             $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
             $uriParam.Add("pageSize", $PageSize)
             $uriParam.Add("pageNumber", $pageNumber)
@@ -4093,14 +4096,14 @@ Param(
             }
             $uriRequest = [System.UriBuilder]$uri
             $uriRequest.Query = $uriParam.ToString()
-            $response = Invoke-TSRestApiMethod -Uri $uriRequest.Uri.OriginalString -Method Get
+            $response = Invoke-TableauRestMethod -Uri $uriRequest.Uri.OriginalString -Method Get
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.customViews.customView
         } until ($PageSize*$pageNumber -ge $totalAvailable)
     }
 }
 
-function Get-TSCustomViewAsUserDefault {
+function Get-TableauCustomViewUserDefault {
 <#
 .SYNOPSIS
 List Users with Custom View as Default
@@ -4112,7 +4115,7 @@ Gets the list of users whose default view is the specified custom view.
 The LUID for the custom view.
 
 .EXAMPLE
-$users = Get-TSCustomViewAsUserDefault -CustomViewId $id
+$users = Get-TableauCustomViewUserDefault -CustomViewId $id
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#list_users_with_custom_view_as_default
@@ -4121,13 +4124,13 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_
 Param(
     [Parameter(Mandatory)][string] $CustomViewId
 )
-    Assert-TSRestApiVersion -AtLeast 3.21
-    $uri = Get-TSRequestUri -Endpoint CustomView -Param "$CustomViewId/default/users"
-    $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
+    Assert-TableauRestVersion -AtLeast 3.21
+    $uri = Get-TableauRequestUri -Endpoint CustomView -Param "$CustomViewId/default/users"
+    $response = Invoke-TableauRestMethod -Uri $uri -Method Get
     return $response.tsResponse.users.user
 }
 
-function Set-TSCustomViewAsUserDefault {
+function Set-TableauCustomViewUserDefault {
 <#
 .SYNOPSIS
 Set Custom View as Default for Users
@@ -4142,7 +4145,7 @@ The LUID for the custom view.
 List of user LUIDs.
 
 .EXAMPLE
-$result = Set-TSCustomViewAsUserDefault -CustomViewId $id -UserId $user1,$user2
+$result = Set-TableauCustomViewUserDefault -CustomViewId $id -UserId $user1,$user2
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#set_custom_view_as_default_for_users
@@ -4153,7 +4156,7 @@ Param(
     [Parameter(Mandatory)][string] $CustomViewId,
     [Parameter(Mandatory)][string[]] $UserId
 )
-    Assert-TSRestApiVersion -AtLeast 3.21
+    Assert-TableauRestVersion -AtLeast 3.21
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_users = $tsRequest.AppendChild($xml.CreateElement("users"))
@@ -4161,14 +4164,14 @@ Param(
         $el_user = $el_users.AppendChild($xml.CreateElement("user"))
         $el_user.SetAttribute("id", $id)
     }
-    $uri = Get-TSRequestUri -Endpoint CustomView -Param "$CustomViewId/default/users"
+    $uri = Get-TableauRequestUri -Endpoint CustomView -Param "$CustomViewId/default/users"
     if ($PSCmdlet.ShouldProcess("custom view: $CustomViewId, user: $UserId")) {
-        $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Post
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Post
         return $response.tsResponse.customViewAsUserDefaultResults.customViewAsUserDefaultViewResult
     }
 }
 
-function Export-TSCustomViewImage {
+function Export-TableauCustomViewImage {
 <#
 .SYNOPSIS
 Get Custom View Image
@@ -4196,7 +4199,7 @@ To filter a view using a field, add one or more query parameters to your method 
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#Filter-query-views
 
 .EXAMPLE
-Export-TSCustomViewImage -CustomViewId $id -OutFile "export.png" -Resolution high
+Export-TableauCustomViewImage -CustomViewId $id -OutFile "export.png" -Resolution high
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#get_custom_view_image
@@ -4209,12 +4212,12 @@ Param(
     [Parameter()][string] $OutFile,
     [Parameter()][hashtable] $ViewFilters
 )
-    Assert-TSRestApiVersion -AtLeast 3.18
+    Assert-TableauRestVersion -AtLeast 3.18
     $OutFileParam = @{}
     if ($OutFile) {
         $OutFileParam.Add("OutFile", $OutFile)
     }
-    $uri = Get-TSRequestUri -Endpoint CustomView -Param $CustomViewId
+    $uri = Get-TableauRequestUri -Endpoint CustomView -Param $CustomViewId
     $uriParam = @{}
     $uri += "/image"
     if ($Resolution -eq "high") {
@@ -4228,10 +4231,10 @@ Param(
             $uriParam.Add("vf_"+$_.Key, $_.Value)
         }
     }
-    Invoke-TSRestApiMethod -Uri $uri -Body $uriParam -Method Get -TimeoutSec 600 @OutFileParam
+    Invoke-TableauRestMethod -Uri $uri -Body $uriParam -Method Get -TimeoutSec 600 @OutFileParam
 }
 
-function Update-TSCustomView {
+function Set-TableauCustomView {
 <#
 .SYNOPSIS
 Update Custom View
@@ -4249,7 +4252,7 @@ The LUID for the custom view being updated.
 (Optional) The LUID of the new owner of custom view that replaces the existing one.
 
 .EXAMPLE
-$result = Update-TSCustomView -CustomViewId $id -Name "My Custom View"
+$result = Set-TableauCustomView -CustomViewId $id -Name "My Custom View"
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#update_custom_view
@@ -4261,7 +4264,7 @@ Param(
     [Parameter()][string] $NewName,
     [Parameter()][string] $NewOwnerId
 )
-    Assert-TSRestApiVersion -AtLeast 3.18
+    Assert-TableauRestVersion -AtLeast 3.18
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_cview = $tsRequest.AppendChild($xml.CreateElement("customView"))
@@ -4273,12 +4276,12 @@ Param(
         $el_owner.SetAttribute("id", $NewOwnerId)
     }
     if ($PSCmdlet.ShouldProcess($CustomViewId)) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint CustomView -Param $CustomViewId) -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint CustomView -Param $CustomViewId) -Body $xml.OuterXml -Method Put
         return $response.tsResponse.customView
     }
 }
 
-function Remove-TSCustomView {
+function Remove-TableauCustomView {
 <#
 .SYNOPSIS
 Delete Custom View
@@ -4290,7 +4293,7 @@ Deletes the specified custom view.
 The LUID for the custom view being removed.
 
 .EXAMPLE
-Remove-TSCustomView -CustomViewId $id
+Remove-TableauCustomView -CustomViewId $id
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#delete_custom_view
@@ -4300,13 +4303,13 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_
 Param(
     [Parameter(Mandatory)][string] $CustomViewId
 )
-    Assert-TSRestApiVersion -AtLeast 3.18
+    Assert-TableauRestVersion -AtLeast 3.18
     if ($PSCmdlet.ShouldProcess($CustomViewId)) {
-        Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint CustomView -Param $CustomViewId) -Method Delete
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint CustomView -Param $CustomViewId) -Method Delete
     }
 }
 
-function Get-TSViewUrl {
+function Get-TableauViewUrl {
 <#
 .SYNOPSIS
 Get View URL
@@ -4321,7 +4324,7 @@ The LUID of the specified view. Either ViewId or ContentUrl needs to be provided
 The content URL of the specified view. Either ViewId or ContentUrl needs to be provided.
 
 .EXAMPLE
-Get-TSViewUrl -ViewId $view.id
+Get-TableauViewUrl -ViewId $view.id
 #>
 [OutputType([string])]
 Param(
@@ -4329,11 +4332,11 @@ Param(
     [Parameter(Mandatory,ParameterSetName='ContentUrl')][string] $ContentUrl
 )
     if ($ViewId) {
-        $view = Get-TSView -ViewId $ViewId
+        $view = Get-TableauView -ViewId $ViewId
         $ContentUrl = $view.contentUrl
     }
-    $currentSite = Get-TSSite -Current
-    $viewUrl = $script:TSServerUrl + "/#/"
+    $currentSite = Get-TableauSite -Current
+    $viewUrl = $script:TableauServerUrl + "/#/"
     if ($currentSite.contentUrl) { # non-default site
         $viewUrl += "site/" + $currentSite.contentUrl
     }
@@ -4342,7 +4345,7 @@ Param(
 }
 
 ### Flows methods
-function Get-TSFlow {
+function Get-TableauFlow {
 <#
 .SYNOPSIS
 Query Flow / Query Flows / Query Flow Revisions
@@ -4379,13 +4382,13 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_field
 (Optional) Page size when paging through results.
 
 .EXAMPLE
-$flow = Get-TSFlow -FlowId $flowId
+$flow = Get-TableauFlow -FlowId $flowId
 
 .EXAMPLE
-$outputSteps = Get-TSFlow -FlowId $flowId -OutputSteps
+$outputSteps = Get-TableauFlow -FlowId $flowId -OutputSteps
 
 .EXAMPLE
-$flows = Get-TSFlow -Filter "name:eq:$flowName"
+$flows = Get-TableauFlow -Filter "name:eq:$flowName"
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#query_flow
@@ -4407,19 +4410,19 @@ Param(
     [Parameter(ParameterSetName='FlowRevisions')]
     [ValidateRange(1,100)][int] $PageSize = 100
 )
-    Assert-TSRestApiVersion -AtLeast 3.3
+    Assert-TableauRestVersion -AtLeast 3.3
     if ($Revisions) { # Get Flow Revisions
         $pageNumber = 0
         do {
             $pageNumber++
-            $uri = Get-TSRequestUri -Endpoint Flow -Param $FlowId/revisions
+            $uri = Get-TableauRequestUri -Endpoint Flow -Param $FlowId/revisions
             $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-            $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
+            $response = Invoke-TableauRestMethod -Uri $uri -Method Get
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.revisions.revision
         } until ($PageSize*$pageNumber -ge $totalAvailable)
     } elseif ($FlowId) { # Get Flow
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param $FlowId) -Method Get
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Flow -Param $FlowId) -Method Get
         if ($OutputSteps) { # Get Flow, return output steps
             $response.tsResponse.flowOutputSteps.flowOutputStep
         } else { # Get Flow
@@ -4429,7 +4432,7 @@ Param(
         $pageNumber = 0
         do {
             $pageNumber++
-            $uri = Get-TSRequestUri -Endpoint Flow
+            $uri = Get-TableauRequestUri -Endpoint Flow
             $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
             $uriParam.Add("pageSize", $PageSize)
             $uriParam.Add("pageNumber", $pageNumber)
@@ -4444,14 +4447,14 @@ Param(
             }
             $uriRequest = [System.UriBuilder]$uri
             $uriRequest.Query = $uriParam.ToString()
-            $response = Invoke-TSRestApiMethod -Uri $uriRequest.Uri.OriginalString -Method Get
+            $response = Invoke-TableauRestMethod -Uri $uriRequest.Uri.OriginalString -Method Get
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.flows.flow
         } until ($PageSize*$pageNumber -ge $totalAvailable)
     }
 }
 
-function Get-TSFlowsForUser {
+function Get-TableauFlowsForUser {
 <#
 .SYNOPSIS
 Query Flows for User
@@ -4469,7 +4472,7 @@ The LUID of the user to get flows for.
 (Optional) Page size when paging through results.
 
 .EXAMPLE
-$flows = Get-TSFlowsForUser -UserId (Get-TSCurrentUserId)
+$flows = Get-TableauFlowsForUser -UserId (Get-TableauCurrentUserId)
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#query_flows_for_user
@@ -4480,20 +4483,20 @@ Param(
     [Parameter()][switch] $IsOwner,
     [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
 )
-    Assert-TSRestApiVersion -AtLeast 3.3
+    Assert-TableauRestVersion -AtLeast 3.3
     $pageNumber = 0
     do {
         $pageNumber++
-        $uri = Get-TSRequestUri -Endpoint User -Param $UserId/flows
+        $uri = Get-TableauRequestUri -Endpoint User -Param $UserId/flows
         $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
         if ($IsOwner) { $uri += "&ownedBy=true" }
-        $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
+        $response = Invoke-TableauRestMethod -Uri $uri -Method Get
         $totalAvailable = $response.tsResponse.pagination.totalAvailable
         $response.tsResponse.flows.flow
     } until ($PageSize*$pageNumber -ge $totalAvailable)
 }
 
-function Get-TSFlowConnection {
+function Get-TableauFlowConnection {
 <#
 .SYNOPSIS
 Query Flow Connections
@@ -4505,7 +4508,7 @@ Returns a list of data connections for the specific flow.
 The LUID of the flow to return connection information about.
 
 .EXAMPLE
-$connections = Get-TSFlowConnection -FlowId $flowId
+$connections = Get-TableauFlowConnection -FlowId $flowId
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#query_flow_connections
@@ -4514,12 +4517,12 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#q
 Param(
     [Parameter(Mandatory)][string] $FlowId
 )
-    Assert-TSRestApiVersion -AtLeast 3.3
-    $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param $FlowId/connections) -Method Get
+    Assert-TableauRestVersion -AtLeast 3.3
+    $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Flow -Param $FlowId/connections) -Method Get
     return $response.tsResponse.connections.connection
 }
 
-function Export-TSFlow {
+function Export-TableauFlow {
 <#
 .SYNOPSIS
 Download Flow
@@ -4539,7 +4542,7 @@ If not provided, the downloaded content is piped to the output.
 Note: reserved for future use, flow revisions are currently not supported via REST API
 
 .EXAMPLE
-Export-TSFlow -FlowId $sampleflowId -OutFile "Flow.tflx"
+Export-TableauFlow -FlowId $sampleflowId -OutFile "Flow.tflx"
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#download_flow
@@ -4550,24 +4553,24 @@ Param(
     [Parameter()][string] $OutFile,
     [Parameter()][int] $Revision
 )
-    Assert-TSRestApiVersion -AtLeast 3.3
+    Assert-TableauRestVersion -AtLeast 3.3
     $OutFileParam = @{}
     if ($OutFile) {
         $OutFileParam.Add("OutFile", $OutFile)
     }
-    $uri = Get-TSRequestUri -Endpoint Flow -Param $FlowId
+    $uri = Get-TableauRequestUri -Endpoint Flow -Param $FlowId
     if ($Revision) {
-        $lastRevision = Get-TSFlow -FlowId $FlowId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
+        $lastRevision = Get-TableauFlow -FlowId $FlowId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
         # Note that the current revision of a flow cannot be accessed by the /revisions endpoint; in this case we ignore the -Revision parameter
         if ($Revision -lt $lastRevision) {
             $uri += "/revisions/$Revision"
         }
     }
     $uri += "/content"
-    Invoke-TSRestApiMethod -Uri $uri -Method Get -TimeoutSec 600 @OutFileParam
+    Invoke-TableauRestMethod -Uri $uri -Method Get -TimeoutSec 600 @OutFileParam
 }
 
-function Publish-TSFlow {
+function Publish-TableauFlow {
 <#
 .SYNOPSIS
 Publish Flow
@@ -4605,7 +4608,7 @@ This can be helpful if timeouts occur during upload.
 (Optional) Hashtable array containing connection attributes and credentials (see online help).
 
 .EXAMPLE
-$flow = Publish-TSFlow -Name $sampleFlowName -InFile "Flow.tflx" -ProjectId $projectId -Overwrite
+$flow = Publish-TableauFlow -Name $sampleFlowName -InFile "Flow.tflx" -ProjectId $projectId -Overwrite
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#publish_flow
@@ -4622,7 +4625,7 @@ Param(
     # [Parameter()][hashtable] $Credentials, # connectionCredentials is not supported in this API method
     [Parameter()][hashtable[]] $Connections
 )
-    Assert-TSRestApiVersion -AtLeast 3.3
+    Assert-TableauRestVersion -AtLeast 3.3
     $fileItem = Get-Item -LiteralPath $InFile
     if (-Not $FileName) {
         $FileName = $fileItem.Name -replace '["`]','' # remove special chars
@@ -4644,10 +4647,10 @@ Param(
         Write-Verbose "Filename $FileName contains special characters, replacing with tableau_flow.$FileType"
         $FileName = "tableau_flow.$FileType" # fallback to standard filename (doesn't matter for file upload)
     }
-    if ($fileItem.Length -ge $script:TSRestApiFileSizeLimit) {
+    if ($fileItem.Length -ge $script:TableauRestFileSizeLimit) {
         $Chunked = $true
     }
-    $uri = Get-TSRequestUri -Endpoint Flow
+    $uri = Get-TableauRequestUri -Endpoint Flow
     $uri += "?flowType=$FileType"
     if ($Overwrite) {
         $uri += "&overwrite=true"
@@ -4657,10 +4660,10 @@ Param(
     $el_flow = $tsRequest.AppendChild($xml.CreateElement("flow"))
     $el_flow.SetAttribute("name", $Name)
     # if ($Credentials) {
-    #     Add-TSCredentialsElement -Element $tsRequest -Credentials $Credentials
+    #     Add-TableauRequestCredentialsElement -Element $tsRequest -Credentials $Credentials
     # }
     if ($Connections) {
-        Add-TSConnectionsElement -Element $tsRequest -Connections $Connections
+        Add-TableauRequestConnectionsElement -Element $tsRequest -Connections $Connections
     }
     if ($ProjectId) {
         $el_project = $el_flow.AppendChild($xml.CreateElement("project"))
@@ -4677,9 +4680,9 @@ Param(
         $stringContent.Headers.ContentDisposition.Name = "request_payload"
         $multipartContent.Add($stringContent)
         if ($Chunked) {
-            $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName
+            $uploadSessionId = Send-TableauFileUpload -InFile $InFile -FileName $FileName
             $uri += "&uploadSessionId=$uploadSessionId"
-            $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post
+            $response = Invoke-TableauRestMethod -Uri $uri -Body $multipartContent -Method Post
         } else {
             $fileStream = New-Object System.IO.FileStream($fileItem.FullName, [System.IO.FileMode]::Open)
             try {
@@ -4689,7 +4692,7 @@ Param(
                 $fileContent.Headers.ContentDisposition.Name = "tableau_flow"
                 $fileContent.Headers.ContentDisposition.FileName = "`"$FileName`""
                 $multipartContent.Add($fileContent)
-                $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post
+                $response = Invoke-TableauRestMethod -Uri $uri -Body $multipartContent -Method Post
             } finally {
                 $fileStream.Dispose()
             }
@@ -4704,7 +4707,7 @@ Param(
             $xml.OuterXml
         )
         if ($Chunked) {
-            $uploadSessionId = Send-TSFileUpload -InFile $InFile -FileName $FileName
+            $uploadSessionId = Send-TableauFileUpload -InFile $InFile -FileName $FileName
             $uri += "&uploadSessionId=$uploadSessionId"
         } else {
             $bodyLines += @(
@@ -4717,12 +4720,12 @@ Param(
         }
         $bodyLines += "--$boundaryString--"
         $multipartContent = $bodyLines -join "`r`n"
-        $response = Invoke-TSRestApiMethod -Uri $uri -Body $multipartContent -Method Post -ContentType "multipart/mixed; boundary=$boundaryString"
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $multipartContent -Method Post -ContentType "multipart/mixed; boundary=$boundaryString"
     }
     return $response.tsResponse.flow
 }
 
-function Update-TSFlow {
+function Set-TableauFlow {
 <#
 .SYNOPSIS
 Update Flow
@@ -4740,7 +4743,7 @@ The LUID of the flow to update.
 (Optional) The LUID of a user to assign the flow to as owner.
 
 .EXAMPLE
-$flow = Update-TSFlow -FlowId $flow.id -NewProjectId $project.id
+$flow = Set-TableauFlow -FlowId $flow.id -NewProjectId $project.id
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#update_flow
@@ -4752,7 +4755,7 @@ Param(
     [Parameter()][string] $NewProjectId,
     [Parameter()][string] $NewOwnerId
 )
-    Assert-TSRestApiVersion -AtLeast 3.3
+    Assert-TableauRestVersion -AtLeast 3.3
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_flow = $tsRequest.AppendChild($xml.CreateElement("flow"))
@@ -4765,12 +4768,12 @@ Param(
         $el_owner.SetAttribute("id", $NewOwnerId)
     }
     if ($PSCmdlet.ShouldProcess($FlowId)) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param $FlowId) -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Flow -Param $FlowId) -Body $xml.OuterXml -Method Put
         return $response.tsResponse.flow
     }
 }
 
-function Update-TSFlowConnection {
+function Set-TableauFlowConnection {
 <#
 .SYNOPSIS
 Update Flow Connection
@@ -4800,7 +4803,7 @@ The LUID of the connection to update.
 (Optional) Boolean switch, if supplied, the connection password is embedded.
 
 .EXAMPLE
-$flowConnection = Update-TSFlowConnection -FlowId $flow.id -ConnectionId $connectionId -ServerAddress myserver.com
+$flowConnection = Set-TableauFlowConnection -FlowId $flow.id -ConnectionId $connectionId -ServerAddress myserver.com
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#update_flow_connection
@@ -4816,7 +4819,7 @@ Param(
     [Parameter()][securestring] $SecurePassword,
     [Parameter()][switch] $EmbedPassword
 )
-    Assert-TSRestApiVersion -AtLeast 3.3
+    Assert-TableauRestVersion -AtLeast 3.3
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_connection = $tsRequest.AppendChild($xml.CreateElement("connection"))
@@ -4836,14 +4839,14 @@ Param(
     if ($PSBoundParameters.ContainsKey('EmbedPassword')) {
         $el_connection.SetAttribute("embedPassword", $EmbedPassword)
     }
-    $uri = Get-TSRequestUri -Endpoint Flow -Param $FlowId/connections/$ConnectionId
+    $uri = Get-TableauRequestUri -Endpoint Flow -Param $FlowId/connections/$ConnectionId
     if ($PSCmdlet.ShouldProcess($ConnectionId)) {
-        $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put
         return $response.tsResponse.connection
     }
 }
 
-function Remove-TSFlow {
+function Remove-TableauFlow {
 <#
 .SYNOPSIS
 Delete Flow
@@ -4860,7 +4863,7 @@ The LUID of the flow to delete.
 Note: reserved for future use, flow revisions are currently not supported via REST API
 
 .EXAMPLE
-Remove-TSFlow -FlowId $sampleFlowId
+Remove-TableauFlow -FlowId $sampleFlowId
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#delete_flow
@@ -4871,19 +4874,19 @@ Param(
     [Parameter(Mandatory)][string] $FlowId,
     [Parameter()][int] $Revision # Note: flow revisions currently not supported via REST API
 )
-    Assert-TSRestApiVersion -AtLeast 3.3
+    Assert-TableauRestVersion -AtLeast 3.3
     if ($Revision) { # Remove Flow Revision
         if ($PSCmdlet.ShouldProcess("$FlowId, revision $Revision")) {
-            Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $FlowId/revisions/$Revision) -Method Delete
+            Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Datasource -Param $FlowId/revisions/$Revision) -Method Delete
         }
     } else { # Remove Flow
         if ($PSCmdlet.ShouldProcess($FlowId)) {
-            Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param $FlowId) -Method Delete
+            Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Flow -Param $FlowId) -Method Delete
         }
     }
 }
 
-function Start-TSFlowNow {
+function Start-TableauFlowNow {
 <#
 .SYNOPSIS
 Run Flow Now
@@ -4904,7 +4907,7 @@ The LUID of the flow to run.
 (Optional) The hashtable of the flow parameters, with flow parameter IDs and values.
 
 .EXAMPLE
-$job = Start-TSFlowNow -FlowId $flow.id
+$job = Start-TableauFlowNow -FlowId $flow.id
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#run_flow_now
@@ -4917,7 +4920,7 @@ Param(
     [Parameter()][string] $OutputStepId,
     [Parameter()][hashtable] $FlowParams
 )
-    Assert-TSRestApiVersion -AtLeast 3.3
+    Assert-TableauRestVersion -AtLeast 3.3
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_frs = $tsRequest.AppendChild($xml.CreateElement("flowRunSpec"))
@@ -4929,7 +4932,7 @@ Param(
         $el_step.SetAttribute("id", $OutputStepId)
     }
     if ($FlowParams) {
-        Assert-TSRestApiVersion -AtLeast 3.15
+        Assert-TableauRestVersion -AtLeast 3.15
         $el_params = $el_frs.AppendChild($xml.CreateElement("flowParameterSpecs"))
         $FlowParams.GetEnumerator() | ForEach-Object {
             $el_param = $el_params.AppendChild($xml.CreateElement("flowParameterSpec"))
@@ -4937,14 +4940,14 @@ Param(
             $el_param.SetAttribute("overrideValue", $_.Value)
         }
     }
-    $uri = Get-TSRequestUri -Endpoint Flow -Param $FlowId/run
+    $uri = Get-TableauRequestUri -Endpoint Flow -Param $FlowId/run
     if ($PSCmdlet.ShouldProcess($FlowId)) {
-        $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Post
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Post
         return $response.tsResponse.job
     }
 }
 
-function Get-TSFlowRun {
+function Get-TableauFlowRun {
 <#
 .SYNOPSIS
 Get Flow Run / Get Flow Runs
@@ -4964,10 +4967,10 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filte
 (Optional) Page size when paging through results.
 
 .EXAMPLE
-$run = Get-TSFlowRun -FlowRunId $id
+$run = Get-TableauFlowRun -FlowRunId $id
 
 .EXAMPLE
-$runs = Get-TSFlowRun -Filter "flowId:eq:$($flowRun.flowId)"
+$runs = Get-TableauFlowRun -Filter "flowId:eq:$($flowRun.flowId)"
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#get_flow_run
@@ -4981,15 +4984,15 @@ Param(
     [Parameter(ParameterSetName='FlowRuns')][string[]] $Filter,
     [Parameter(ParameterSetName='FlowRuns')][ValidateRange(1,100)][int] $PageSize = 100
 )
-    Assert-TSRestApiVersion -AtLeast 3.10
+    Assert-TableauRestVersion -AtLeast 3.10
     if ($FlowRunId) { # Get Flow Run
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param runs/$FlowRunId) -Method Get
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Flow -Param runs/$FlowRunId) -Method Get
         $response.tsResponse.flowRun
     } else { # Get Flow Runs
         $pageNumber = 0
         do {
             $pageNumber++
-            $uri = Get-TSRequestUri -Endpoint Flow -Param runs
+            $uri = Get-TableauRequestUri -Endpoint Flow -Param runs
             $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
             $uriParam.Add("pageSize", $PageSize)
             $uriParam.Add("pageNumber", $pageNumber)
@@ -4998,14 +5001,14 @@ Param(
             }
             $uriRequest = [System.UriBuilder]$uri
             $uriRequest.Query = $uriParam.ToString()
-            $response = Invoke-TSRestApiMethod -Uri $uriRequest.Uri.OriginalString -Method Get
+            $response = Invoke-TableauRestMethod -Uri $uriRequest.Uri.OriginalString -Method Get
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.flowRuns.flowRuns
         } until ($PageSize*$pageNumber -ge $totalAvailable)
     }
 }
 
-function Stop-TSFlowRun {
+function Stop-TableauFlowRun {
 <#
 .SYNOPSIS
 Cancel Flow Run
@@ -5018,7 +5021,7 @@ If the flow run was cancelled successfully, $null is returned, otherwise the res
 The LUID of the flow run.
 
 .EXAMPLE
-Stop-TSFlowRun -FlowRunId $run.id
+Stop-TableauFlowRun -FlowRunId $run.id
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#cancel_flow_run
@@ -5028,9 +5031,9 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#c
 Param(
     [Parameter(Mandatory)][string] $FlowRunId
 )
-    Assert-TSRestApiVersion -AtLeast 3.10
+    Assert-TableauRestVersion -AtLeast 3.10
     if ($PSCmdlet.ShouldProcess($FlowRunId)) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param runs/$FlowRunId) -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Flow -Param runs/$FlowRunId) -Method Put
         if ($response.tsResponse.error) {
             return $response.tsResponse.error
         } else {
@@ -5040,7 +5043,7 @@ Param(
 }
 
 ### Permissions methods
-function Get-TSContentPermission {
+function Get-TableauContentPermission {
 <#
 .SYNOPSIS
 Query Workbook / Data Source / View / Project / Flow Permissions
@@ -5064,13 +5067,13 @@ The LUID of the project to get permissions for.
 The LUID of the flow to get permissions for.
 
 .EXAMPLE
-$permissions = Get-TSContentPermission -WorkbookId $workbookId
+$permissions = Get-TableauContentPermission -WorkbookId $workbookId
 
 .EXAMPLE
-$permissions = Get-TSContentPermission -DatasourceId $datasourceId
+$permissions = Get-TableauContentPermission -DatasourceId $datasourceId
 
 .EXAMPLE
-$permissions = Get-TSContentPermission -ProjectId $project.id
+$permissions = Get-TableauContentPermission -ProjectId $project.id
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_permissions.htm#query_workbook_permissions
@@ -5095,26 +5098,26 @@ Param(
     [Parameter(Mandatory,ParameterSetName='Project')][string] $ProjectId,
     [Parameter(Mandatory,ParameterSetName='Flow')][string] $FlowId
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     if ($WorkbookId) {
-        $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId
+        $uri = Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId
     } elseif ($DatasourceId) {
-        $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId
+        $uri = Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId
     } elseif ($ViewId) {
-        Assert-TSRestApiVersion -AtLeast 3.2
-        $uri = Get-TSRequestUri -Endpoint View -Param $ViewId
+        Assert-TableauRestVersion -AtLeast 3.2
+        $uri = Get-TableauRequestUri -Endpoint View -Param $ViewId
     } elseif ($ProjectId) {
-        $uri = Get-TSRequestUri -Endpoint Project -Param $ProjectId
+        $uri = Get-TableauRequestUri -Endpoint Project -Param $ProjectId
     } elseif ($FlowId) {
-        Assert-TSRestApiVersion -AtLeast 3.3
-        $uri = Get-TSRequestUri -Endpoint Flow -Param $FlowId
+        Assert-TableauRestVersion -AtLeast 3.3
+        $uri = Get-TableauRequestUri -Endpoint Flow -Param $FlowId
     }
     $uri += "/permissions"
-    $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
+    $response = Invoke-TableauRestMethod -Uri $uri -Method Get
     return $response.tsResponse.permissions
 }
 
-function Add-TSContentPermission {
+function Add-TableauContentPermission {
 <#
 .SYNOPSIS
 Add Workbook / Data Source / View / Project / Flow Permissions
@@ -5146,15 +5149,15 @@ A list of permissions (hashtable), each item must be structured as follows:
 Note: existing capabilities are not removed.
 
 .EXAMPLE
-$permissions = Add-TSContentPermission -WorkbookId $workbook.id -PermissionTable @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"}}
+$permissions = Add-TableauContentPermission -WorkbookId $workbook.id -PermissionTable @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{Read="Allow"}}
 
 .EXAMPLE
-$permissions = Add-TSContentPermission -FlowId $flow.id -PermissionTable @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Execute="Allow"}}
+$permissions = Add-TableauContentPermission -FlowId $flow.id -PermissionTable @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{Execute="Allow"}}
 
 .NOTES
 This method uses the corresponding REST API method directly.
 This implies that existing permissions which are conflicting with the permissions to be added, the response will be an error.
-To fall back to override existing permissions, and to use permission templates, check Set-TSContentPermission.
+To fall back to override existing permissions, and to use permission templates, check Set-TableauContentPermission.
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_permissions.htm#query_workbook_permissions
@@ -5181,30 +5184,30 @@ Param(
     [Parameter(Mandatory,ParameterSetName='Flow')][string] $FlowId,
     [Parameter(Mandatory)][hashtable[]] $PermissionTable
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_pm = $tsRequest.AppendChild($xml.CreateElement("permissions"))
     if ($WorkbookId) {
-        $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId
+        $uri = Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId
         # $el_pm.AppendChild($xml.CreateElement("workbook")).SetAttribute("id", $WorkbookId)
         $shouldProcessItem = "workbook:$WorkbookId"
     } elseif ($DatasourceId) {
-        $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId
+        $uri = Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId
         # $el_pm.AppendChild($xml.CreateElement("datasource")).SetAttribute("id", $DatasourceId)
         $shouldProcessItem = "datasource:$DatasourceId"
     } elseif ($ViewId) {
-        Assert-TSRestApiVersion -AtLeast 3.2
-        $uri = Get-TSRequestUri -Endpoint View -Param $ViewId
+        Assert-TableauRestVersion -AtLeast 3.2
+        $uri = Get-TableauRequestUri -Endpoint View -Param $ViewId
         # $el_pm.AppendChild($xml.CreateElement("view")).SetAttribute("id", $ViewId)
         $shouldProcessItem = "view:$ViewId"
     } elseif ($ProjectId) {
-        $uri = Get-TSRequestUri -Endpoint Project -Param $ProjectId
+        $uri = Get-TableauRequestUri -Endpoint Project -Param $ProjectId
         # $el_pm.AppendChild($xml.CreateElement("project")).SetAttribute("id", $ProjectId)
         $shouldProcessItem = "project:$ProjectId"
     } elseif ($FlowId) {
-        Assert-TSRestApiVersion -AtLeast 3.3
-        $uri = Get-TSRequestUri -Endpoint Flow -Param $FlowId
+        Assert-TableauRestVersion -AtLeast 3.3
+        $uri = Get-TableauRequestUri -Endpoint Flow -Param $FlowId
         # $el_pm.AppendChild($xml.CreateElement("flow")).SetAttribute("id", $FlowId)
         $shouldProcessItem = "flow:$FlowId"
     }
@@ -5223,19 +5226,19 @@ Param(
     }
     $shouldProcessItem += ", grantees:{0}, permissions:{1}" -f $PermissionTable.Length, $permissionsCount
     if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-        $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put
         return $response.tsResponse.permissions
     }
 }
 
-function Set-TSContentPermission {
+function Set-TableauContentPermission {
 <#
 .SYNOPSIS
 Set Workbook / Data Source / View / Project / Flow Permissions
 
 .DESCRIPTION
 Sets permissions to the specified content for list of grantees (Tableau user or group).
-This method is a wrapper for Set-TSContentPermission with support for overriding conflicting permissions and permission templates.
+This method is a wrapper for Set-TableauContentPermission with support for overriding conflicting permissions and permission templates.
 You can specify multiple sets of permissions using one call, and use permission templates (similar to Tableau Server UI).
 
 .PARAMETER WorkbookId
@@ -5264,13 +5267,13 @@ The following templates are supported: View, Explore, Publish, Administer, Denie
 Note: existing capabilities are removed for the grantee, if template is used.
 
 .EXAMPLE
-$permissions = Set-TSContentPermission -ProjectId $projectId -PermissionTable @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"}}
+$permissions = Set-TableauContentPermission -ProjectId $projectId -PermissionTable @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{Read="Allow"}}
 
 .EXAMPLE
-$permissions = Set-TSContentPermission -DatasourceId $datasourceId -PermissionTable @{granteeType="Group"; granteeId=$groupId; template='Publish'}
+$permissions = Set-TableauContentPermission -DatasourceId $datasourceId -PermissionTable @{granteeType="Group"; granteeId=$groupId; template='Publish'}
 
 .NOTES
-This method is similar to Add-TSContentPermission, but it can also override existing permissions, and supports permission templates.
+This method is similar to Add-TableauContentPermission, but it can also override existing permissions, and supports permission templates.
 #>
 [CmdletBinding(SupportsShouldProcess)]
 [OutputType([PSCustomObject])]
@@ -5282,7 +5285,7 @@ Param(
     [Parameter(Mandatory,ParameterSetName='Flow')][string] $FlowId,
     [Parameter(Mandatory)][hashtable[]] $PermissionTable
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     $MainParam = @{}
     if ($WorkbookId) {
         $shouldProcessItem = "workbook:$WorkbookId"
@@ -5291,20 +5294,20 @@ Param(
         $shouldProcessItem = "datasource:$DatasourceId"
         $MainParam.Add("DatasourceId", $DatasourceId)
     } elseif ($ViewId) {
-        Assert-TSRestApiVersion -AtLeast 3.2
+        Assert-TableauRestVersion -AtLeast 3.2
         $shouldProcessItem = "view:$ViewId"
         $MainParam.Add("ViewId", $ViewId)
     } elseif ($ProjectId) {
         $shouldProcessItem = "project:$ProjectId"
         $MainParam.Add("ProjectId", $ProjectId)
     } elseif ($FlowId) {
-        Assert-TSRestApiVersion -AtLeast 3.3
+        Assert-TableauRestVersion -AtLeast 3.3
         $shouldProcessItem = "flow:$FlowId"
         $MainParam.Add("FlowId", $FlowId)
     }
     $permissionsCount = 0
     $permissionOverrides = @()
-    $currentPermissionTable = Get-TSContentPermission @MainParam | ConvertTo-TSPermissionTable
+    $currentPermissionTable = Get-TableauContentPermission @MainParam | ConvertTo-TableauPermissionTable
     $addPermissionTable = @()
     foreach ($permission in $PermissionTable) {
         if ($permission.capabilities) {
@@ -5404,13 +5407,13 @@ Param(
     $shouldProcessItem += ", grantees:{0}, permissions:{1}, overrides:{2}" -f $PermissionTable.Length, $permissionsCount, $permissionOverrides.Length
     if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
         $permissionOverrides | ForEach-Object { # remove all existing incompatible permissions (or that are not included in the permission template)
-            Remove-TSContentPermission @MainParam -GranteeType $_.granteeType -GranteeId $_.granteeId -CapabilityName $_.capabilityName -CapabilityMode $_.capabilityMode
+            Remove-TableauContentPermission @MainParam -GranteeType $_.granteeType -GranteeId $_.granteeId -CapabilityName $_.capabilityName -CapabilityMode $_.capabilityMode
         }
-        Add-TSContentPermission @MainParam -PermissionTable $addPermissionTable
+        Add-TableauContentPermission @MainParam -PermissionTable $addPermissionTable
     }
 }
 
-function Remove-TSContentPermission {
+function Remove-TableauContentPermission {
 <#
 .SYNOPSIS
 Delete Workbook / Data Source / View / Project / Flow Permission
@@ -5451,13 +5454,13 @@ If this parameter is not provided, all existing permissions for the grantee will
 Explicit boolean switch, supply this to delete ALL permissions for ALL grantees.
 
 .EXAMPLE
-Remove-TSContentPermission -WorkbookId $sampleWorkbookId -All
+Remove-TableauContentPermission -WorkbookId $sampleWorkbookId -All
 
 .EXAMPLE
-Remove-TSContentPermission -DatasourceId $datasource.id -GranteeType User -GranteeId (Get-TSCurrentUserId)
+Remove-TableauContentPermission -DatasourceId $datasource.id -GranteeType User -GranteeId (Get-TableauCurrentUserId)
 
 .EXAMPLE
-Remove-TSContentPermission -FlowId $flow.id -GranteeType User -GranteeId (Get-TSCurrentUserId) -CapabilityName Execute -CapabilityMode Allow
+Remove-TableauContentPermission -FlowId $flow.id -GranteeType User -GranteeId (Get-TableauCurrentUserId) -CapabilityName Execute -CapabilityMode Allow
 
 .NOTES
 This function always returns $null.
@@ -5543,28 +5546,28 @@ Param(
     [Parameter(Mandatory,ParameterSetName='FlowAll')]
     [switch] $All
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     $MainParam = @{}
     if ($WorkbookId) {
-        $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId
+        $uri = Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId
         $shouldProcessItem = "workbook:$WorkbookId"
         $MainParam.Add("WorkbookId", $WorkbookId)
     } elseif ($DatasourceId) {
-        $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId
+        $uri = Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId
         $shouldProcessItem = "datasource:$DatasourceId"
         $MainParam.Add("DatasourceId", $DatasourceId)
     } elseif ($ViewId) {
-        Assert-TSRestApiVersion -AtLeast 3.2
-        $uri = Get-TSRequestUri -Endpoint View -Param $ViewId
+        Assert-TableauRestVersion -AtLeast 3.2
+        $uri = Get-TableauRequestUri -Endpoint View -Param $ViewId
         $shouldProcessItem = "view:$ViewId"
         $MainParam.Add("ViewId", $ViewId)
     } elseif ($ProjectId) {
-        $uri = Get-TSRequestUri -Endpoint Project -Param $ProjectId
+        $uri = Get-TableauRequestUri -Endpoint Project -Param $ProjectId
         $shouldProcessItem = "project:$ProjectId"
         $MainParam.Add("ProjectId", $ProjectId)
     } elseif ($FlowId) {
-        Assert-TSRestApiVersion -AtLeast 3.3
-        $uri = Get-TSRequestUri -Endpoint Flow -Param $FlowId
+        Assert-TableauRestVersion -AtLeast 3.3
+        $uri = Get-TableauRequestUri -Endpoint Flow -Param $FlowId
         $shouldProcessItem = "flow:$FlowId"
         $MainParam.Add("FlowId", $FlowId)
     }
@@ -5573,18 +5576,18 @@ Param(
         $shouldProcessItem += ", {0}:{1}, {2}:{3}" -f $GranteeType, $GranteeId, $CapabilityName, $CapabilityMode
         $uriAdd = "{0}s/{1}/{2}/{3}" -f $GranteeType.ToLower(), $GranteeId, $CapabilityName, $CapabilityMode
         if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-            $null = Invoke-TSRestApiMethod -Uri $uri$uriAdd -Method Delete
+            $null = Invoke-TableauRestMethod -Uri $uri$uriAdd -Method Delete
         }
     } elseif ($GranteeType -and $GranteeId) { # Remove all permissions for one grantee
         $shouldProcessItem += ", all permissions for {0}:{1}" -f $GranteeType, $GranteeId
         if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-            $permissions = Get-TSContentPermission @MainParam
+            $permissions = Get-TableauContentPermission @MainParam
             if ($permissions.granteeCapabilities) {
                 $permissions.granteeCapabilities | ForEach-Object {
                     if (($GranteeType -eq 'Group' -and $_.group -and $_.group.id -eq $GranteeId) -or ($GranteeType -eq 'User' -and $_.user -and $_.user.id -eq $GranteeId)) {
                         $_.capabilities.capability | ForEach-Object {
                             $uriAdd = "{0}s/{1}/{2}/{3}" -f $GranteeType.ToLower(), $GranteeId, $_.name, $_.mode
-                            $null = Invoke-TSRestApiMethod -Uri $uri$uriAdd -Method Delete
+                            $null = Invoke-TableauRestMethod -Uri $uri$uriAdd -Method Delete
                         }
                     }
                 }
@@ -5593,7 +5596,7 @@ Param(
     } elseif ($All) { # Remove all permissions for all grantees
         $shouldProcessItem += ", ALL PERMISSIONS"
         if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-            $permissions = Get-TSContentPermission @MainParam
+            $permissions = Get-TableauContentPermission @MainParam
             if ($permissions.granteeCapabilities) {
                 $permissions.granteeCapabilities | ForEach-Object {
                     if ($_.group) {
@@ -5605,7 +5608,7 @@ Param(
                     }
                     $_.capabilities.capability | ForEach-Object {
                         $uriAdd = "{0}s/{1}/{2}/{3}" -f $grtType, $grtId, $_.name, $_.mode
-                        $null = Invoke-TSRestApiMethod -Uri $uri$uriAdd -Method Delete
+                        $null = Invoke-TableauRestMethod -Uri $uri$uriAdd -Method Delete
                     }
                 }
             }
@@ -5613,27 +5616,27 @@ Param(
     }
 }
 
-function ConvertTo-TSPermissionTable {
+function ConvertTo-TableauPermissionTable {
 <#
 .SYNOPSIS
 Convert permissions response into "PermissionTable"
 
 .DESCRIPTION
 Converts the response of permission methods into the list-hashtable which can be used as input (PermissionTable) for:
-- Add-TSContentPermission
-- Set-TSContentPermission
+- Add-TableauContentPermission
+- Set-TableauContentPermission
 
 .PARAMETER Permissions
 XmlElement with the input raw data.
 
 .EXAMPLE
-$currentPermissionTable = Get-TSContentPermission -WorkbookId $sampleWorkbookId | ConvertTo-TSPermissionTable
+$currentPermissionTable = Get-TableauContentPermission -WorkbookId $sampleWorkbookId | ConvertTo-TableauPermissionTable
 
 .NOTES
-The following functions can be used as input for ConvertTo-TSPermissionTable:
-- Get-TSContentPermission
-- Add-TSContentPermission
-- Set-TSContentPermission
+The following functions can be used as input for ConvertTo-TableauPermissionTable:
+- Get-TableauContentPermission
+- Add-TableauContentPermission
+- Set-TableauContentPermission
 #>
 [OutputType([hashtable[]])]
 Param(
@@ -5671,7 +5674,7 @@ Param(
     }
 }
 
-function Get-TSDefaultPermission {
+function Get-TableauDefaultPermission {
 <#
 .SYNOPSIS
 Query Default Permissions
@@ -5679,7 +5682,7 @@ Query Default Permissions
 .DESCRIPTION
 Returns details of default permission rules granted to users and groups for
 workbooks, data sources, flows, data roles, lenses, metrics, databases or tables resources in a specific project.
-Return object is a list of hashtables (similar to the output of ConvertTo-TSPermissionTable)
+Return object is a list of hashtables (similar to the output of ConvertTo-TableauPermissionTable)
 
 .PARAMETER ProjectId
 The LUID of the project to get default permissions for.
@@ -5689,8 +5692,8 @@ Specific content type to query default permission for.
 If omitted, the default permissions for all supported content types are returned.
 
 .EXAMPLE
-$defProjectPermissions = Get-TSDefaultPermission -ProjectId $project.id
-$wbPermissionTable = Get-TSDefaultPermission -ProjectId $project.id -ContentType workbooks
+$defProjectPermissions = Get-TableauDefaultPermission -ProjectId $project.id
+$wbPermissionTable = Get-TableauDefaultPermission -ProjectId $project.id -ContentType workbooks
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_permissions.htm#query_default_permissions
@@ -5700,19 +5703,19 @@ Param(
     [Parameter(Mandatory)][string] $ProjectId,
     [Parameter()][ValidateSet('Workbooks','Datasources','Flows','Dataroles','Lenses','Metrics','Databases','Tables')][string] $ContentType
 )
-    # Assert-TSRestApiVersion -AtLeast 2.1
+    # Assert-TableauRestVersion -AtLeast 2.1
     $permissionTable = @()
-    $uri = Get-TSRequestUri -Endpoint Project -Param "$ProjectId/default-permissions/"
+    $uri = Get-TableauRequestUri -Endpoint Project -Param "$ProjectId/default-permissions/"
     foreach ($ct in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') { #,'virtualconnections' not supported yet
-        if ($ct -eq 'dataroles' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
+        if ($ct -eq 'dataroles' -and ((Get-TableauRestVersion) -lt [version]3.13 -or (Get-TableauRestVersion) -ge [version]3.22)) {
             continue
-        } elseif ($ct -eq 'lenses' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
+        } elseif ($ct -eq 'lenses' -and ((Get-TableauRestVersion) -lt [version]3.13 -or (Get-TableauRestVersion) -ge [version]3.22)) {
             continue
-        } elseif ($ct -in 'databases','tables' -and (Get-TSRestApiVersion) -lt [version]3.6) {
+        } elseif ($ct -in 'databases','tables' -and (Get-TableauRestVersion) -lt [version]3.6) {
             continue
         }
         if ((-Not ($ContentType)) -or $ContentType -eq $ct) {
-            $response = Invoke-TSRestApiMethod -Uri $uri$ct -Method Get
+            $response = Invoke-TableauRestMethod -Uri $uri$ct -Method Get
             if ($response.tsResponse.permissions.granteeCapabilities) {
                 $response.tsResponse.permissions.granteeCapabilities | ForEach-Object {
                     if ($_.group -and $_.group.id) {
@@ -5740,7 +5743,7 @@ Param(
     return $permissionTable
 }
 
-function Set-TSDefaultPermission {
+function Set-TableauDefaultPermission {
 <#
 .SYNOPSIS
 Set (add) Default Permission(s)
@@ -5764,12 +5767,12 @@ The following templates are supported: View, Explore, Publish, Administer, Denie
 Note: existing capabilities are removed for the grantee, if template is used.
 
 .EXAMPLE
-$dpt = @{contentType="workbooks"; granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"}}
-$dpt += @{contentType="datasources"; granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow";Connect="Allow"}}
-$permissions = Set-TSDefaultPermission -ProjectId $testProjectId -PermissionTable $dpt
+$dpt = @{contentType="workbooks"; granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{Read="Allow"}}
+$dpt += @{contentType="datasources"; granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{Read="Allow";Connect="Allow"}}
+$permissions = Set-TableauDefaultPermission -ProjectId $testProjectId -PermissionTable $dpt
 
 .NOTES
-The PermissionTable parameter has similar structure as for Set-TSContentPermission, but has in addition to provide 'contentType' keys.
+The PermissionTable parameter has similar structure as for Set-TableauContentPermission, but has in addition to provide 'contentType' keys.
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_permissions.htm#add_default_permissions
@@ -5780,19 +5783,19 @@ Param(
     [Parameter(Mandatory)][string] $ProjectId,
     [Parameter(Mandatory)][hashtable[]] $PermissionTable
 )
-    $uri = Get-TSRequestUri -Endpoint Project -Param "$ProjectId/default-permissions/"
+    $uri = Get-TableauRequestUri -Endpoint Project -Param "$ProjectId/default-permissions/"
     $outputPermissionTable = @()
     foreach ($ct in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
-        if ($ct -eq 'dataroles' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
+        if ($ct -eq 'dataroles' -and ((Get-TableauRestVersion) -lt [version]3.13 -or (Get-TableauRestVersion) -ge [version]3.22)) {
             continue
-        } elseif ($ct -eq 'lenses' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
+        } elseif ($ct -eq 'lenses' -and ((Get-TableauRestVersion) -lt [version]3.13 -or (Get-TableauRestVersion) -ge [version]3.22)) {
             continue
-        } elseif ($ct -in 'databases','tables' -and (Get-TSRestApiVersion) -lt [version]3.6) {
+        } elseif ($ct -in 'databases','tables' -and (Get-TableauRestVersion) -lt [version]3.6) {
             continue
         }
         $shouldProcessItem = "project:$ProjectId"
         $contentTypePermissions = $PermissionTable | Where-Object contentType -eq $ct
-        $currentPermissionTable = Get-TSDefaultPermission -ProjectId $ProjectId -ContentType $ct
+        $currentPermissionTable = Get-TableauDefaultPermission -ProjectId $ProjectId -ContentType $ct
         if ($contentTypePermissions.Length -gt 0) {
             $xml = New-Object System.Xml.XmlDocument
             $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -5912,10 +5915,10 @@ Param(
             if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
                 $permissionOverrides | ForEach-Object { # remove all existing incompatible permissions (or that are not included in the permission template)
                     # note: it's also possible to remove all permissions for one grantee, one content type first, using the following method
-                    Remove-TSDefaultPermission -ProjectId $ProjectId -ContentType $ct -GranteeType $_.granteeType -GranteeId $_.granteeId -CapabilityName $_.capabilityName -CapabilityMode $_.capabilityMode
+                    Remove-TableauDefaultPermission -ProjectId $ProjectId -ContentType $ct -GranteeType $_.granteeType -GranteeId $_.granteeId -CapabilityName $_.capabilityName -CapabilityMode $_.capabilityMode
                 }
                 if ($permissionsCount -gt 0) { # empty permissions element in xml is not allowed
-                    $response = Invoke-TSRestApiMethod -Uri $uri$ct -Body $xml.OuterXml -Method Put
+                    $response = Invoke-TableauRestMethod -Uri $uri$ct -Body $xml.OuterXml -Method Put
                     if ($response.tsResponse.permissions.granteeCapabilities) {
                         $response.tsResponse.permissions.granteeCapabilities | ForEach-Object {
                             if ($_.group -and $_.group.id) {
@@ -5945,7 +5948,7 @@ Param(
     return $outputPermissionTable
 }
 
-function Remove-TSDefaultPermission {
+function Remove-TableauDefaultPermission {
 <#
 .SYNOPSIS
 Delete Default Permission(s)
@@ -5979,13 +5982,13 @@ If omitted, default permissions for all content types are deleted (for specific 
 Explicit boolean switch, supply this to delete ALL permissions for ALL grantees and ALL content types.
 
 .EXAMPLE
-Remove-TSDefaultPermission -ProjectId $projectId -GranteeType User -GranteeId (Get-TSCurrentUserId)
+Remove-TableauDefaultPermission -ProjectId $projectId -GranteeType User -GranteeId (Get-TableauCurrentUserId)
 
 .EXAMPLE
-Remove-TSDefaultPermission -ProjectId $projectId -GranteeType Group -GranteeId $groupId -ContentType workbooks
+Remove-TableauDefaultPermission -ProjectId $projectId -GranteeType Group -GranteeId $groupId -ContentType workbooks
 
 .EXAMPLE
-Remove-TSDefaultPermission -ProjectId $project.id -All
+Remove-TableauDefaultPermission -ProjectId $project.id -All
 
 .NOTES
 This function always returns $null.
@@ -6017,25 +6020,25 @@ Param(
     [Parameter(Mandatory,ParameterSetName='AllPermissions')]
     [switch] $All
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
-    $uri = Get-TSRequestUri -Endpoint Project -Param "$ProjectId/default-permissions/"
+    # Assert-TableauRestVersion -AtLeast 2.0
+    $uri = Get-TableauRequestUri -Endpoint Project -Param "$ProjectId/default-permissions/"
     $shouldProcessItem = "project:$ProjectId"
     if ($CapabilityName -and $CapabilityMode) { # Remove one default permission/capability
         $shouldProcessItem += ", default permission for {0}:{1}, {2}:{3}" -f $GranteeType, $GranteeId, $CapabilityName, $CapabilityMode
         $uriAdd = "{0}/{1}s/{2}/{3}/{4}" -f $ContentType, $GranteeType.ToLower(), $GranteeId, $CapabilityName, $CapabilityMode
         if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-            $null = Invoke-TSRestApiMethod -Uri $uri$uriAdd -Method Delete
+            $null = Invoke-TableauRestMethod -Uri $uri$uriAdd -Method Delete
         }
     } elseif ($GranteeType -and $GranteeId) { # Remove all permissions for one grantee
         $shouldProcessItem += ", all default permissions for {0}:{1}" -f $GranteeTyp, $GranteeId
         if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-            $allDefaultPermissions = Get-TSDefaultPermission -ProjectId $ProjectId
+            $allDefaultPermissions = Get-TableauDefaultPermission -ProjectId $ProjectId
             foreach ($ct in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
-                if ($ct -eq 'dataroles' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
+                if ($ct -eq 'dataroles' -and ((Get-TableauRestVersion) -lt [version]3.13 -or (Get-TableauRestVersion) -ge [version]3.22)) {
                     continue
-                } elseif ($ct -eq 'lenses' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
+                } elseif ($ct -eq 'lenses' -and ((Get-TableauRestVersion) -lt [version]3.13 -or (Get-TableauRestVersion) -ge [version]3.22)) {
                     continue
-                } elseif ($ct -in 'databases','tables' -and (Get-TSRestApiVersion) -lt [version]3.6) {
+                } elseif ($ct -in 'databases','tables' -and (Get-TableauRestVersion) -lt [version]3.6) {
                     continue
                 }
                 if ((-Not ($ContentType)) -or $ContentType -eq $ct) {
@@ -6047,7 +6050,7 @@ Param(
                         foreach ($permission in $permissions) {
                             $permission.capabilities.GetEnumerator() | ForEach-Object {
                                 $uriAdd = "{0}/{1}s/{2}/{3}/{4}" -f $ct, $GranteeType.ToLower(), $GranteeId, $_.Key, $_.Value
-                                $null = Invoke-TSRestApiMethod -Uri $uri$uriAdd -Method Delete
+                                $null = Invoke-TableauRestMethod -Uri $uri$uriAdd -Method Delete
                             }
                         }
                     }
@@ -6057,13 +6060,13 @@ Param(
     } elseif ($All) {
         $shouldProcessItem += ", ALL DEFAULT PERMISSIONS"
         if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-            $allDefaultPermissions = Get-TSDefaultPermission -ProjectId $ProjectId
+            $allDefaultPermissions = Get-TableauDefaultPermission -ProjectId $ProjectId
             foreach ($ct in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
-                if ($ct -eq 'dataroles' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
+                if ($ct -eq 'dataroles' -and ((Get-TableauRestVersion) -lt [version]3.13 -or (Get-TableauRestVersion) -ge [version]3.22)) {
                     continue
-                } elseif ($ct -eq 'lenses' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
+                } elseif ($ct -eq 'lenses' -and ((Get-TableauRestVersion) -lt [version]3.13 -or (Get-TableauRestVersion) -ge [version]3.22)) {
                     continue
-                } elseif ($ct -in 'databases','tables' -and (Get-TSRestApiVersion) -lt [version]3.6) {
+                } elseif ($ct -in 'databases','tables' -and (Get-TableauRestVersion) -lt [version]3.6) {
                     continue
                 }
                 $contentTypePermissions = $allDefaultPermissions | Where-Object contentType -eq $ct
@@ -6071,7 +6074,7 @@ Param(
                     foreach ($permission in $contentTypePermissions) {
                         $permission.capabilities.GetEnumerator() | ForEach-Object {
                             $uriAdd = "{0}/{1}s/{2}/{3}/{4}" -f $ct, $permission.granteeType.ToLower(), $permission.granteeId, $_.Key, $_.Value
-                            $null = Invoke-TSRestApiMethod -Uri $uri$uriAdd -Method Delete
+                            $null = Invoke-TableauRestMethod -Uri $uri$uriAdd -Method Delete
                         }
                     }
                 }
@@ -6081,7 +6084,7 @@ Param(
 }
 
 ### Tags methods
-function Add-TSTagsToContent {
+function Add-TableauContentTag {
 <#
 .SYNOPSIS
 Add Tags to Workbook / Data Source / View / Flow
@@ -6105,7 +6108,7 @@ The LUID of the flow to add tags to.
 List of tags as strings.
 
 .EXAMPLE
-Add-TSTagsToContent -WorkbookId $sampleWorkbookId -Tags "active","test"
+Add-TableauContentTag -WorkbookId $sampleWorkbookId -Tags "active","test"
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#add_tags_to_workbook
@@ -6125,7 +6128,7 @@ Param(
     [Parameter(Mandatory,ParameterSetName='Flow')][string] $FlowId,
     [Parameter(Mandatory)][string[]] $Tags
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_tags = $tsRequest.AppendChild($xml.CreateElement("tags"))
@@ -6134,21 +6137,21 @@ Param(
         $el_tag.SetAttribute("label", $tag)
     }
     if ($WorkbookId -and $PSCmdlet.ShouldProcess("workbook:$WorkbookId, tags:"+($Tags -join ' '))) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/tags) -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId/tags) -Body $xml.OuterXml -Method Put
         return $response.tsResponse.tags.tag
     } elseif ($DatasourceId -and $PSCmdlet.ShouldProcess("datasource:$DatasourceId, tags:"+($Tags -join ' '))) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/tags) -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId/tags) -Body $xml.OuterXml -Method Put
         return $response.tsResponse.tags.tag
     } elseif ($ViewId -and $PSCmdlet.ShouldProcess("view:$ViewId, tags:"+($Tags -join ' '))) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint View -Param $ViewId/tags) -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint View -Param $ViewId/tags) -Body $xml.OuterXml -Method Put
         return $response.tsResponse.tags.tag
     } elseif ($FlowId -and $PSCmdlet.ShouldProcess("flow:$FlowId, tags:"+($Tags -join ' '))) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param $FlowId/tags) -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Flow -Param $FlowId/tags) -Body $xml.OuterXml -Method Put
         return $response.tsResponse.tags.tag
     }
 }
 
-function Remove-TSTagFromContent {
+function Remove-TableauContentTag {
 <#
 .SYNOPSIS
 Delete Tag from Workbook / Data Source / View / Flow
@@ -6172,7 +6175,7 @@ The ID of the flow to remove the tag from.
 The name of the tag to remove from the content.
 
 .EXAMPLE
-Remove-TSTagFromContent -WorkbookId $sampleWorkbookId -Tag "test"
+Remove-TableauContentTag -WorkbookId $sampleWorkbookId -Tag "test"
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#delete_tag_from_workbook
@@ -6192,20 +6195,20 @@ Param(
     [Parameter(Mandatory,ParameterSetName='Flow')][string] $FlowId,
     [Parameter(Mandatory)][string] $Tag
 )
-    # Assert-TSRestApiVersion -AtLeast 2.0
+    # Assert-TableauRestVersion -AtLeast 2.0
     if ($WorkbookId -and $PSCmdlet.ShouldProcess("workbook:$WorkbookId, tag:$Tag")) {
-        Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId/tags/$Tag) -Method Delete
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId/tags/$Tag) -Method Delete
     } elseif ($DatasourceId -and $PSCmdlet.ShouldProcess("datasource:$DatasourceId, tag:$Tag")) {
-        Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId/tags/$Tag) -Method Delete
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId/tags/$Tag) -Method Delete
     } elseif ($ViewId -and $PSCmdlet.ShouldProcess("view:$ViewId, tag:$Tag")) {
-        Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint View -Param $ViewId/tags/$Tag) -Method Delete
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint View -Param $ViewId/tags/$Tag) -Method Delete
     } elseif ($FlowId -and $PSCmdlet.ShouldProcess("flow:$FlowId, tag:$Tag")) {
-        Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Flow -Param $FlowId/tags/$Tag) -Method Delete
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Flow -Param $FlowId/tags/$Tag) -Method Delete
     }
 }
 
 ### Jobs, Tasks and Schedules methods
-function Get-TSSchedule {
+function Get-TableauSchedule {
 <#
 .SYNOPSIS
 Get Server Schedule / List Server Schedules
@@ -6221,10 +6224,10 @@ Not available for Tableau Cloud.
 (Optional) Page size when paging through results.
 
 .EXAMPLE
-$schedules = Get-TSSchedule
+$schedules = Get-TableauSchedule
 
 .EXAMPLE
-$schedule = Get-TSSchedule -ScheduleId $testScheduleId
+$schedule = Get-TableauSchedule -ScheduleId $testScheduleId
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_jobs_tasks_and_schedules.htm#get-schedule
@@ -6237,27 +6240,27 @@ Param(
     [Parameter(Mandatory,ParameterSetName='ScheduleById')][string] $ScheduleId,
     [Parameter(ParameterSetName='Schedules')][ValidateRange(1,100)][int] $PageSize = 100
 )
-    # Assert-TSRestApiVersion -AtLeast 2.3
+    # Assert-TableauRestVersion -AtLeast 2.3
     if ($ScheduleId) { # Get Server Schedule
-        Assert-TSRestApiVersion -AtLeast 3.8
+        Assert-TableauRestVersion -AtLeast 3.8
     }
     if ($ScheduleId) { # Get Server Schedule
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint ServerSchedule -Param $ScheduleId) -Method Get
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ServerSchedule -Param $ScheduleId) -Method Get
         $response.tsResponse.schedule
     } else { # List Server Schedules
         $pageNumber = 0
         do {
             $pageNumber++
-            $uri = Get-TSRequestUri -Endpoint ServerSchedule
+            $uri = Get-TableauRequestUri -Endpoint ServerSchedule
             $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-            $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
+            $response = Invoke-TableauRestMethod -Uri $uri -Method Get
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.schedules.schedule
         } until ($PageSize*$pageNumber -ge $totalAvailable)
     }
 }
 
-function Add-TSSchedule {
+function New-TableauSchedule {
 <#
 .SYNOPSIS
 Create Server Schedule
@@ -6302,7 +6305,7 @@ The starting daytime for scheduled jobs. For Hourly: the starting time of execut
 (Optional) For Monthly: the day of the month when the schedule is run. For last month day, the value 0 should be supplied.
 
 .EXAMPLE
-$schedule = Add-TSSchedule -Name "Monthly on 3rd day of the month" -Type Extract -Frequency Monthly -StartTime "08:00:00" -IntervalMonthday 3
+$schedule = New-TableauSchedule -Name "Monthly on 3rd day of the month" -Type Extract -Frequency Monthly -StartTime "08:00:00" -IntervalMonthday 3
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_jobs_tasks_and_schedules.htm#create_schedule
@@ -6334,9 +6337,9 @@ Param(
     [Parameter(Mandatory,ParameterSetName='Weekly')][ValidateSet('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')][string[]] $IntervalWeekdays,
     [Parameter(Mandatory,ParameterSetName='Monthly')][ValidateRange(0,31)][int] $IntervalMonthday
 )
-    # Assert-TSRestApiVersion -AtLeast 2.3
+    # Assert-TableauRestVersion -AtLeast 2.3
     if ($Type -eq 'DataAcceleration') {
-        Assert-TSRestApiVersion -AtLeast 3.8 -LessThan 3.16
+        Assert-TableauRestVersion -AtLeast 3.8 -LessThan 3.16
     }
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -6382,12 +6385,12 @@ Param(
         }
     }
     if ($PSCmdlet.ShouldProcess($Name)) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint ServerSchedule) -Body $xml.OuterXml -Method Post
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ServerSchedule) -Body $xml.OuterXml -Method Post
         return $response.tsResponse.schedule
     }
 }
 
-function Update-TSSchedule {
+function Set-TableauSchedule {
 <#
 .SYNOPSIS
 Update Server Schedule
@@ -6434,10 +6437,10 @@ If frequency is supplied, the StartTime and other relevant frequency details par
 (Optional) For Monthly: the day of the month when the schedule is run. For last month day, the value 0 should be supplied.
 
 .EXAMPLE
-$schedule = Update-TSSchedule -ScheduleId $oldScheduleId -State Suspended
+$schedule = Set-TableauSchedule -ScheduleId $oldScheduleId -State Suspended
 
 .EXAMPLE
-$schedule = Update-TSSchedule -ScheduleId $testScheduleId -Frequency Hourly -StartTime "12:00:00" -EndTime "16:00:00" -IntervalHours 1
+$schedule = Set-TableauSchedule -ScheduleId $testScheduleId -Frequency Hourly -StartTime "12:00:00" -EndTime "16:00:00" -IntervalHours 1
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_jobs_tasks_and_schedules.htm#update_schedule
@@ -6470,7 +6473,7 @@ Param(
     [Parameter(Mandatory,ParameterSetName='Weekly')][ValidateSet('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')][string[]] $IntervalWeekdays,
     [Parameter(Mandatory,ParameterSetName='Monthly')][ValidateRange(0,31)][int] $IntervalMonthday # 0 for last day
 )
-    # Assert-TSRestApiVersion -AtLeast 2.3
+    # Assert-TableauRestVersion -AtLeast 2.3
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_sched = $tsRequest.AppendChild($xml.CreateElement("schedule"))
@@ -6529,12 +6532,12 @@ Param(
         }
     }
     if ($PSCmdlet.ShouldProcess($ScheduleId)) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint ServerSchedule -Param $ScheduleId) -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ServerSchedule -Param $ScheduleId) -Body $xml.OuterXml -Method Put
         return $response.tsResponse.schedule
     }
 }
 
-function Remove-TSSchedule {
+function Remove-TableauSchedule {
 <#
 .SYNOPSIS
 Delete Server Schedule
@@ -6547,7 +6550,7 @@ This method can only be called by Server Admins.
 The LUID of the schedule to delete.
 
 .EXAMPLE
-$response = Remove-TSSchedule -ScheduleId $oldScheduleId
+$response = Remove-TableauSchedule -ScheduleId $oldScheduleId
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_jobs_tasks_and_schedules.htm#delete_schedule
@@ -6557,13 +6560,13 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_jobs_tasks
 Param(
     [Parameter(Mandatory)][string] $ScheduleId
 )
-    # Assert-TSRestApiVersion -AtLeast 2.3
+    # Assert-TableauRestVersion -AtLeast 2.3
     if ($PSCmdlet.ShouldProcess($ScheduleId)) {
-        Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint ServerSchedule -Param $ScheduleId) -Method Delete
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ServerSchedule -Param $ScheduleId) -Method Delete
     }
 }
 
-function Add-TSContentToSchedule {
+function Add-TableauContentToSchedule {
 <#
 .SYNOPSIS
 Add Workbook / Data Source / Flow Task to Server Schedule
@@ -6601,10 +6604,10 @@ Add Flow Task to Schedule: (Optional) The LUID of the specific output step, if o
 Add Flow Task to Schedule: (Optional) The hashtable for the flow parameters. The keys are the parameter LUIDs and the values are the override values.
 
 .EXAMPLE
-$task = Add-TSContentToSchedule -ScheduleId $extractScheduleId -WorkbookId $workbook.id
+$task = Add-TableauContentToSchedule -ScheduleId $extractScheduleId -WorkbookId $workbook.id
 
 .EXAMPLE
-$task = Add-TSContentToSchedule -ScheduleId $runFlowScheduleId -FlowId $flowForTasks.id
+$task = Add-TableauContentToSchedule -ScheduleId $runFlowScheduleId -FlowId $flowForTasks.id
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_jobs_tasks_and_schedules.htm#add_workbook_to_schedule
@@ -6626,7 +6629,7 @@ Param(
     [Parameter(ParameterSetName='Flow')][string] $OutputStepId, # note: this input is ignored by the API, maybe will be supported later
     [Parameter(ParameterSetName='Flow')][hashtable] $FlowParams
 )
-    Assert-TSRestApiVersion -AtLeast 2.8
+    Assert-TableauRestVersion -AtLeast 2.8
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_task = $tsRequest.AppendChild($xml.CreateElement("task"))
@@ -6634,10 +6637,10 @@ Param(
         $el_extr = $el_task.AppendChild($xml.CreateElement("extractRefresh"))
         $el_workbook = $el_extr.AppendChild($xml.CreateElement("workbook"))
         $el_workbook.SetAttribute("id", $WorkbookId)
-        $uri = Get-TSRequestUri -Endpoint Schedule -Param $ScheduleId/workbooks
+        $uri = Get-TableauRequestUri -Endpoint Schedule -Param $ScheduleId/workbooks
         $shouldProcessItem = "schedule:$ScheduleId, workbook:$WorkbookId"
         if ($DataAccelerationTask) {
-            Assert-TSRestApiVersion -AtLeast 3.8 -LessThan 3.16
+            Assert-TableauRestVersion -AtLeast 3.8 -LessThan 3.16
             $el_da = $el_task.AppendChild($xml.CreateElement("dataAcceleration"))
             $el_workbook = $el_da.AppendChild($xml.CreateElement("workbook"))
             $el_workbook.SetAttribute("id", $WorkbookId)
@@ -6647,14 +6650,14 @@ Param(
         $el_extr = $el_task.AppendChild($xml.CreateElement("extractRefresh"))
         $el_datasource = $el_extr.AppendChild($xml.CreateElement("datasource"))
         $el_datasource.SetAttribute("id", $DatasourceId)
-        $uri = Get-TSRequestUri -Endpoint Schedule -Param $ScheduleId/datasources
+        $uri = Get-TableauRequestUri -Endpoint Schedule -Param $ScheduleId/datasources
         $shouldProcessItem = "schedule:$ScheduleId, datasource:$DatasourceId"
     } elseif ($FlowId) {
-        Assert-TSRestApiVersion -AtLeast 3.3
+        Assert-TableauRestVersion -AtLeast 3.3
         $el_fr = $el_task.AppendChild($xml.CreateElement("flowRun"))
         $el_flow = $el_fr.AppendChild($xml.CreateElement("flow"))
         $el_flow.SetAttribute("id", $FlowId)
-        $uri = Get-TSRequestUri -Endpoint Schedule -Param $ScheduleId/flows
+        $uri = Get-TableauRequestUri -Endpoint Schedule -Param $ScheduleId/flows
         $shouldProcessItem = "schedule:$ScheduleId, flow:$FlowId"
         $el_frs = $el_fr.AppendChild($xml.CreateElement("flowRunSpec"))
         if ($OutputStepId) {
@@ -6663,7 +6666,7 @@ Param(
             $el_step.SetAttribute("id", $OutputStepId)
         }
         if ($FlowParams) {
-            Assert-TSRestApiVersion -AtLeast 3.15
+            Assert-TableauRestVersion -AtLeast 3.15
             $el_params = $el_frs.AppendChild($xml.CreateElement("flowParameterSpecs"))
             $FlowParams.GetEnumerator() | ForEach-Object {
                 $el_param = $el_params.AppendChild($xml.CreateElement("flowParameterSpec"))
@@ -6673,13 +6676,13 @@ Param(
         }
     }
     if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-        $response = Invoke-TSRestApiMethod -Uri $uri -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put
         return $response.tsResponse.task
     }
 }
 
 # note: return objects are different for two use cases
-function Get-TSJob {
+function Get-TableauJob {
 <#
 .SYNOPSIS
 Query Job / Query Jobs
@@ -6709,10 +6712,10 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_field
 (Optional, Query Jobs) Page size when paging through results.
 
 .EXAMPLE
-$jobStatus = Get-TSJob -JobId $job.id
+$jobStatus = Get-TableauJob -JobId $job.id
 
 .EXAMPLE
-$extractJobs = Get-TSJob -Filter "jobType:eq:refresh_extracts"
+$extractJobs = Get-TableauJob -Filter "jobType:eq:refresh_extracts"
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_jobs_tasks_and_schedules.htm#query_job
@@ -6728,15 +6731,15 @@ Param(
     [Parameter(ParameterSetName='Jobs')][string[]] $Fields,
     [Parameter(ParameterSetName='Jobs')][ValidateRange(1,100)][int] $PageSize = 100
 )
-    Assert-TSRestApiVersion -AtLeast 3.1
+    Assert-TableauRestVersion -AtLeast 3.1
     if ($JobId) { # Query Job
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Job -Param $JobId) -Method Get
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Job -Param $JobId) -Method Get
         $response.tsResponse.job
     } else { # Get Jobs
         $pageNumber = 0
         do {
             $pageNumber++
-            $uri = Get-TSRequestUri -Endpoint Job
+            $uri = Get-TableauRequestUri -Endpoint Job
             $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
             $uriParam.Add("pageSize", $PageSize)
             $uriParam.Add("pageNumber", $pageNumber)
@@ -6751,14 +6754,14 @@ Param(
             }
             $uriRequest = [System.UriBuilder]$uri
             $uriRequest.Query = $uriParam.ToString()
-            $response = Invoke-TSRestApiMethod -Uri $uriRequest.Uri.OriginalString -Method Get
+            $response = Invoke-TableauRestMethod -Uri $uriRequest.Uri.OriginalString -Method Get
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.backgroundJobs.backgroundJob
         } until ($PageSize*$pageNumber -ge $totalAvailable)
     }
 }
 
-function Stop-TSJob {
+function Stop-TableauJob {
 <#
 .SYNOPSIS
 Cancel Job
@@ -6771,7 +6774,7 @@ If the job was cancelled successfully, $null is returned, otherwise the response
 The LUID of the job to cancel.
 
 .EXAMPLE
-Stop-TSJob -JobId $job.id
+Stop-TableauJob -JobId $job.id
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_jobs_tasks_and_schedules.htm#cancel_job
@@ -6781,9 +6784,9 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_jobs_tasks
 Param(
     [Parameter(Mandatory)][string] $JobId
 )
-    Assert-TSRestApiVersion -AtLeast 3.1
+    Assert-TableauRestVersion -AtLeast 3.1
     if ($PSCmdlet.ShouldProcess($JobId)) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Job -Param $JobId) -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Job -Param $JobId) -Method Put
         if ($response.tsResponse.error) {
             return $response.tsResponse.error
         } else {
@@ -6792,7 +6795,7 @@ Param(
     }
 }
 
-function Wait-TSJob {
+function Wait-TableauJob {
 <#
 .SYNOPSIS
 Wait For Job to complete
@@ -6812,7 +6815,7 @@ Set timeout to 0 to wait indefinitely long.
 Increase interval to reduce the frequency of refresh status requests.
 
 .EXAMPLE
-$finished = Wait-TSJob -JobId $job.id -Timeout 600
+$finished = Wait-TableauJob -JobId $job.id -Timeout 600
 
 .NOTES
 See also: wait_for_job() in TSC
@@ -6826,7 +6829,7 @@ Param(
     do {
         Start-Sleep -s $Interval
         $Timeout--
-        $jobUpdate = Get-TSJob -JobId $JobId
+        $jobUpdate = Get-TableauJob -JobId $JobId
         if ($jobUpdate.progress) {
             Write-Progress -Activity "Running" -Status ("Job progress: {0}%" -f $jobUpdate.progress) -PercentComplete $jobUpdate.progress
         } else {
@@ -6848,7 +6851,7 @@ Param(
     return $jobUpdate
 }
 
-function Get-TSTask {
+function Get-TableauTask {
 <#
 .SYNOPSIS
 Get Task / List Tasks on Site
@@ -6876,10 +6879,10 @@ Get Task by Id: The LUID of the specific task.
 (Optional, List Tasks) Page size when paging through results.
 
 .EXAMPLE
-$extractTasks = Get-TSTask -Type ExtractRefresh | Where-Object -FilterScript {$_.datasource.id -eq $datasourceForTasks.id}
+$extractTasks = Get-TableauTask -Type ExtractRefresh | Where-Object -FilterScript {$_.datasource.id -eq $datasourceForTasks.id}
 
 .EXAMPLE
-$flowTasks = Get-TSTask -Type FlowRun -TaskId $taskId
+$flowTasks = Get-TableauTask -Type FlowRun -TaskId $taskId
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_extract_and_encryption.htm#get_extract_refresh_task
@@ -6911,23 +6914,23 @@ Param(
     if ($TaskId) { # Get Flow Run Task / Get Extract Refresh Task / Get Linked Task / Get Data Acceleration Task
         switch ($Type) {
             'ExtractRefresh' {
-                Assert-TSRestApiVersion -AtLeast 2.6
-                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param extractRefreshes/$TaskId) -Method Get
+                Assert-TableauRestVersion -AtLeast 2.6
+                $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Task -Param extractRefreshes/$TaskId) -Method Get
                 $response.tsResponse.task.extractRefresh
             }
             'FlowRun' {
-                Assert-TSRestApiVersion -AtLeast 3.3
-                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param runFlow/$TaskId) -Method Get
+                Assert-TableauRestVersion -AtLeast 3.3
+                $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Task -Param runFlow/$TaskId) -Method Get
                 $response.tsResponse.task.flowRun
             }
             'Linked' {
-                Assert-TSRestApiVersion -AtLeast 3.15
-                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param linked/$TaskId) -Method Get
+                Assert-TableauRestVersion -AtLeast 3.15
+                $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Task -Param linked/$TaskId) -Method Get
                 $response.tsResponse.linkedTask
             }
             'DataAcceleration' {
-                Assert-TSRestApiVersion -AtLeast 3.8 -LessThan 3.16
-                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param dataAcceleration/$TaskId) -Method Get
+                Assert-TableauRestVersion -AtLeast 3.8 -LessThan 3.16
+                $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Task -Param dataAcceleration/$TaskId) -Method Get
                 $response.tsResponse.task.dataAcceleration
             }
         }
@@ -6937,24 +6940,24 @@ Param(
             $pageNumber++
             switch ($Type) {
                 'ExtractRefresh' {
-                    # Assert-TSRestApiVersion -AtLeast 2.2
-                    $uri = Get-TSRequestUri -Endpoint Task -Param extractRefreshes
+                    # Assert-TableauRestVersion -AtLeast 2.2
+                    $uri = Get-TableauRequestUri -Endpoint Task -Param extractRefreshes
                 }
                 'FlowRun' {
-                    Assert-TSRestApiVersion -AtLeast 3.3
-                    $uri = Get-TSRequestUri -Endpoint Task -Param runFlow
+                    Assert-TableauRestVersion -AtLeast 3.3
+                    $uri = Get-TableauRequestUri -Endpoint Task -Param runFlow
                 }
                 'Linked' {
-                    Assert-TSRestApiVersion -AtLeast 3.15
-                    $uri = Get-TSRequestUri -Endpoint Task -Param linked
+                    Assert-TableauRestVersion -AtLeast 3.15
+                    $uri = Get-TableauRequestUri -Endpoint Task -Param linked
                 }
                 'DataAcceleration' {
-                    Assert-TSRestApiVersion -AtLeast 3.8 -LessThan 3.16
-                    $uri = Get-TSRequestUri -Endpoint Task -Param dataAcceleration
+                    Assert-TableauRestVersion -AtLeast 3.8 -LessThan 3.16
+                    $uri = Get-TableauRequestUri -Endpoint Task -Param dataAcceleration
                 }
             }
             $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-            $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
+            $response = Invoke-TableauRestMethod -Uri $uri -Method Get
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             switch ($Type) {
                 'ExtractRefresh' {
@@ -6974,7 +6977,7 @@ Param(
     }
 }
 
-function Remove-TSTask {
+function Remove-TableauTask {
 <#
 .SYNOPSIS
 Delete Extract Refresh or Data Acceleration Task
@@ -6990,7 +6993,7 @@ Supported types are: ExtractRefresh, DataAcceleration
 The LUID of the task to remove.
 
 .EXAMPLE
-Remove-TSTask -Type ExtractRefresh -TaskId $extractTaskId
+Remove-TableauTask -Type ExtractRefresh -TaskId $extractTaskId
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_extract_and_encryption.htm#delete_extract_refresh_task
@@ -7007,18 +7010,18 @@ Param(
     if ($PSCmdlet.ShouldProcess("$Type $TaskId")) {
         switch ($Type) {
             'ExtractRefresh' {
-                Assert-TSRestApiVersion -AtLeast 3.6
-                Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param extractRefreshes/$TaskId) -Method Delete
+                Assert-TableauRestVersion -AtLeast 3.6
+                Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Task -Param extractRefreshes/$TaskId) -Method Delete
             }
             'DataAcceleration' {
-                Assert-TSRestApiVersion -AtLeast 3.8 -LessThan 3.16
-                Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param dataAcceleration/$TaskId) -Method Delete
+                Assert-TableauRestVersion -AtLeast 3.8 -LessThan 3.16
+                Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Task -Param dataAcceleration/$TaskId) -Method Delete
             }
         }
     }
 }
 
-function Start-TSTaskNow {
+function Start-TableauTaskNow {
 <#
 .SYNOPSIS
 Run Extract Refresh / Flow / Linked Task
@@ -7034,10 +7037,10 @@ The type of the task, which corresponds to a specific API call.
 Supported types are: ExtractRefresh, FlowRun, Linked
 
 .EXAMPLE
-$job = Start-TSTaskNow -Type ExtractRefresh -TaskId $extractTaskId
+$job = Start-TableauTaskNow -Type ExtractRefresh -TaskId $extractTaskId
 
 .EXAMPLE
-$job = Start-TSTaskNow -Type FlowRun -TaskId $flowTaskId
+$job = Start-TableauTaskNow -Type FlowRun -TaskId $flowTaskId
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_extract_and_encryption.htm#run_extract_refresh_task
@@ -7057,18 +7060,18 @@ Param(
     if ($PSCmdlet.ShouldProcess("$Type $TaskId")) {
         switch ($Type) {
             'ExtractRefresh' { # Run Extract Refresh Task
-                Assert-TSRestApiVersion -AtLeast 2.6
-                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param extractRefreshes/$TaskId/runNow) -Body "<tsRequest />" -Method Post -ContentType "application/xml"
+                Assert-TableauRestVersion -AtLeast 2.6
+                $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Task -Param extractRefreshes/$TaskId/runNow) -Body "<tsRequest />" -Method Post -ContentType "application/xml"
                 return $response.tsResponse.job
             }
             'FlowRun' { # Run Flow Task
-                Assert-TSRestApiVersion -AtLeast 3.3
-                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param runFlow/$TaskId/runNow) -Body "<tsRequest />" -Method Post -ContentType "application/xml"
+                Assert-TableauRestVersion -AtLeast 3.3
+                $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Task -Param runFlow/$TaskId/runNow) -Body "<tsRequest />" -Method Post -ContentType "application/xml"
                 return $response.tsResponse.job
             }
             'Linked' { # Run Linked Task Now
-                Assert-TSRestApiVersion -AtLeast 3.15
-                $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param linked/$TaskId/runNow) -Body "<tsRequest />" -Method Post -ContentType "application/xml"
+                Assert-TableauRestVersion -AtLeast 3.15
+                $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Task -Param linked/$TaskId/runNow) -Body "<tsRequest />" -Method Post -ContentType "application/xml"
                 return $response.tsResponse.linkedTaskJob
             }
         }
@@ -7076,7 +7079,7 @@ Param(
 }
 
 ### Extract and Encryption methods
-function Get-TSExtractRefreshTasksInSchedule {
+function Get-TableauExtractRefreshTask {
 <#
 .SYNOPSIS
 List Extract Refresh Tasks in Server Schedule
@@ -7092,7 +7095,7 @@ The LUID of the schedule to get extract information for.
 (Optional) Page size when paging through results.
 
 .EXAMPLE
-$tasks = Get-TSExtractRefreshTasksInSchedule -ScheduleId $extractScheduleId
+$tasks = Get-TableauExtractRefreshTask -ScheduleId $extractScheduleId
 
 .NOTES
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_extract_and_encryption.htm#list_extract_refresh_tasks1
@@ -7102,19 +7105,19 @@ Param(
     [Parameter(Mandatory)][string] $ScheduleId,
     [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
 )
-    # Assert-TSRestApiVersion -AtLeast 2.3
+    # Assert-TableauRestVersion -AtLeast 2.3
     $pageNumber = 0
     do {
         $pageNumber++
-        $uri = Get-TSRequestUri -Endpoint Schedule -Param $ScheduleId/extracts
+        $uri = Get-TableauRequestUri -Endpoint Schedule -Param $ScheduleId/extracts
         $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-        $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
+        $response = Invoke-TableauRestMethod -Uri $uri -Method Get
         $totalAvailable = $response.tsResponse.pagination.totalAvailable
         $response.tsResponse.extracts.extract
     } until ($PageSize*$pageNumber -ge $totalAvailable)
 }
 
-function Add-TSExtractsInContent {
+function Add-TableauContentExtract {
 <#
 .SYNOPSIS
 Create an Extract for a Data Source / Create Extracts for Embedded Data Sources in a Workbook
@@ -7134,10 +7137,10 @@ Either workbook ID or data source ID needs to be provided.
 (Optional) If true, then Tableau will attempt to encrypt the created extracts
 
 .EXAMPLE
-$job = Add-TSExtractsInContent -WorkbookId = $workbookId
+$job = Add-TableauContentExtract -WorkbookId = $workbookId
 
 .EXAMPLE
-$job = Add-TSExtractsInContent -DatasourceId = $datasourceId -EncryptExtracts
+$job = Add-TableauContentExtract -DatasourceId = $datasourceId -EncryptExtracts
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_extract_and_encryption.htm#create_extract_for_datasource
@@ -7153,12 +7156,12 @@ Param(
     [Parameter()][switch] $EncryptExtracts
 )
     if ($WorkbookId) {
-        Assert-TSRestApiVersion -AtLeast 3.5
-        $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId
+        Assert-TableauRestVersion -AtLeast 3.5
+        $uri = Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId
         $shouldProcessItem = "workbook:$WorkbookId"
     } elseif ($DatasourceId) {
-        Assert-TSRestApiVersion -AtLeast 3.5
-        $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId
+        Assert-TableauRestVersion -AtLeast 3.5
+        $uri = Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId
         $shouldProcessItem = "datasource:$DatasourceId"
     }
     $uri += "/createExtract"
@@ -7166,12 +7169,12 @@ Param(
         $uri += "?encrypt=true"
     }
     if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-        $response = Invoke-TSRestApiMethod -Uri $uri -Method Post
+        $response = Invoke-TableauRestMethod -Uri $uri -Method Post
         return $response.tsResponse.job
     }
 }
 
-function Remove-TSExtractsInContent {
+function Remove-TableauContentExtract {
 <#
 .SYNOPSIS
 Delete the Extract from a Data Source / Delete Extracts of Embedded Data Sources from a Workbook
@@ -7188,7 +7191,7 @@ The LUID of the datasource whose extract is to be deleted.
 Either workbook ID or data source ID needs to be provided.
 
 .EXAMPLE
-Remove-TSExtractsInContent -WorkbookId = $workbookId
+Remove-TableauContentExtract -WorkbookId = $workbookId
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_extract_and_encryption.htm#delete_extracts_from_workbook
@@ -7202,21 +7205,21 @@ Param(
     [Parameter(Mandatory,ParameterSetName='Workbook')][string] $WorkbookId,
     [Parameter(Mandatory,ParameterSetName='Datasource')][string] $DatasourceId
 )
-    Assert-TSRestApiVersion -AtLeast 3.5
+    Assert-TableauRestVersion -AtLeast 3.5
     if ($WorkbookId) {
-        $uri = Get-TSRequestUri -Endpoint Workbook -Param $WorkbookId
+        $uri = Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId
         $shouldProcessItem = "workbook:$WorkbookId"
     } elseif ($DatasourceId) {
-        $uri = Get-TSRequestUri -Endpoint Datasource -Param $DatasourceId
+        $uri = Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId
         $shouldProcessItem = "datasource:$DatasourceId"
     }
     $uri += "/deleteExtract"
     if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-        Invoke-TSRestApiMethod -Uri $uri -Method Post
+        Invoke-TableauRestMethod -Uri $uri -Method Post
     }
 }
 
-function Add-TSExtractsRefreshTask {
+function Add-TableauExtractRefreshTask {
 <#
 .SYNOPSIS
 Create Cloud Extract Refresh Task
@@ -7265,7 +7268,7 @@ For last day of the month, leave this parameter empty.
 (Optional) For Monthly, describing specific days in a month, e.g. for 3rd and 5th days, the list of values 3 and 5 should be provided.
 
 .EXAMPLE
-$extractTaskResult = Add-TSExtractsRefreshTask -WorkbookId $workbook.id -Type FullRefresh -Frequency Daily -StartTime 12:00:00 -IntervalHours 24 -IntervalWeekdays 'Sunday','Monday'
+$extractTaskResult = Add-TableauExtractRefreshTask -WorkbookId $workbook.id -Type FullRefresh -Frequency Daily -StartTime 12:00:00 -IntervalHours 24 -IntervalWeekdays 'Sunday','Monday'
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_extract_and_encryption.htm#create_cloud_extract_refresh_task
@@ -7286,7 +7289,7 @@ Param(
     [Parameter()][ValidateSet('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')][string] $IntervalMonthdayWeekday,
     [Parameter()][ValidateRange(1,31)][int[]] $IntervalMonthdays
 )
-    Assert-TSRestApiVersion -AtLeast 3.20
+    Assert-TableauRestVersion -AtLeast 3.20
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_extr = $tsRequest.AppendChild($xml.CreateElement("extractRefresh"))
@@ -7361,12 +7364,12 @@ Param(
         }
     }
     if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param extractRefreshes) -Body $xml.OuterXml -Method Post #-ContentType "application/xml"
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Task -Param extractRefreshes) -Body $xml.OuterXml -Method Post #-ContentType "application/xml"
         return $response.tsResponse
     }
 }
 
-function Update-TSExtractsRefreshTask {
+function Set-TableauExtractRefreshTask {
 <#
 .SYNOPSIS
 Update Cloud extract refresh task
@@ -7419,7 +7422,7 @@ For last day of the month, leave this parameter empty.
 (Optional) For Monthly, describing specific days in a month, e.g. for 3rd and 5th days, the list of values 3 and 5 should be provided.
 
 .EXAMPLE
-$extractTaskResult = Update-TSExtractsRefreshTask -TaskId $taskId -DatasourceId $datasource.id -Type FullRefresh -Frequency Hourly -StartTime 08:00:00 -EndTime 20:00:00 -IntervalHours 6 -IntervalWeekdays 'Tuesday'
+$extractTaskResult = Set-TableauExtractRefreshTask -TaskId $taskId -DatasourceId $datasource.id -Type FullRefresh -Frequency Hourly -StartTime 08:00:00 -EndTime 20:00:00 -IntervalHours 6 -IntervalWeekdays 'Tuesday'
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_extract_and_encryption.htm#update_cloud_extract_refresh_task
@@ -7441,7 +7444,7 @@ Param(
     [Parameter()][ValidateSet('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')][string] $IntervalMonthdayWeekday,
     [Parameter()][ValidateRange(1,31)][int[]] $IntervalMonthdays # specific month days
 )
-    Assert-TSRestApiVersion -AtLeast 3.20
+    Assert-TableauRestVersion -AtLeast 3.20
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_extr = $tsRequest.AppendChild($xml.CreateElement("extractRefresh"))
@@ -7520,12 +7523,12 @@ Param(
         }
     }
     if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Task -Param extractRefreshes/$TaskId) -Body $xml.OuterXml -Method Put #-ContentType "application/xml"
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Task -Param extractRefreshes/$TaskId) -Body $xml.OuterXml -Method Put #-ContentType "application/xml"
         return $response.tsResponse
     }
 }
 
-function Invoke-TSEncryption {
+function Set-TableauEncryption {
 <#
 .SYNOPSIS
 Encrypt Extracts in a Site / Decrypt Extracts in a Site / Reencrypt Extracts in a Site
@@ -7549,7 +7552,7 @@ Boolean switch, if supplied, the re-encryption of all extracts is triggered.
 Site LUID where the encryption process should be conducted. If omitted, the current site is used.
 
 .EXAMPLE
-Invoke-TSEncryption -EncryptExtracts
+Set-TableauEncryption -EncryptExtracts
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_extract_and_encryption.htm#encrypt_extracts
@@ -7569,25 +7572,25 @@ Param(
     [Parameter()][string] $SiteId
 )
     if (-Not $SiteId) {
-        $SiteId = $script:TSSiteId
+        $SiteId = $script:TableauSiteId
     }
     if ($EncryptExtracts) {
         if ($PSCmdlet.ShouldProcess("encrypt extracts on site $SiteId")) {
-            Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Site -Param "$SiteId/encrypt-extracts") -Method Post
+            Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Site -Param "$SiteId/encrypt-extracts") -Method Post
         }
     } elseif ($DecryptExtracts) {
         if ($PSCmdlet.ShouldProcess("decrypt extracts on site $SiteId")) {
-            Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Site -Param "$SiteId/decrypt-extracts") -Method Post
+            Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Site -Param "$SiteId/decrypt-extracts") -Method Post
         }
     } elseif ($ReencryptExtracts) {
         if ($PSCmdlet.ShouldProcess("reencrypt extracts on site $SiteId")) {
-            Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Site -Param "$SiteId/reencrypt-extracts") -Method Post
+            Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Site -Param "$SiteId/reencrypt-extracts") -Method Post
         }
     }
 }
 
 ### Favorites methods
-function Get-TSUserFavorite {
+function Get-TableauUserFavorite {
 <#
 .SYNOPSIS
 Get Favorites for User
@@ -7602,7 +7605,7 @@ The LUID of the user for which you want to get a list favorites.
 (Optional) Page size when paging through results.
 
 .EXAMPLE
-$favorites = Get-TSUserFavorite -UserId (Get-TSCurrentUserId)
+$favorites = Get-TableauUserFavorite -UserId (Get-TableauCurrentUserId)
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_favorites.htm#get_favorites_for_user
@@ -7612,19 +7615,19 @@ Param(
     [Parameter(Mandatory)][string] $UserId,
     [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
 )
-    Assert-TSRestApiVersion -AtLeast 2.5
+    Assert-TableauRestVersion -AtLeast 2.5
     $pageNumber = 0
     do {
         $pageNumber++
-        $uri = Get-TSRequestUri -Endpoint Favorite -Param $UserId
+        $uri = Get-TableauRequestUri -Endpoint Favorite -Param $UserId
         $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-        $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
+        $response = Invoke-TableauRestMethod -Uri $uri -Method Get
         $totalAvailable = $response.tsResponse.pagination.totalAvailable
         $response.tsResponse.favorites.favorite
     } until ($PageSize*$pageNumber -ge $totalAvailable)
 }
 
-function Add-TSUserFavorite {
+function Add-TableauUserFavorite {
 <#
 .SYNOPSIS
 Add Workbook / Data Source / View / Project / Flow to Favorites
@@ -7656,10 +7659,10 @@ The LUID of the project to add as a favorite.
 The LUID of the flow to add as a favorite.
 
 .EXAMPLE
-Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -WorkbookId $workbook.id -Label $workbook.name
+Add-TableauUserFavorite -UserId (Get-TableauCurrentUserId) -WorkbookId $workbook.id -Label $workbook.name
 
 .EXAMPLE
-Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -ProjectId $reportsProjectId
+Add-TableauUserFavorite -UserId (Get-TableauCurrentUserId) -ProjectId $reportsProjectId
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_favorites.htm#add_workbook_to_favorites
@@ -7691,7 +7694,7 @@ Param(
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_favorite = $tsRequest.AppendChild($xml.CreateElement("favorite"))
     if ($WorkbookId) {
-        # Assert-TSRestApiVersion -AtLeast 2.0
+        # Assert-TableauRestVersion -AtLeast 2.0
         $el_favorite.AppendChild($xml.CreateElement("workbook")).SetAttribute("id", $WorkbookId)
         if ($Label) {
             $el_favorite.SetAttribute("label", $Label)
@@ -7700,7 +7703,7 @@ Param(
         }
         $shouldProcessItem = "user:$UserId, workbook:$WorkbookId"
     } elseif ($DatasourceId) {
-        # Assert-TSRestApiVersion -AtLeast 2.3
+        # Assert-TableauRestVersion -AtLeast 2.3
         $el_favorite.AppendChild($xml.CreateElement("datasource")).SetAttribute("id", $DatasourceId)
         if ($Label) {
             $el_favorite.SetAttribute("label", $Label)
@@ -7709,7 +7712,7 @@ Param(
         }
         $shouldProcessItem = "user:$UserId, datasource:$DatasourceId"
     } elseif ($ViewId) {
-        # Assert-TSRestApiVersion -AtLeast 2.0
+        # Assert-TableauRestVersion -AtLeast 2.0
         $el_favorite.AppendChild($xml.CreateElement("view")).SetAttribute("id", $ViewId)
         if ($Label) {
             $el_favorite.SetAttribute("label", $Label)
@@ -7718,7 +7721,7 @@ Param(
         }
         $shouldProcessItem = "user:$UserId, view:$ViewId"
     } elseif ($ProjectId) {
-        Assert-TSRestApiVersion -AtLeast 3.1
+        Assert-TableauRestVersion -AtLeast 3.1
         $el_favorite.AppendChild($xml.CreateElement("project")).SetAttribute("id", $ProjectId)
         if ($Label) {
             $el_favorite.SetAttribute("label", $Label)
@@ -7727,7 +7730,7 @@ Param(
         }
         $shouldProcessItem = "user:$UserId, project:$ProjectId"
     } elseif ($FlowId) {
-        Assert-TSRestApiVersion -AtLeast 3.3
+        Assert-TableauRestVersion -AtLeast 3.3
         $el_favorite.AppendChild($xml.CreateElement("flow")).SetAttribute("id", $FlowId)
         if ($Label) {
             $el_favorite.SetAttribute("label", $Label)
@@ -7737,12 +7740,12 @@ Param(
         $shouldProcessItem = "user:$UserId, flow:$FlowId"
     }
     if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Favorite -Param $UserId) -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Favorite -Param $UserId) -Body $xml.OuterXml -Method Put
         return $response.tsResponse.favorites.favorite
     }
 }
 
-function Remove-TSUserFavorite {
+function Remove-TableauUserFavorite {
 <#
 .SYNOPSIS
 Delete Workbook / Data Source / View / Project / Flow from Favorites
@@ -7769,7 +7772,7 @@ The LUID of the project to remove from favorite.
 The LUID of the flow to remove from favorite.
 
 .EXAMPLE
-Remove-TSUserFavorite -UserId (Get-TSCurrentUserId) -WorkbookId $workbook.id
+Remove-TableauUserFavorite -UserId (Get-TableauCurrentUserId) -WorkbookId $workbook.id
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_favorites.htm#delete_workbook_from_favorites
@@ -7797,32 +7800,32 @@ Param(
     [Parameter(Mandatory,ParameterSetName='Flow')][string] $FlowId
 )
     if ($WorkbookId) {
-        # Assert-TSRestApiVersion -AtLeast 2.0
-        $uri = Get-TSRequestUri -Endpoint Favorite -Param $UserId/workbooks/$WorkbookId
+        # Assert-TableauRestVersion -AtLeast 2.0
+        $uri = Get-TableauRequestUri -Endpoint Favorite -Param $UserId/workbooks/$WorkbookId
         $shouldProcessItem = "user:$UserId, workbook:$WorkbookId"
     } elseif ($DatasourceId) {
-        # Assert-TSRestApiVersion -AtLeast 2.3
-        $uri = Get-TSRequestUri -Endpoint Favorite -Param $UserId/datasources/$DatasourceId
+        # Assert-TableauRestVersion -AtLeast 2.3
+        $uri = Get-TableauRequestUri -Endpoint Favorite -Param $UserId/datasources/$DatasourceId
         $shouldProcessItem = "user:$UserId, datasource:$DatasourceId"
     } elseif ($ViewId) {
-        # Assert-TSRestApiVersion -AtLeast 2.0
-        $uri = Get-TSRequestUri -Endpoint Favorite -Param $UserId/views/$ViewId
+        # Assert-TableauRestVersion -AtLeast 2.0
+        $uri = Get-TableauRequestUri -Endpoint Favorite -Param $UserId/views/$ViewId
         $shouldProcessItem = "user:$UserId, view:$ViewId"
     } elseif ($ProjectId) {
-        Assert-TSRestApiVersion -AtLeast 3.1
-        $uri = Get-TSRequestUri -Endpoint Favorite -Param $UserId/projects/$ProjectId
+        Assert-TableauRestVersion -AtLeast 3.1
+        $uri = Get-TableauRequestUri -Endpoint Favorite -Param $UserId/projects/$ProjectId
         $shouldProcessItem = "user:$UserId, project:$ProjectId"
     } elseif ($FlowId) {
-        Assert-TSRestApiVersion -AtLeast 3.3
-        $uri = Get-TSRequestUri -Endpoint Favorite -Param $UserId/flows/$FlowId
+        Assert-TableauRestVersion -AtLeast 3.3
+        $uri = Get-TableauRequestUri -Endpoint Favorite -Param $UserId/flows/$FlowId
         $shouldProcessItem = "user:$UserId, flow:$FlowId"
     }
     if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-        Invoke-TSRestApiMethod -Uri $uri -Method Delete
+        Invoke-TableauRestMethod -Uri $uri -Method Delete
     }
 }
 
-function Move-TSUserFavorite {
+function Move-TableauUserFavorite {
 <#
 .SYNOPSIS
 Organize Favorites
@@ -7848,7 +7851,7 @@ The type of a favorite item that should precede (insert the specific favorite af
 Valid types are Workbook, Datasource, View, Project, Flow.
 
 .EXAMPLE
-Move-TSUserFavorite -UserId (Get-TSCurrentUserId) -FavoriteId $view.id -FavoriteType View -AfterFavoriteId $view2.id -AfterFavoriteType View
+Move-TableauUserFavorite -UserId (Get-TableauCurrentUserId) -FavoriteId $view.id -FavoriteType View -AfterFavoriteId $view2.id -AfterFavoriteType View
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_favorites.htm#update_favorites
@@ -7862,7 +7865,7 @@ Param(
     [Parameter(Mandatory)][string] $AfterFavoriteId,
     [Parameter(Mandatory)][ValidateSet('Workbook','Datasource','View','Project','Flow')][string] $AfterFavoriteType
 )
-    Assert-TSRestApiVersion -AtLeast 3.8
+    Assert-TableauRestVersion -AtLeast 3.8
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_fos = $tsRequest.AppendChild($xml.CreateElement("favoriteOrderings"))
@@ -7872,12 +7875,12 @@ Param(
     $el_fo.SetAttribute("favoriteIdMoveAfter", $AfterFavoriteId)
     $el_fo.SetAttribute("favoriteTypeMoveAfter", $AfterFavoriteType.ToLower()) # note: needs to be lowercase, otherwise TS will return error 400
     if ($PSCmdlet.ShouldProcess("user:$UserId, favorite($FavoriteType):$FavoriteId, after($AfterFavoriteType):$AfterFavoriteId")) {
-        Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint OrderFavorite -Param $UserId) -Body $xml.OuterXml -Method Put
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint OrderFavorite -Param $UserId) -Body $xml.OuterXml -Method Put
     }
 }
 
 ### Subscription methods
-function Get-TSSubscription {
+function Get-TableauSubscription {
 <#
 .SYNOPSIS
 Get Subscription / List Subscriptions
@@ -7892,10 +7895,10 @@ Get Subscription: The ID of the subscription to get information for.
 (Optional, List Subscriptions) Page size when paging through results.
 
 .EXAMPLE
-$subscriptions = Get-TSSubscription
+$subscriptions = Get-TableauSubscription
 
 .EXAMPLE
-$subscription = Get-TSSubscription -SubscriptionId $id
+$subscription = Get-TableauSubscription -SubscriptionId $id
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_subscriptions.htm#get_subscription
@@ -7908,22 +7911,22 @@ Param(
     [Parameter(Mandatory,ParameterSetName='SubscriptionById')][string] $SubscriptionId,
     [Parameter(ParameterSetName='Subscriptions')][ValidateRange(1,100)][int] $PageSize = 100
 )
-    # Assert-TSRestApiVersion -AtLeast 2.3
+    # Assert-TableauRestVersion -AtLeast 2.3
     if ($SubscriptionId) { # Get Subscription
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Subscription -Param $SubscriptionId) -Method Get
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Subscription -Param $SubscriptionId) -Method Get
         $response.tsResponse.subscription
     } else { # List Subscriptions
         $pageNumber = 0
         do {
             $pageNumber++
-            $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Subscription) -Method Get
+            $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Subscription) -Method Get
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.subscriptions.subscription
         } until ($PageSize*$pageNumber -ge $totalAvailable)
     }
 }
 
-function Add-TSSubscription {
+function Add-TableauSubscription {
 <#
 .SYNOPSIS
 Create Subscription
@@ -8002,10 +8005,10 @@ For last day of the month, leave this parameter empty.
 (Optional, for Tableau Cloud) For Monthly, describing specific days in a month, e.g. for 3rd and 5th days, the list of values 3 and 5 should be provided.
 
 .EXAMPLE
-$subscription = Add-TSSubscription -ScheduleId $subscriptionScheduleId -ContentType Workbook -ContentId $workbook.id -Subject "test" -Message "Test subscription" -UserId (Get-TSCurrentUserId)
+$subscription = Add-TableauSubscription -ScheduleId $subscriptionScheduleId -ContentType Workbook -ContentId $workbook.id -Subject "test" -Message "Test subscription" -UserId (Get-TableauCurrentUserId)
 
 .EXAMPLE
-$subscription = Add-TSSubscription -ContentType View -ContentId $view.id -Subject "test" -Message "Test subscription" -UserId (Get-TSCurrentUserId) -Frequency Weekly -StartTime 12:00:00 -IntervalWeekdays 'Sunday'
+$subscription = Add-TableauSubscription -ContentType View -ContentId $view.id -Subject "test" -Message "Test subscription" -UserId (Get-TableauCurrentUserId) -Frequency Weekly -StartTime 12:00:00 -IntervalWeekdays 'Sunday'
 
 .NOTES
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_subscriptions.htm#create_subscription
@@ -8054,11 +8057,11 @@ Param(
     $el_user = $el_subs.AppendChild($xml.CreateElement("user"))
     $el_user.SetAttribute("id", $UserId)
     if ($ScheduleId) { # Create Subscription on Tableau Server
-        # Assert-TSRestApiVersion -AtLeast 2.3
+        # Assert-TableauRestVersion -AtLeast 2.3
         $el_sched = $el_subs.AppendChild($xml.CreateElement("schedule"))
         $el_sched.SetAttribute("id", $ScheduleId)
     } elseif ($Frequency) { # Create Subscription on Tableau Cloud
-        Assert-TSRestApiVersion -AtLeast 3.20
+        Assert-TableauRestVersion -AtLeast 3.20
         $el_sched = $tsRequest.AppendChild($xml.CreateElement("schedule"))
         $el_sched.SetAttribute("frequency", $Frequency)
         $el_freq = $el_sched.AppendChild($xml.CreateElement("frequencyDetails"))
@@ -8121,12 +8124,12 @@ Param(
         }
     }
     if ($PSCmdlet.ShouldProcess($Subject)) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Subscription) -Body $xml.OuterXml -Method Post
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Subscription) -Body $xml.OuterXml -Method Post
         return $response.tsResponse.subscription
     }
 }
 
-function Update-TSSubscription {
+function Set-TableauSubscription {
 <#
 .SYNOPSIS
 Update Subscription
@@ -8210,10 +8213,10 @@ For last day of the month, leave this parameter empty.
 (Optional, for Tableau Cloud) For Monthly, describing specific days in a month, e.g. for 3rd and 5th days, the list of values 3 and 5 should be provided.
 
 .EXAMPLE
-$subscription = Update-TSSubscription -SubscriptionId $subscription.id -ScheduleId $subscriptionScheduleId -ContentType View -ContentId $view.id -Subject "Subscription test"
+$subscription = Set-TableauSubscription -SubscriptionId $subscription.id -ScheduleId $subscriptionScheduleId -ContentType View -ContentId $view.id -Subject "Subscription test"
 
 .EXAMPLE
-$subscription = Update-TSSubscription -SubscriptionId $subscription.id -ContentType View -ContentId $view.id -Subject "test1" -Message "Test subscription1" -UserId (Get-TSCurrentUserId) -Frequency Monthly -StartTime 14:00:00 -IntervalMonthdays 5,10
+$subscription = Set-TableauSubscription -SubscriptionId $subscription.id -ContentType View -ContentId $view.id -Subject "test1" -Message "Test subscription1" -UserId (Get-TableauCurrentUserId) -Frequency Monthly -StartTime 14:00:00 -IntervalMonthdays 5,10
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_subscriptions.htm#update_subscription
@@ -8285,11 +8288,11 @@ Param(
         $el_user.SetAttribute("id", $UserId)
     }
     if ($ScheduleId) { # Update Subscription on Tableau Server
-        # Assert-TSRestApiVersion -AtLeast 2.3
+        # Assert-TableauRestVersion -AtLeast 2.3
         $el_sched = $el_subs.AppendChild($xml.CreateElement("schedule"))
         $el_sched.SetAttribute("id", $ScheduleId)
     } elseif ($Frequency) { # Update Subscription on Tableau Cloud
-        Assert-TSRestApiVersion -AtLeast 3.20
+        Assert-TableauRestVersion -AtLeast 3.20
         $el_sched = $tsRequest.AppendChild($xml.CreateElement("schedule"))
         $el_sched.SetAttribute("frequency", $Frequency)
         $el_freq = $el_sched.AppendChild($xml.CreateElement("frequencyDetails"))
@@ -8352,12 +8355,12 @@ Param(
         }
     }
     if ($PSCmdlet.ShouldProcess($SubscriptionId)) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Subscription -Param $SubscriptionId) -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Subscription -Param $SubscriptionId) -Body $xml.OuterXml -Method Put
         return $response.tsResponse.subscription
     }
 }
 
-function Remove-TSSubscription {
+function Remove-TableauSubscription {
 <#
 .SYNOPSIS
 Delete Subscription
@@ -8369,7 +8372,7 @@ Deletes the specified subscription on Tableau Server or Tableau Cloud.
 The ID of the subscription to delete.
 
 .EXAMPLE
-Remove-TSSubscription -SubscriptionId $subscriptionId
+Remove-TableauSubscription -SubscriptionId $subscriptionId
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_subscriptions.htm#delete_subscription
@@ -8379,14 +8382,14 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_subscripti
 Param(
     [Parameter(Mandatory)][string] $SubscriptionId
 )
-    # Assert-TSRestApiVersion -AtLeast 2.3
+    # Assert-TableauRestVersion -AtLeast 2.3
     if ($PSCmdlet.ShouldProcess($SubscriptionId)) {
-        Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Subscription -Param $SubscriptionId) -Method Delete
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Subscription -Param $SubscriptionId) -Method Delete
     }
 }
 
 ### Tableau Extensions Settings Methods
-function Get-TSExtensionSettingsServer {
+function Get-TableauServerSettingsExtension {
 <#
 .SYNOPSIS
 List Tableau extensions server settings
@@ -8396,19 +8399,19 @@ Lists the settings for extensions of a server.
 This method can only be called by server administrators; it is not available on Tableau Cloud.
 
 .EXAMPLE
-$settings = Get-TSExtensionSettingsServer
+$settings = Get-TableauServerSettingsExtension
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_tableau_extensions_settings.htm#list_tableau_extensions_server_settings
 #>
 [OutputType([PSCustomObject])]
 Param()
-    Assert-TSRestApiVersion -AtLeast 3.21
-    $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint ServerSetting -Param extensions) -Method Get
+    Assert-TableauRestVersion -AtLeast 3.21
+    $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ServerSetting -Param extensions) -Method Get
     return $response.tsResponse.extensionsServerSettings
 }
 
-function Update-TSExtensionSettingsServer {
+function Set-TableauServerSettingsExtension {
 <#
 .SYNOPSIS
 Update Tableau extensions server settings
@@ -8424,17 +8427,18 @@ True/false. True: extensions are allowed to run on the server. False: all extend
 (Optional) List of domains that are not allowed to serve extensions to the Tableau Server. Domains are in the form of https://blocked_example.com
 
 .EXAMPLE
-$settings = Update-TSExtensionSettingsServer -Enabled true -BlockList 'https://test.com'
+$settings = Set-TableauServerSettingsExtension -Enabled true -BlockList 'https://test.com'
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_tableau_extensions_settings.htm#update_tableau_extensions_server_settings
 #>
+[CmdletBinding(SupportsShouldProcess)]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][ValidateSet('true','false')][string] $Enabled,
     [Parameter()][string[]] $BlockList
 )
-    Assert-TSRestApiVersion -AtLeast 3.21
+    Assert-TableauRestVersion -AtLeast 3.21
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_settings = $tsRequest.AppendChild($xml.CreateElement("extensionsServerSettings"))
@@ -8446,11 +8450,13 @@ Param(
             $el_block.InnerText = $blockext
         }
     }
-    $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint ServerSetting -Param extensions) -Method Put -Body $xml.OuterXml
-    return $response.tsResponse.extensionsServerSettings
+    if ($PSCmdlet.ShouldProcess("Server Extensions: $Enabled")) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ServerSetting -Param extensions) -Method Put -Body $xml.OuterXml
+        return $response.tsResponse.extensionsServerSettings
+    }
 }
 
-function Get-TSExtensionSettingsSite {
+function Get-TableauSiteSettingsExtension {
 <#
 .SYNOPSIS
 List Tableau extensions site settings
@@ -8460,19 +8466,19 @@ Lists the settings for extensions of a site.
 This method can only be called by site or server administrators.
 
 .EXAMPLE
-$settings = Get-TSExtensionSettingsSite
+$settings = Get-TableauSiteSettingsExtension
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_tableau_extensions_settings.htm#list_tableau_extensions_site_settings
 #>
 [OutputType([PSCustomObject])]
 Param()
-    Assert-TSRestApiVersion -AtLeast 3.21
-    $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Setting -Param extensions) -Method Get
+    Assert-TableauRestVersion -AtLeast 3.21
+    $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Setting -Param extensions) -Method Get
     return $response.tsResponse.extensionsSiteSettings
 }
 
-function Update-TSExtensionSettingsSite {
+function Set-TableauSiteSettingsExtension {
 <#
 .SYNOPSIS
 Update Tableau extensions site settings
@@ -8496,18 +8502,19 @@ Note that updating the safelist replaces the existing list with the new list.
 If you want to add a URL to the existing list, you must also include the existing URLs in the new list.
 
 .EXAMPLE
-$settings = Update-TSExtensionSettingsSite -Enabled true -SafeList @{url='https://test.com';fullDataAllowed='true';promptNeeded='true'}
+$settings = Set-TableauSiteSettingsExtension -Enabled true -SafeList @{url='https://test.com';fullDataAllowed='true';promptNeeded='true'}
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_tableau_extensions_settings.htm#update_tableau_extensions_site_settings
 #>
+[CmdletBinding(SupportsShouldProcess)]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][ValidateSet('true','false')][string] $Enabled,
     [Parameter()][ValidateSet('true','false')][string] $UseDefaultSetting,
     [Parameter()][hashtable[]] $SafeList
 )
-    Assert-TSRestApiVersion -AtLeast 3.21
+    Assert-TableauRestVersion -AtLeast 3.21
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_settings = $tsRequest.AppendChild($xml.CreateElement("extensionsSiteSettings"))
@@ -8528,12 +8535,14 @@ Param(
             $el_prompt.InnerText = $safeext.promptNeeded
         }
     }
-    $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Setting -Param extensions) -Method Put -Body $xml.OuterXml
-    return $response.tsResponse.extensionsSiteSettings
+    if ($PSCmdlet.ShouldProcess("Site Extensions: $Enabled")) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Setting -Param extensions) -Method Put -Body $xml.OuterXml
+        return $response.tsResponse.extensionsSiteSettings
+    }
 }
 
 ### Notifications methods
-function Get-TSDataAlert {
+function Get-TableauDataAlert {
 <#
 .SYNOPSIS
 Get Data-Driven Alert / List Data-Driven Alerts on Site
@@ -8563,7 +8572,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_field
 (Optional, List Data-Driven Alerts on Site) Page size when paging through results.
 
 .EXAMPLE
-$dataAlert = Get-TSDataAlert -DataAlertId $id
+$dataAlert = Get-TableauDataAlert -DataAlertId $id
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#query_data-driven_alert_details
@@ -8579,15 +8588,15 @@ Param(
     [Parameter(ParameterSetName='DataAlerts')][string[]] $Fields,
     [Parameter(ParameterSetName='DataAlerts')][ValidateRange(1,100)][int] $PageSize = 100
 )
-    Assert-TSRestApiVersion -AtLeast 3.2
+    Assert-TableauRestVersion -AtLeast 3.2
     if ($DataAlertId) { # Get Data-Driven Alert
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint DataAlert -Param $DataAlertId) -Method Get
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint DataAlert -Param $DataAlertId) -Method Get
         $response.tsResponse.dataAlert
     } else { # List Data-Driven Alerts on Site
         $pageNumber = 0
         do {
             $pageNumber++
-            $uri = Get-TSRequestUri -Endpoint DataAlert
+            $uri = Get-TableauRequestUri -Endpoint DataAlert
             $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
             $uriParam.Add("pageSize", $PageSize)
             $uriParam.Add("pageNumber", $pageNumber)
@@ -8602,14 +8611,14 @@ Param(
             }
             $uriRequest = [System.UriBuilder]$uri
             $uriRequest.Query = $uriParam.ToString()
-            $response = Invoke-TSRestApiMethod -Uri $uriRequest.Uri.OriginalString -Method Get
+            $response = Invoke-TableauRestMethod -Uri $uriRequest.Uri.OriginalString -Method Get
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.dataAlerts.dataAlert
         } until ($PageSize*$pageNumber -ge $totalAvailable)
     }
 }
 
-function Add-TSDataAlert {
+function Add-TableauDataAlert {
 <#
 .SYNOPSIS
 Create Data Driven Alert
@@ -8652,7 +8661,7 @@ The LUID of the custom view that contains the data that can trigger an alert.
 Either the ViewId or CustomViewId needs to be provided.
 
 .EXAMPLE
-$dataAlert = Add-TSDataAlert -Subject "Data Driven Alert for Forecast" -Condition above -Threshold 14000 -WorksheetName "one_measure_no_dimension" -ViewId $view.id
+$dataAlert = Add-TableauDataAlert -Subject "Data Driven Alert for Forecast" -Condition above -Threshold 14000 -WorksheetName "one_measure_no_dimension" -ViewId $view.id
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#create_data_driven_alert
@@ -8670,7 +8679,7 @@ Param(
     [Parameter(Mandatory,ParameterSetName='View')][string] $ViewId,
     [Parameter(Mandatory,ParameterSetName='CustomView')][string] $CustomViewId
 )
-    Assert-TSRestApiVersion -AtLeast 3.20
+    Assert-TableauRestVersion -AtLeast 3.20
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_alert = $tsRequest.AppendChild($xml.CreateElement("dataAlertCreateAlert"))
@@ -8689,12 +8698,12 @@ Param(
         $el_alert.SetAttribute("customViewId", $CustomViewId)
     }
     if ($PSCmdlet.ShouldProcess($Name)) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint DataAlert) -Body $xml.OuterXml -Method Post
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint DataAlert) -Body $xml.OuterXml -Method Post
         return $response.tsResponse.dataAlertCreateAlert
     }
 }
 
-function Update-TSDataAlert {
+function Set-TableauDataAlert {
 <#
 .SYNOPSIS
 Update Data-Driven Alert
@@ -8720,7 +8729,7 @@ If the flag is true, users with access to the view containing the alert can see 
 If the flag is false, then the alert is only visible to the owner, site or server administrators, and specific users they add as recipients.
 
 .EXAMPLE
-$dataAlert = Update-TSDataAlert -DataAlertId $id -Subject "New Alert for Forecast"
+$dataAlert = Set-TableauDataAlert -DataAlertId $id -Subject "New Alert for Forecast"
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#update_data-driven_alert
@@ -8734,7 +8743,7 @@ Param(
     [Parameter()][ValidateSet('once','freguently','hourly','daily','weekly')][string] $Frequency,
     [Parameter()][ValidateSet('true','false')][string] $Public
 )
-    Assert-TSRestApiVersion -AtLeast 3.2
+    Assert-TableauRestVersion -AtLeast 3.2
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_alert = $tsRequest.AppendChild($xml.CreateElement("dataAlert"))
@@ -8752,12 +8761,12 @@ Param(
         $el_owner.SetAttribute("id", $OwnerUserId)
     }
     if ($PSCmdlet.ShouldProcess($DataAlertId)) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint DataAlert -Param $DataAlertId) -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint DataAlert -Param $DataAlertId) -Body $xml.OuterXml -Method Put
         return $response.tsResponse.dataAlert
     }
 }
 
-function Remove-TSDataAlert {
+function Remove-TableauDataAlert {
 <#
 .SYNOPSIS
 Delete Data-Driven Alert
@@ -8769,7 +8778,7 @@ Deletes the specified data-driven alert.
 Parameter description
 
 .EXAMPLE
-Remove-TSDataAlert -DataAlertId $id
+Remove-TableauDataAlert -DataAlertId $id
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#delete_data-driven_alert
@@ -8779,13 +8788,13 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notificati
 Param(
     [Parameter(Mandatory)][string] $DataAlertId
 )
-    Assert-TSRestApiVersion -AtLeast 3.2
+    Assert-TableauRestVersion -AtLeast 3.2
     if ($PSCmdlet.ShouldProcess($DataAlertId)) {
-        Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint DataAlert -Param $DataAlertId) -Method Delete
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint DataAlert -Param $DataAlertId) -Method Delete
     }
 }
 
-function Add-TSUserToDataAlert {
+function Add-TableauDataAlertUser {
 <#
 .SYNOPSIS
 Add User to Data-Driven Alert
@@ -8800,7 +8809,7 @@ The LUID of the data-driven alert.
 The LUID of the user to add to the data-driven alert.
 
 .EXAMPLE
-Add-TSUserToDataAlert -DataAlertId $id -UserId (Get-TSCurrentUserId)
+Add-TableauDataAlertUser -DataAlertId $id -UserId (Get-TableauCurrentUserId)
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#add_user_to_data-driven_alert
@@ -8811,18 +8820,18 @@ Param(
     [Parameter(Mandatory)][string] $DataAlertId,
     [Parameter(Mandatory)][string] $UserId
 )
-    Assert-TSRestApiVersion -AtLeast 3.2
+    Assert-TableauRestVersion -AtLeast 3.2
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_user = $tsRequest.AppendChild($xml.CreateElement("user"))
     $el_user.SetAttribute("id", $UserId)
     if ($PSCmdlet.ShouldProcess("user:$UserId, data alert:$DataAlertId")) {
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint DataAlert -Param $DataAlertId/users) -Body $xml.OuterXml -Method Post
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint DataAlert -Param $DataAlertId/users) -Body $xml.OuterXml -Method Post
         return $response.tsResponse.user
     }
 }
 
-function Remove-TSUserFromDataAlert {
+function Remove-TableauDataAlertUser {
 <#
 .SYNOPSIS
 Delete User from Data-Driven Alert
@@ -8837,7 +8846,7 @@ The LUID of the data-driven alert.
 The LUID of the user to remove from the data-driven alert.
 
 .EXAMPLE
-Remove-TSUserFromDataAlert -DataAlertId $id -UserId (Get-TSCurrentUserId)
+Remove-TableauDataAlertUser -DataAlertId $id -UserId (Get-TableauCurrentUserId)
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#delete_user_from_data-driven_alert
@@ -8848,14 +8857,14 @@ Param(
     [Parameter(Mandatory)][string] $DataAlertId,
     [Parameter(Mandatory)][string] $UserId
 )
-    Assert-TSRestApiVersion -AtLeast 3.2
+    Assert-TableauRestVersion -AtLeast 3.2
     if ($PSCmdlet.ShouldProcess("user:$UserId, data alert:$DataAlertId")) {
-        Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint DataAlert -Param $DataAlertId/users/$UserId) -Method Delete
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint DataAlert -Param $DataAlertId/users/$UserId) -Method Delete
     }
 }
 
 ### Metadata methods
-function Get-TSDatabase {
+function Get-TableauDatabase {
 <#
 .SYNOPSIS
 Query Database / Query Databases
@@ -8870,7 +8879,7 @@ Query Database: The LUID of the database.
 (Optional, Query Databases) Page size when paging through results.
 
 .EXAMPLE
-$databases = Get-TSDatabase
+$databases = Get-TableauDatabase
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_metadata.htm#query_database
@@ -8883,24 +8892,24 @@ Param(
     [Parameter(Mandatory,ParameterSetName='DatabaseById')][string] $DatabaseId,
     [Parameter(ParameterSetName='Databases')][ValidateRange(1,100)][int] $PageSize = 100
 )
-    Assert-TSRestApiVersion -AtLeast 3.5
+    Assert-TableauRestVersion -AtLeast 3.5
     if ($DatabaseId) { # Query Database
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Database -Param $DatabaseId) -Method Get
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Database -Param $DatabaseId) -Method Get
         $response.tsResponse.database
     } else { # Query Databases
         $pageNumber = 0
         do {
             $pageNumber++
-            $uri = Get-TSRequestUri -Endpoint Database
+            $uri = Get-TableauRequestUri -Endpoint Database
             $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-            $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
+            $response = Invoke-TableauRestMethod -Uri $uri -Method Get
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.databases.database
         } until ($PageSize*$pageNumber -ge $totalAvailable)
     }
 }
 
-function Get-TSTable {
+function Get-TableauTable {
 <#
 .SYNOPSIS
 Query Table / Query Tables
@@ -8915,7 +8924,7 @@ Query Table: The LUID of the table.
 (Optional, Query Tables) Page size when paging through results.
 
 .EXAMPLE
-$tables = Get-TSTable
+$tables = Get-TableauTable
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_metadata.htm#query_table
@@ -8928,24 +8937,24 @@ Param(
     [Parameter(Mandatory,ParameterSetName='TableById')][string] $TableId,
     [Parameter(ParameterSetName='Tables')][ValidateRange(1,100)][int] $PageSize = 100
 )
-    Assert-TSRestApiVersion -AtLeast 3.5
+    Assert-TableauRestVersion -AtLeast 3.5
     if ($TableId) { # Query Table
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Table -Param $TableId) -Method Get
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Table -Param $TableId) -Method Get
         $response.tsResponse.table
     } else { # Query Tables
         $pageNumber = 0
         do {
             $pageNumber++
-            $uri = Get-TSRequestUri -Endpoint Table
+            $uri = Get-TableauRequestUri -Endpoint Table
             $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-            $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
+            $response = Invoke-TableauRestMethod -Uri $uri -Method Get
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.tables.table
         } until ($PageSize*$pageNumber -ge $totalAvailable)
     }
 }
 
-function Get-TSTableColumn {
+function Get-TableauTableColumn {
 <#
 .SYNOPSIS
 Query Column in a Table / Query Columns in a Table
@@ -8963,7 +8972,7 @@ Query Column in a Table: The LUID of the column.
 (Optional, Query Columns in a Table) Page size when paging through results.
 
 .EXAMPLE
-$columns = Get-TSTableColumn -TableId $id
+$columns = Get-TableauTableColumn -TableId $id
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_metadata.htm#query_column
@@ -8977,24 +8986,24 @@ Param(
     [Parameter(Mandatory,ParameterSetName='ColumnById')][string] $ColumnId,
     [Parameter(ParameterSetName='Columns')][ValidateRange(1,100)][int] $PageSize = 100
 )
-    Assert-TSRestApiVersion -AtLeast 3.5
+    Assert-TableauRestVersion -AtLeast 3.5
     if ($ColumnId) { # Query Column in a Table
-        $response = Invoke-TSRestApiMethod -Uri (Get-TSRequestUri -Endpoint Table -Param $TableId/columns/$ColumnId) -Method Get
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Table -Param $TableId/columns/$ColumnId) -Method Get
         $response.tsResponse.column
     } else { # Query Columns in a Table
         $pageNumber = 0
         do {
             $pageNumber++
-            $uri = Get-TSRequestUri -Endpoint Table -Param $TableId/columns
+            $uri = Get-TableauRequestUri -Endpoint Table -Param $TableId/columns
             $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
-            $response = Invoke-TSRestApiMethod -Uri $uri -Method Get
+            $response = Invoke-TableauRestMethod -Uri $uri -Method Get
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.columns.column
         } until ($PageSize*$pageNumber -ge $totalAvailable)
     }
 }
 
-function Get-TSMetadataGraphQL {
+function Get-TableauMetadataGraphQL {
 <#
 .SYNOPSIS
 Run Metadata GraphQL query
@@ -9013,7 +9022,7 @@ Pagination in Tableau Metadata API is supported on entities ending with "Connect
 (Optional, Query Columns in a Table) Page size when paging through results.
 
 .EXAMPLE
-$results = Get-TSMetadataGraphQL -Query (Get-Content "workbooks.graphql" | Out-String)
+$results = Get-TableauMetadataGraphQL -Query (Get-Content "workbooks.graphql" | Out-String)
 
 .LINK
 https://help.tableau.com/current/api/metadata_api/en-us/index.html
@@ -9024,8 +9033,8 @@ Param(
     [Parameter()][string] $PaginatedEntity,
     [Parameter()][ValidateRange(1,20000)][int] $PageSize = 100
 )
-    Assert-TSRestApiVersion -AtLeast 3.5
-    $uri = Get-TSRequestUri -Endpoint GraphQL
+    Assert-TableauRestVersion -AtLeast 3.5
+    $uri = Get-TableauRequestUri -Endpoint GraphQL
     if ($PaginatedEntity) { # run paginated (modified) query
         # $pageNumber = 0
         $nodesCount = 0
@@ -9041,7 +9050,7 @@ Param(
                 query = $queryPage
                 # TODO variables = $null
             } | ConvertTo-Json
-            $response = Invoke-TSRestApiMethod -Uri $uri -Body $jsonQuery -Method Post -ContentType 'application/json'
+            $response = Invoke-TableauRestMethod -Uri $uri -Body $jsonQuery -Method Post -ContentType 'application/json'
             $endCursor = $response.data.$PaginatedEntity.pageInfo.endCursor
             $hasNextPage = $response.data.$PaginatedEntity.pageInfo.hasNextPage
             $totalCount = $response.data.$PaginatedEntity.totalCount
@@ -9061,7 +9070,7 @@ Param(
             query = $Query
             # TODO variables = $null
         } | ConvertTo-Json
-        $response = Invoke-TSRestApiMethod -Uri $uri -Body $jsonQuery -Method Post -ContentType 'application/json'
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $jsonQuery -Method Post -ContentType 'application/json'
         $entity = $response.data.PSObject.Properties | Select-Object -First 1 -ExpandProperty Name
         $response.data.$entity
     }

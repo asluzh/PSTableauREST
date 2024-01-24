@@ -24,34 +24,34 @@ To try out the functionality, obtaining a free Developer access to Tableau Cloud
 ### Example: Workbooks operation
 This example uses Sign-in via username / password
 
-    $credentials = Open-TSSignIn -Server $server -Site $site -Username $username -SecurePassword $securePw
-    $workbooks = Get-TSWorkbook
-    $workbooksFiltered = Get-TSWorkbook -Filter "name:eq:$workbookName" -Sort name:asc -Fields id,name
+    $credentials = Connect-TableauServer -Server $server -Site $site -Username $username -SecurePassword $securePw
+    $workbooks = Get-TableauWorkbook
+    $workbooksFiltered = Get-TableauWorkbook -Filter "name:eq:$workbookName" -Sort name:asc -Fields id,name
     $description = "Test description"
     workbookId = $workbooks[0].id
-    $workbook = Update-TSWorkbook -WorkbookId $workbookId -Description $description
-    Export-TSWorkbook -WorkbookId $workbookId -OutFile "workbook.twbx"
-    Export-TSWorkbookToFormat -WorkbookId $workbookId -Format pdf -OutFile "workbook.pdf"
-    $workbook = Publish-TSWorkbook -Name "My Workbook" -InFile "workbook.twbx" -Overwrite
+    $workbook = Set-TableauWorkbook -WorkbookId $workbookId -Description $description
+    Export-TableauWorkbook -WorkbookId $workbookId -OutFile "workbook.twbx"
+    Export-TableauWorkbookToFormat -WorkbookId $workbookId -Format pdf -OutFile "workbook.pdf"
+    $workbook = Publish-TableauWorkbook -Name "My Workbook" -InFile "workbook.twbx" -Overwrite
 
 ### Example: Users/Groups operations
 This example uses Sign-in via Personal Access Token
 
-    $credentials = Open-TSSignIn -Server $server -Site $site -PersonalAccessTokenName $patName -PersonalAccessTokenSecret $patSecret
-    $users = Get-TSUser
-    $newGroup = Add-TSGroup -Name "Test Group" -MinimumSiteRole Viewer
-    $testUser = Add-TSUser -Name "testuser" -SiteRole Unlicensed
-    $user = Add-TSUserToGroup -UserId $testUser.id -GroupId $newGroup.id
-    $usersInGroup = Get-TSUsersInGroup -GroupId $newGroup.id
-    $user = Update-TSUser -UserId $testUser.id -SiteRole Explorer
-    Remove-TSUser -UserId $testUser.id
-    Remove-TSGroup -GroupId $newGroup.id
+    $credentials = Connect-TableauServer -Server $server -Site $site -PersonalAccessTokenName $patName -PersonalAccessTokenSecret $patSecret
+    $users = Get-TableauUser
+    $newGroup = New-TableauGroup -Name "Test Group" -MinimumSiteRole Viewer
+    $testUser = New-TableauUser -Name "testuser" -SiteRole Unlicensed
+    $user = Add-TableauUserToGroup -UserId $testUser.id -GroupId $newGroup.id
+    $usersInGroup = Get-TableauUsersInGroup -GroupId $newGroup.id
+    $user = Set-TableauUser -UserId $testUser.id -SiteRole Explorer
+    Remove-TableauUser -UserId $testUser.id
+    Remove-TableauGroup -GroupId $newGroup.id
 
 ### Example: Run Metadata API query (GraphQL)
 
-    $credentials = Open-TSSignIn -Server $server -Site $site -Username $username -SecurePassword $securePw
+    $credentials = Connect-TableauServer -Server $server -Site $site -Username $username -SecurePassword $securePw
     $query = Get-Content "fields-paginated.graphql" | Out-String
-    $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 500
+    $results = Get-TableauMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 500
 
 ## Help Files
 The help files for each cmdlet are located in the *docs* folder.

@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.3.0'
+ModuleVersion = '0.4.0'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -71,79 +71,79 @@ PowerShellVersion = '5.1'
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
 FunctionsToExport = @(
 ### API version methods
-'Assert-TSRestApiVersion', 'Get-TSRestApiVersion', 'Set-TSRestApiVersion',
+'Assert-TableauRestVersion', 'Get-TableauRestVersion', 'Set-TableauRestVersion',
 
 ### Authentication / Server methods
-'Get-TSServerInfo', 'Open-TSSignIn', 'Switch-TSSite', 'Close-TSSignOut', 'Revoke-TSServerAdminPAT', 'Get-TSCurrentUserId',
-'Get-TSCurrentSession', 'Remove-TSSession', 'Get-TSActiveDirectoryDomain', 'Update-TSActiveDirectoryDomain',
+'Get-TableauServerInfo', 'Connect-TableauServer', 'Switch-TableauSite', 'Disconnect-TableauServer', 'Revoke-TableauServerAdminPAT', 'Get-TableauCurrentUserId',
+'Get-TableauSession', 'Remove-TableauSession', 'Get-TableauActiveDirectoryDomain', 'Set-TableauActiveDirectoryDomain',
 
 ### Site methods
-'Get-TSSite', 'Add-TSSite', 'Update-TSSite', 'Remove-TSSite',
-'Get-TSRecentlyViewedContent', 'Get-TSSettingsForEmbedding', 'Update-TSSettingsForEmbedding',
+'Get-TableauSite', 'New-TableauSite', 'Set-TableauSite', 'Remove-TableauSite',
+'Get-TableauRecentlyViewedContent', 'Get-TableauSiteSettingsEmbedding', 'Set-TableauSiteSettingsEmbedding',
 # Get Data Acceleration Report for a Site - feature deprecated in API 3.16
 
 ### Projects methods
-'Get-TSProject', 'Add-TSProject', 'Update-TSProject', 'Remove-TSProject', 'Get-TSDefaultProject',
+'Get-TableauProject', 'New-TableauProject', 'Set-TableauProject', 'Remove-TableauProject', 'Get-TableauDefaultProject',
 
 ### Users and Groups methods
-'Get-TSUser', 'Add-TSUser', 'Update-TSUser', 'Remove-TSUser',
-'Get-TSGroup', 'Add-TSGroup', 'Update-TSGroup', 'Remove-TSGroup',
-'Add-TSUserToGroup', 'Remove-TSUserFromGroup', 'Get-TSUsersInGroup', 'Get-TSGroupsForUser',
-'Import-TSUsersWithCSV', 'Remove-TSUsersWithCSV',
+'Get-TableauUser', 'New-TableauUser', 'Set-TableauUser', 'Remove-TableauUser',
+'Get-TableauGroup', 'New-TableauGroup', 'Set-TableauGroup', 'Remove-TableauGroup',
+'Add-TableauUserToGroup', 'Remove-TableauUserFromGroup', 'Get-TableauUsersInGroup', 'Get-TableauGroupsForUser',
+'Import-TableauUsersCsv', 'Remove-TableauUsersCsv',
 
 ### Publishing methods
-'Send-TSFileUpload',
+'Send-TableauFileUpload',
 
 ### Workbooks methods
-'Get-TSWorkbook', 'Get-TSWorkbooksForUser', 'Export-TSWorkbook', 'Publish-TSWorkbook', 'Update-TSWorkbook', 'Remove-TSWorkbook',
-'Get-TSWorkbookDowngradeInfo', 'Export-TSWorkbookToFormat',
-'Get-TSWorkbookConnection', 'Update-TSWorkbookConnection', 'Update-TSWorkbookNow',
+'Get-TableauWorkbook', 'Get-TableauWorkbooksForUser', 'Export-TableauWorkbook', 'Publish-TableauWorkbook', 'Set-TableauWorkbook', 'Remove-TableauWorkbook',
+'Get-TableauWorkbookDowngradeInfo', 'Export-TableauWorkbookToFormat',
+'Get-TableauWorkbookConnection', 'Set-TableauWorkbookConnection', 'Update-TableauWorkbookNow',
 
 ### Datasources methods
-'Get-TSDatasource', 'Export-TSDatasource', 'Publish-TSDatasource', 'Update-TSDatasource', 'Remove-TSDatasource',
-'Get-TSDatasourceConnection', 'Update-TSDatasourceConnection', 'Update-TSDatasourceNow', 'Update-TSHyperData',
+'Get-TableauDatasource', 'Export-TableauDatasource', 'Publish-TableauDatasource', 'Set-TableauDatasource', 'Remove-TableauDatasource',
+'Get-TableauDatasourceConnection', 'Set-TableauDatasourceConnection', 'Update-TableauDatasourceNow', 'Update-TableauHyperData',
 
 ### Views methods
-'Get-TSView', 'Export-TSViewPreviewImage', 'Export-TSViewToFormat', 'Get-TSViewUrl',
-'Get-TSViewRecommendation', 'Hide-TSViewRecommendation', 'Show-TSViewRecommendation',
-'Get-TSCustomView', 'Get-TSCustomViewAsUserDefault', 'Set-TSCustomViewAsUserDefault', 'Update-TSCustomView', 'Remove-TSCustomView',
-'Export-TSCustomViewImage',
+'Get-TableauView', 'Export-TableauViewImage', 'Export-TableauViewToFormat', 'Get-TableauViewUrl',
+'Get-TableauViewRecommendation', 'Hide-TableauViewRecommendation', 'Show-TableauViewRecommendation',
+'Get-TableauCustomView', 'Get-TableauCustomViewUserDefault', 'Set-TableauCustomViewUserDefault', 'Set-TableauCustomView', 'Remove-TableauCustomView',
+'Export-TableauCustomViewImage',
 
 ### Flow methods
-'Get-TSFlow', 'Get-TSFlowsForUser', 'Get-TSFlowConnection', 'Export-TSFlow', 'Publish-TSFlow', 'Update-TSFlow', 'Remove-TSFlow',
-'Update-TSFlowConnection', 'Start-TSFlowNow', 'Get-TSFlowRun', 'Stop-TSFlowRun',
+'Get-TableauFlow', 'Get-TableauFlowsForUser', 'Get-TableauFlowConnection', 'Export-TableauFlow', 'Publish-TableauFlow', 'Set-TableauFlow', 'Remove-TableauFlow',
+'Set-TableauFlowConnection', 'Start-TableauFlowNow', 'Get-TableauFlowRun', 'Stop-TableauFlowRun',
 
 ### Permissions methods
-'Get-TSContentPermission', 'Set-TSContentPermission', 'Add-TSContentPermission', 'Remove-TSContentPermission',
-'ConvertTo-TSPermissionTable',
-'Get-TSDefaultPermission', 'Set-TSDefaultPermission', 'Remove-TSDefaultPermission',
+'Get-TableauContentPermission', 'Set-TableauContentPermission', 'Add-TableauContentPermission', 'Remove-TableauContentPermission',
+'ConvertTo-TableauPermissionTable',
+'Get-TableauDefaultPermission', 'Set-TableauDefaultPermission', 'Remove-TableauDefaultPermission',
 # List/Add/Delete Ask Data Lens Permissions - retired in API 3.22
 
 ### Tags methods
-'Add-TSTagsToContent', 'Remove-TSTagFromContent',
+'Add-TableauContentTag', 'Remove-TableauContentTag',
 
 ### Jobs, Tasks and Schedules methods
-'Get-TSSchedule', 'Add-TSSchedule', 'Update-TSSchedule', 'Remove-TSSchedule', 'Add-TSContentToSchedule',
-'Get-TSJob', 'Stop-TSJob', 'Wait-TSJob',
-'Get-TSTask', 'Remove-TSTask', 'Start-TSTaskNow',
+'Get-TableauSchedule', 'New-TableauSchedule', 'Set-TableauSchedule', 'Remove-TableauSchedule', 'Add-TableauContentToSchedule',
+'Get-TableauJob', 'Stop-TableauJob', 'Wait-TableauJob',
+'Get-TableauTask', 'Remove-TableauTask', 'Start-TableauTaskNow',
 
 ### Extract and Encryption methods
-'Get-TSExtractRefreshTasksInSchedule',
-'Add-TSExtractsInContent', 'Remove-TSExtractsInContent',
-'Add-TSExtractsRefreshTask', 'Update-TSExtractsRefreshTask',
-'Invoke-TSEncryption',
+'Get-TableauExtractRefreshTask',
+'Add-TableauContentExtract', 'Remove-TableauContentExtract',
+'Add-TableauExtractRefreshTask', 'Set-TableauExtractRefreshTask',
+'Set-TableauEncryption',
 
 ### Favorites methods
-'Get-TSUserFavorite', 'Add-TSUserFavorite', 'Remove-TSUserFavorite', 'Move-TSUserFavorite',
+'Get-TableauUserFavorite', 'Add-TableauUserFavorite', 'Remove-TableauUserFavorite', 'Move-TableauUserFavorite',
 # Add Metric to Favorites - retired in API 3.22
 
 ### Subscription methods
-'Get-TSSubscription', 'Add-TSSubscription', 'Update-TSSubscription', 'Remove-TSSubscription',
+'Get-TableauSubscription', 'Add-TableauSubscription', 'Set-TableauSubscription', 'Remove-TableauSubscription',
 
 ### Dashboard Extensions Settings methods - introduced in API 3.8, retired in API 3.21
 ### Tableau Extensions Settings Methods - introduced in API 3.21
-'Get-TSExtensionSettingsServer', 'Update-TSExtensionSettingsServer',
-'Get-TSExtensionSettingsSite', 'Update-TSExtensionSettingsSite',
+'Get-TableauServerSettingsExtension', 'Set-TableauServerSettingsExtension',
+'Get-TableauSiteSettingsExtension', 'Set-TableauSiteSettingsExtension',
 
 ### Analytics Extensions Settings methods - introduced in API 3.8
 # List analytics extension connections on site
@@ -176,8 +176,8 @@ FunctionsToExport = @(
 # Delete EAS
 
 ### Notifications methods
-'Get-TSDataAlert', 'Add-TSDataAlert', 'Update-TSDataAlert', 'Remove-TSDataAlert',
-'Add-TSUserToDataAlert', 'Remove-TSUserFromDataAlert',
+'Get-TableauDataAlert', 'Add-TableauDataAlert', 'Set-TableauDataAlert', 'Remove-TableauDataAlert',
+'Add-TableauDataAlertUser', 'Remove-TableauDataAlertUser',
 # List Webhooks - introduced in API 3.6
 # Get a Webhook
 # Create a Webhook
@@ -218,7 +218,7 @@ FunctionsToExport = @(
 # Update Virtual Connection Database Connections
 
 ### Metadata methods - introduced in API API 3.5
-'Get-TSDatabase', 'Get-TSTable', 'Get-TSTableColumn', 'Get-TSMetadataGraphQL'
+'Get-TableauDatabase', 'Get-TableauTable', 'Get-TableauTableColumn', 'Get-TableauMetadataGraphQL'
 # Query Data Quality Warning by ID
 # Query Data Quality Warning by Content
 # Query Data Quality Certification by ID

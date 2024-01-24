@@ -1,6 +1,6 @@
 BeforeAll {
-    #Requires -Modules Assert
-    # Import-Module Assert
+    # Requires -Modules Assert
+    Import-Module Assert
     Import-Module ./PSTableauREST -Force
     . ./Tests/Test.Functions.ps1
     # InModuleScope 'PSTableauREST' { $script:VerbosePreference = 'Continue' } # display verbose output of module functions
@@ -28,79 +28,79 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
     }
     Context "Auth operations" -Tag Auth {
         It "Request auth sign-in for <ConfigFile.server>" {
-            $credentials = Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
+            $credentials = Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
             $credentials.user.id | Should -BeOfType String
         }
         It "Request switch site to <ConfigFile.switch_site> for <ConfigFile.server>" {
-            $credentials = Switch-TSSite -Site $ConfigFile.switch_site
+            $credentials = Switch-TableauSite -Site $ConfigFile.switch_site
             $credentials.user.id | Should -BeOfType String
         }
         It "Request sign-out for <ConfigFile.server>" {
-            $response = Close-TSSignOut
+            $response = Disconnect-TableauServer
             $response | Should -BeOfType "String"
         }
         It "Request PAT sign-in for <ConfigFile.server>" {
             if (-not $ConfigFile.pat_name) {
                 Set-ItResult -Skipped -Because "PAT not provided"
             }
-            $credentials = Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
+            $credentials = Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
             $credentials.user.id | Should -BeOfType String
-            $response = Close-TSSignOut
+            $response = Disconnect-TableauServer
             $response | Should -BeOfType "String"
         }
         It "Impersonate user sign-in for <ConfigFile.server>" {
             if (-not $ConfigFile.impersonate_user_id) {
                 Set-ItResult -Skipped -Because "impersonate user ID not provided"
             }
-            $credentials = Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password -ImpersonateUserId $ConfigFile.impersonate_user_id
+            $credentials = Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password -ImpersonateUserId $ConfigFile.impersonate_user_id
             $credentials.user.id | Should -Be $ConfigFile.impersonate_user_id
-            $response = Close-TSSignOut
+            $response = Disconnect-TableauServer
             $response | Should -BeOfType "String"
         }
     }
     Context "Content operations" -Tag Content {
         BeforeAll {
             if ($ConfigFile.pat_name) {
-                $null = Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
+                $null = Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
             } else {
-                $null = Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
+                $null = Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
             }
         }
         AfterAll {
             if ($script:testProjectId) {
-                Remove-TSProject -ProjectId $script:testProjectId
+                Remove-TableauProject -ProjectId $script:testProjectId
                 $script:testProjectId = $null
             }
             if ($script:testUserId) {
-                Remove-TSUser -UserId $script:testUserId
+                Remove-TableauUser -UserId $script:testUserId
                 $script:testUserId = $null
             }
             if ($script:testGroupId) {
-                Remove-TSGroup -GroupId $script:testGroupId
+                Remove-TableauGroup -GroupId $script:testGroupId
                 $script:testGroupId = $null
             }
             if ($script:testSiteId -and $script:testSite) { # Note: this should be the last cleanup step (session is killed by removing the site)
-                Switch-TSSite -Site $script:testSite
-                Remove-TSSite -SiteId $script:testSiteId
+                Switch-TableauSite -Site $script:testSite
+                Remove-TableauSite -SiteId $script:testSiteId
                 $script:testSite = $null
             }
-            Close-TSSignOut
+            Disconnect-TableauServer
         }
         Context "Server operations" -Tag Server {
             It "Get server info on <ConfigFile.server>" {
-                $serverInfo = Get-TSServerInfo
+                $serverInfo = Get-TableauServerInfo
                 $serverInfo.productVersion | Should -Not -BeNullOrEmpty
                 $serverInfo.restApiVersion | Should -Not -BeNullOrEmpty
             }
             It "Get current session on <ConfigFile.server>" {
-                $session = Get-TSCurrentSession
+                $session = Get-TableauSession
                 $session | Should -Not -BeNullOrEmpty
                 $session.site | Should -Not -BeNullOrEmpty
                 $session.user | Should -Not -BeNullOrEmpty
             }
             It "List AD Domains on <ConfigFile.server>" {
                 if ($ConfigFile.server_admin) {
-                    $domains = Get-TSActiveDirectoryDomain
+                    $domains = Get-TableauActiveDirectoryDomain
                     $domains.id | Should -BeOfType String
                 } else {
                     Set-ItResult -Skipped -Because "Server admin privileges required"
@@ -110,7 +110,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
         Context "Tableau extensions operations" -Tag Extension {
             It "Get Tableau extensions setting (server) on <ConfigFile.server>" {
                 if ($ConfigFile.server_admin) {
-                    $settings = Get-TSExtensionSettingsServer
+                    $settings = Get-TableauServerSettingsExtension
                     $settings.extensionsGloballyEnabled | Should -BeOfType String
                     $script:ServerExtensionsGloballyEnabled = $settings.extensionsGloballyEnabled
                 } else {
@@ -119,15 +119,15 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             }
             It "Update Tableau extensions setting (server) on <ConfigFile.server>" {
                 if ($ConfigFile.server_admin -and $script:ServerExtensionsGloballyEnabled) {
-                    $settings = Update-TSExtensionSettingsServer -Enabled true -BlockList 'https://test123.com'
+                    $settings = Set-TableauServerSettingsExtension -Enabled true -BlockList 'https://test123.com'
                     $settings.extensionsGloballyEnabled | Should -Be true
-                    $settings = Update-TSExtensionSettingsServer -Enabled $script:ServerExtensionsGloballyEnabled
+                    $settings = Set-TableauServerSettingsExtension -Enabled $script:ServerExtensionsGloballyEnabled
                 } else {
                     Set-ItResult -Skipped -Because "Server admin privileges required"
                 }
             }
             It "Get Tableau extensions setting (site) on <ConfigFile.server>" {
-                $settings = Get-TSExtensionSettingsSite
+                $settings = Get-TableauSiteSettingsExtension
                 $settings.extensionsEnabled | Should -BeOfType String
                 $settings.useDefaultSetting | Should -BeOfType String
                 $script:SiteExtensionsEnabled = $settings.extensionsEnabled
@@ -141,9 +141,9 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             }
             It "Update Tableau extensions setting (site) on <ConfigFile.server>" {
                 if ($script:SiteExtensionsEnabled) {
-                    $settings = Update-TSExtensionSettingsSite -Enabled true -SafeList @{url='https://tableau.com';fullDataAllowed='false';promptNeeded='true'}
+                    $settings = Set-TableauSiteSettingsExtension -Enabled true -SafeList @{url='https://tableau.com';fullDataAllowed='false';promptNeeded='true'}
                     $settings.extensionsEnabled | Should -Be true
-                    $settings = Update-TSExtensionSettingsSite -Enabled $script:SiteExtensionsEnabled -UseDefaultSetting $script:SiteUseDefaultSetting -SafeList $script:SiteSafeList
+                    $settings = Set-TableauSiteSettingsExtension -Enabled $script:SiteExtensionsEnabled -UseDefaultSetting $script:SiteUseDefaultSetting -SafeList $script:SiteSafeList
                 } else {
                     Set-ItResult -Skipped -Because "Site extension settings were not saved in the previous test"
                 }
@@ -152,7 +152,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
         Context "Site operations" -Tag Site {
             It "Create new site on <ConfigFile.server>" {
                 if ($ConfigFile.server_admin -and $ConfigFile.test_site_name) {
-                    $site = Add-TSSite -Name $ConfigFile.test_site_name -ContentUrl $ConfigFile.test_site_contenturl -SiteParams @{
+                    $site = New-TableauSite -Name $ConfigFile.test_site_name -ContentUrl $ConfigFile.test_site_contenturl -SiteParams @{
                         adminMode = "ContentOnly"
                         revisionLimit = 20
                     }
@@ -166,20 +166,20 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             }
             It "Update site <testSite> on <ConfigFile.server>" {
                 if ($ConfigFile.server_admin -and $ConfigFile.test_site_name) {
-                    Switch-TSSite -Site $testSite
+                    Switch-TableauSite -Site $testSite
                     $siteNewName = New-Guid
-                    $site = Update-TSSite -SiteId $testSiteId -Name $siteNewName -SiteParams @{revisionLimit = 10}
+                    $site = Set-TableauSite -SiteId $testSiteId -Name $siteNewName -SiteParams @{revisionLimit = 10}
                     $site.id | Should -Be $testSiteId
                     $site.contentUrl | Should -Be $testSite
                     $site.name | Should -Be $siteNewName
-                    Update-TSSite -SiteId $testSiteId -Name $ConfigFile.test_site_name -SiteParams @{adminMode="ContentAndUsers"; userQuota="1"}
+                    Set-TableauSite -SiteId $testSiteId -Name $ConfigFile.test_site_name -SiteParams @{adminMode="ContentAndUsers"; userQuota="1"}
                 } else {
                     Set-ItResult -Skipped -Because "Server admin privileges required"
                 }
             }
             It "Query sites on <ConfigFile.server>" {
                 if ($ConfigFile.test_site_name) {
-                    $sites = Get-TSSite
+                    $sites = Get-TableauSite
                     ($sites | Measure-Object).Count | Should -BeGreaterThan 0
                     $sites | Where-Object id -eq $script:testSiteId | Should -Not -BeNullOrEmpty
                     $sites | Where-Object contentUrl -eq $script:testSite | Should -Not -BeNullOrEmpty
@@ -187,27 +187,27 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             }
             It "Get current site on <ConfigFile.server>" {
                 if ($ConfigFile.test_site_name) {
-                    Switch-TSSite -Site $testSite
-                    $sites = Get-TSSite -Current
+                    Switch-TableauSite -Site $testSite
+                    $sites = Get-TableauSite -Current
                     ($sites | Measure-Object).Count | Should -Be 1
                     $sites | Where-Object id -eq $script:testSiteId | Should -Not -BeNullOrEmpty
                     $sites | Where-Object contentUrl -eq $script:testSite | Should -Not -BeNullOrEmpty
-                    $sites = Get-TSSite -Current -IncludeUsageStatistics
+                    $sites = Get-TableauSite -Current -IncludeUsageStatistics
                     ($sites | Measure-Object).Count | Should -Be 1
                 }
             }
             It "Delete site <testSite> on <ConfigFile.server>" {
                 if ($ConfigFile.server_admin -and $ConfigFile.test_site_name) {
-                    Switch-TSSite -Site $testSite
-                    $response = Remove-TSSite -SiteId $testSiteId
+                    Switch-TableauSite -Site $testSite
+                    $response = Remove-TableauSite -SiteId $testSiteId
                     $response | Should -BeOfType String
                     $script:testSiteId = $null
                     $script:testSite = $null
                     # because we've just deleted the current site, we need to sign-in again
                     if ($ConfigFile.pat_name) {
-                        $credentials = Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
+                        $credentials = Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
                     } else {
-                        $credentials = Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
+                        $credentials = Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
                     }
                     $credentials.user.id | Should -BeOfType String
                 } else {
@@ -217,17 +217,17 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             It "Delete site on <ConfigFile.server> asynchronously" {
                 if ($ConfigFile.server_admin -and $ConfigFile.test_site_name) {
                     $tempSiteName = New-Guid # get UUID for site name and content URL
-                    $site = Add-TSSite -Name $tempSiteName -ContentUrl $tempSiteName
+                    $site = New-TableauSite -Name $tempSiteName -ContentUrl $tempSiteName
                     $site.id | Should -BeOfType String
                     $tempSiteId = $site.id
-                    Switch-TSSite -Site $tempSiteName
-                    $response = Remove-TSSite -SiteId $tempSiteId -BackgroundTask
+                    Switch-TableauSite -Site $tempSiteName
+                    $response = Remove-TableauSite -SiteId $tempSiteId -BackgroundTask
                     $response | Should -BeOfType String
                     # because we've just deleted the current site, we need to sign-in again
                     if ($ConfigFile.pat_name) {
-                        $credentials = Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
+                        $credentials = Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
                     } else {
-                        $credentials = Open-TSSignIn -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
+                        $credentials = Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
                     }
                     $credentials.user.id | Should -BeOfType String
                 } else {
@@ -238,31 +238,31 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
         Context "Project operations" -Tag Project {
             It "Create new project on <ConfigFile.server>" {
                 $projectName = New-Guid
-                $project = Add-TSProject -Name $projectName
+                $project = New-TableauProject -Name $projectName
                 $project.id | Should -BeOfType String
                 $script:testProjectId = $project.id
                 # adding another project with the same name - should throw an error
-                {Add-TSProject -Name $projectName} | Should -Throw
+                {New-TableauProject -Name $projectName} | Should -Throw
             }
             It "Update project <testProjectId> on <ConfigFile.server>" {
                 $projectNewName = New-Guid
-                $project = Update-TSProject -ProjectId $testProjectId -Name $projectNewName
+                $project = Set-TableauProject -ProjectId $testProjectId -Name $projectNewName
                 $project.id | Should -Be $testProjectId
                 $project.name | Should -Be $projectNewName
             }
             It "Query projects on <ConfigFile.server>" {
-                $projects = Get-TSProject
+                $projects = Get-TableauProject
                 ($projects | Measure-Object).Count | Should -BeGreaterThan 0
                 $projects | Where-Object id -eq $testProjectId | Should -Not -BeNullOrEmpty
             }
             It "Query projects with options on <ConfigFile.server>" {
-                $projectName = Get-TSProject | Where-Object id -eq $testProjectId | Select-Object -First 1 -ExpandProperty name
-                $projects = Get-TSProject -Filter "name:eq:$projectName" -Sort name:asc -Fields id,name,description
+                $projectName = Get-TableauProject | Where-Object id -eq $testProjectId | Select-Object -First 1 -ExpandProperty name
+                $projects = Get-TableauProject -Filter "name:eq:$projectName" -Sort name:asc -Fields id,name,description
                 ($projects | Measure-Object).Count | Should -Be 1
                 ($projects | Get-Member -MemberType Property | Measure-Object).Count | Should -Be 3
             }
             It "Delete project <testProjectId> on <ConfigFile.server>" {
-                $response = Remove-TSProject -ProjectId $testProjectId
+                $response = Remove-TableauProject -ProjectId $testProjectId
                 $response | Should -BeOfType String
                 $script:testProjectId = $null
             }
@@ -272,26 +272,26 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 } else {
                     $userName = New-Guid
                 }
-                $user = Add-TSUser -Name $userName -SiteRole Explorer
+                $user = New-TableauUser -Name $userName -SiteRole Explorer
                 $user.id | Should -BeOfType String
                 $projectNameSamples = New-Guid
-                $project = Add-TSProject -Name $projectNameSamples -OwnerId (Get-TSCurrentUserId) #$user.id
+                $project = New-TableauProject -Name $projectNameSamples -OwnerId (Get-TableauCurrentUserId) #$user.id
                 # Note: testing with a different OwnerId doesn't work with Dev Sandbox on Tableau Cloud
                 $project.id | Should -BeOfType String
                 $script:testProjectId = $project.id
-                $project = Update-TSProject -ProjectId $testProjectId -Name $projectNameSamples -PublishSamples -OwnerId (Get-TSCurrentUserId)
+                $project = Set-TableauProject -ProjectId $testProjectId -Name $projectNameSamples -PublishSamples -OwnerId (Get-TableauCurrentUserId)
                 $project.id | Should -BeOfType String
-                Remove-TSUser -UserId $user.id
+                Remove-TableauUser -UserId $user.id
             }
             It "Initial project permissions & default permissions on <ConfigFile.server>" {
-                $defaultProject = Get-TSDefaultProject
+                $defaultProject = Get-TableauDefaultProject
                 $defaultProject.id | Should -BeOfType String
                 $defaultProject.name | Should -Be "Default"
-                $defProjectPermissionTable = Get-TSContentPermission -ProjectId $defaultProject.id | ConvertTo-TSPermissionTable
-                $newProjectPermissionTable = Get-TSContentPermission -ProjectId $testProjectId | ConvertTo-TSPermissionTable
+                $defProjectPermissionTable = Get-TableauContentPermission -ProjectId $defaultProject.id | ConvertTo-TableauPermissionTable
+                $newProjectPermissionTable = Get-TableauContentPermission -ProjectId $testProjectId | ConvertTo-TableauPermissionTable
                 Assert-Equivalent -Actual $defProjectPermissionTable -Expected $newProjectPermissionTable
-                $defProjectPermissions = Get-TSDefaultPermission -ProjectId $defaultProject.id
-                $newProjectPermissions = Get-TSDefaultPermission -ProjectId $testProjectId
+                $defProjectPermissions = Get-TableauDefaultPermission -ProjectId $defaultProject.id
+                $newProjectPermissions = Get-TableauDefaultPermission -ProjectId $testProjectId
                 Assert-Equivalent -Actual $newProjectPermissions -Expected $defProjectPermissions
                 # another approach to deep compare permissions tables: convert to json
                 # however this doesn't work with differences in capabilities sort order
@@ -300,15 +300,15 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 # $newProjectPermissionsJson | Should -Be $defProjectPermissionsJson
             }
             It "Query/remove/add/set project permissions on <ConfigFile.server>" {
-                $permissions = Get-TSContentPermission -ProjectId $testProjectId
+                $permissions = Get-TableauContentPermission -ProjectId $testProjectId
                 $permissions.project.id | Should -Be $testProjectId
-                $savedPermissionTable = $permissions | ConvertTo-TSPermissionTable
+                $savedPermissionTable = $permissions | ConvertTo-TableauPermissionTable
                 # remove all permissions for all grantees
-                Remove-TSContentPermission -ProjectId $testProjectId -All
-                $permissions = Get-TSContentPermission -ProjectId $testProjectId
+                Remove-TableauContentPermission -ProjectId $testProjectId -All
+                $permissions = Get-TableauContentPermission -ProjectId $testProjectId
                 $permissions.granteeCapabilities | Should -BeNullOrEmpty
                 # attempt to set permissions with empty capabilities
-                $permissions = Set-TSContentPermission -ProjectId $testProjectId -PermissionTable @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{}}
+                $permissions = Set-TableauContentPermission -ProjectId $testProjectId -PermissionTable @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{}}
                 $permissions.granteeCapabilities | Should -BeNullOrEmpty
                 # add all possible permissions (random Allow/Deny) for the current user
                 $possibleCap = 'ProjectLeader','Read','Write' #
@@ -321,8 +321,8 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                         $capabilitiesHashtable.Add($cap, (Get-Random -InputObject 'Allow','Deny'))
                     }
                 }
-                $allPermissionTable += @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=$capabilitiesHashtable}
-                $permissions = Add-TSContentPermission -ProjectId $testProjectId -PermissionTable $allPermissionTable
+                $allPermissionTable += @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=$capabilitiesHashtable}
+                $permissions = Add-TableauContentPermission -ProjectId $testProjectId -PermissionTable $allPermissionTable
                 $permissions.project.id | Should -Be $testProjectId
                 $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
                 ($permissions.granteeCapabilities.capabilities.capability | Measure-Object).Count | Should -Be $possibleCap.Length
@@ -332,18 +332,18 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 foreach ($cap in $possibleCap) {
                     $capabilitiesHashtable.Add($cap, "Allow")
                 }
-                $allPermissionTable += @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=$capabilitiesHashtable}
-                $permissions = Set-TSContentPermission -ProjectId $testProjectId -PermissionTable $allPermissionTable
+                $allPermissionTable += @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=$capabilitiesHashtable}
+                $permissions = Set-TableauContentPermission -ProjectId $testProjectId -PermissionTable $allPermissionTable
                 $permissions.project.id | Should -Be $testProjectId
                 $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
                 ($permissions.granteeCapabilities.capabilities.capability | Measure-Object).Count | Should -Be $possibleCap.Length
                 # remove all permissions for the current user
-                Remove-TSContentPermission -ProjectId $testProjectId -GranteeType User -GranteeId (Get-TSCurrentUserId)
-                $permissions = Get-TSContentPermission -ProjectId $testProjectId
+                Remove-TableauContentPermission -ProjectId $testProjectId -GranteeType User -GranteeId (Get-TableauCurrentUserId)
+                $permissions = Get-TableauContentPermission -ProjectId $testProjectId
                 $permissions.granteeCapabilities | Should -BeNullOrEmpty
                 # add back initial permissions configuration
                 if ($savedPermissionTable.Length -gt 0) {
-                    $permissions = Add-TSContentPermission -ProjectId $testProjectId -PermissionTable $savedPermissionTable
+                    $permissions = Add-TableauContentPermission -ProjectId $testProjectId -PermissionTable $savedPermissionTable
                     ($permissions.granteeCapabilities | Measure-Object).Count | Should -Be $savedPermissionTable.Length
                     # remove again each permission/capability one-by-one
                     if ($permissions.granteeCapabilities) {
@@ -358,31 +358,31 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                             $_.capabilities.capability | ForEach-Object {
                                 $capName = $_.name
                                 $capMode = $_.mode
-                                Remove-TSContentPermission -ProjectId $testProjectId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode
+                                Remove-TableauContentPermission -ProjectId $testProjectId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode
                             }
                         }
                     }
-                    $permissions = Get-TSContentPermission -ProjectId $testProjectId
+                    $permissions = Get-TableauContentPermission -ProjectId $testProjectId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                 }
                 # permissions by template for the current user
                 foreach ($pt in 'Denied','None','View','Publish','None') {
-                    $permissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); template=$pt}
-                    $permissions = Set-TSContentPermission -ProjectId $testProjectId -PermissionTable $permissionTable
+                    $permissionTable = @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); template=$pt}
+                    $permissions = Set-TableauContentPermission -ProjectId $testProjectId -PermissionTable $permissionTable
                     $permissions.project.id | Should -Be $testProjectId
-                    $actualPermissionTable = Get-TSContentPermission -ProjectId $testProjectId | ConvertTo-TSPermissionTable
+                    $actualPermissionTable = Get-TableauContentPermission -ProjectId $testProjectId | ConvertTo-TableauPermissionTable
                     switch ($pt) {
                         'View' {
-                            $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"}}
+                            $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{Read="Allow"}}
                         }
                         'Publish' {
-                            $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; Write="Allow"}}
+                            $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{Read="Allow"; Write="Allow"}}
                         }
                         'Administer' {
-                            $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; Write="Allow"}}
+                            $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{Read="Allow"; Write="Allow"}}
                         }
                         'Denied' {
-                            $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Deny"; Write="Deny"}}
+                            $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{Read="Deny"; Write="Deny"}}
                         }
                         default {
                             $expectedPermissionTable = $null
@@ -392,20 +392,20 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 }
             }
             It "Query/remove/set default project permissions on <ConfigFile.server>" {
-                $savedPermissionTable = Get-TSDefaultPermission -ProjectId $testProjectId
-                $wbPermissionTable = Get-TSDefaultPermission -ProjectId $testProjectId -ContentType workbooks
+                $savedPermissionTable = Get-TableauDefaultPermission -ProjectId $testProjectId
+                $wbPermissionTable = Get-TableauDefaultPermission -ProjectId $testProjectId -ContentType workbooks
                 $wbPermissionTable.Length | Should -BeLessOrEqual $savedPermissionTable.Length
                 # remove all default permissions for all grantees
-                Remove-TSDefaultPermission -ProjectId $testProjectId -All
-                $permissions = Get-TSDefaultPermission -ProjectId $testProjectId
+                Remove-TableauDefaultPermission -ProjectId $testProjectId -All
+                $permissions = Get-TableauDefaultPermission -ProjectId $testProjectId
                 $permissions.Length | Should -Be 0
                 # add all possible permissions (random Allow/Deny) for the current user
                 foreach ($ct in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
-                    if ($ct -eq 'dataroles' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
+                    if ($ct -eq 'dataroles' -and ((Get-TableauRestVersion) -lt [version]3.13 -or (Get-TableauRestVersion) -ge [version]3.22)) {
                         continue
-                    } elseif ($ct -eq 'lenses' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
+                    } elseif ($ct -eq 'lenses' -and ((Get-TableauRestVersion) -lt [version]3.13 -or (Get-TableauRestVersion) -ge [version]3.22)) {
                         continue
-                    } elseif ($ct -in 'databases','tables' -and (Get-TSRestApiVersion) -lt [version]3.6) {
+                    } elseif ($ct -in 'databases','tables' -and (Get-TableauRestVersion) -lt [version]3.6) {
                         continue
                     }
                     switch ($ct) {
@@ -430,52 +430,52 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     foreach ($cap in $possibleCap) {
                         $capabilitiesHashtable.Add($cap, (Get-Random -InputObject 'Allow','Deny'))
                     }
-                    $allPermissionTable += @{contentType=$ct; granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=$capabilitiesHashtable}
-                    $permissions = Set-TSDefaultPermission -ProjectId $testProjectId -PermissionTable $allPermissionTable
+                    $allPermissionTable += @{contentType=$ct; granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=$capabilitiesHashtable}
+                    $permissions = Set-TableauDefaultPermission -ProjectId $testProjectId -PermissionTable $allPermissionTable
                     $permissions.Length | Should -Be 1 # we add for only one content type, so the output is also only 1
                     ($permissions | Where-Object contentType -eq $ct).capabilities.Count | Should -Be $possibleCap.Length
                 }
                 # remove all default permissions for one grantee
-                Remove-TSDefaultPermission -ProjectId $testProjectId -GranteeType User -GranteeId (Get-TSCurrentUserId)
-                $permissions = Get-TSDefaultPermission -ProjectId $testProjectId
+                Remove-TableauDefaultPermission -ProjectId $testProjectId -GranteeType User -GranteeId (Get-TableauCurrentUserId)
+                $permissions = Get-TableauDefaultPermission -ProjectId $testProjectId
                 $permissions.Length | Should -Be 0
                 # restore initial permissions configuration
                 if ($savedPermissionTable.Length -gt 0) {
-                    $permissions = Set-TSDefaultPermission -ProjectId $testProjectId -PermissionTable $savedPermissionTable
+                    $permissions = Set-TableauDefaultPermission -ProjectId $testProjectId -PermissionTable $savedPermissionTable
                     # remove all default permissions for one grantee for the first content type
-                    Remove-TSDefaultPermission -ProjectId $testProjectId -GranteeType $permissions[0].granteeType -GranteeId $permissions[0].granteeId -ContentType $permissions[0].contentType
-                    $permissions = Get-TSDefaultPermission -ProjectId $testProjectId
+                    Remove-TableauDefaultPermission -ProjectId $testProjectId -GranteeType $permissions[0].granteeType -GranteeId $permissions[0].granteeId -ContentType $permissions[0].contentType
+                    $permissions = Get-TableauDefaultPermission -ProjectId $testProjectId
                     $permissions.Length | Should -BeLessThan $savedPermissionTable.Length
                 }
                 # restore initial permissions configuration
                 if ($savedPermissionTable.Length -gt 0) {
-                    $permissions = Set-TSDefaultPermission -ProjectId $testProjectId -PermissionTable $savedPermissionTable
+                    $permissions = Set-TableauDefaultPermission -ProjectId $testProjectId -PermissionTable $savedPermissionTable
                     # remove again each permission/capability one-by-one
                     foreach ($permission in $permissions) {
                         if ($permission.capabilities -and $permission.capabilities.Count -gt 0) {
                             $permission.capabilities.GetEnumerator() | ForEach-Object {
-                                Remove-TSDefaultPermission -ProjectId $testProjectId -GranteeType $permission.granteeType -GranteeId $permission.granteeId -CapabilityName $_.Key -CapabilityMode $_.Value -ContentType $permission.contentType
+                                Remove-TableauDefaultPermission -ProjectId $testProjectId -GranteeType $permission.granteeType -GranteeId $permission.granteeId -CapabilityName $_.Key -CapabilityMode $_.Value -ContentType $permission.contentType
                             }
                         }
                     }
-                    $permissions = Get-TSDefaultPermission -ProjectId $testProjectId
+                    $permissions = Get-TableauDefaultPermission -ProjectId $testProjectId
                     $permissions.Length | Should -Be 0
                 }
             }
             It "Set default project permissions with templates on <ConfigFile.server>" {
-                Remove-TSDefaultPermission -ProjectId $testProjectId -All
+                Remove-TableauDefaultPermission -ProjectId $testProjectId -All
                 # apply all possible permission templates for the current user
                 foreach ($ct in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
-                    if ($ct -eq 'dataroles' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
+                    if ($ct -eq 'dataroles' -and ((Get-TableauRestVersion) -lt [version]3.13 -or (Get-TableauRestVersion) -ge [version]3.22)) {
                         continue
-                    } elseif ($ct -eq 'lenses' -and ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -ge [version]3.22)) {
+                    } elseif ($ct -eq 'lenses' -and ((Get-TableauRestVersion) -lt [version]3.13 -or (Get-TableauRestVersion) -ge [version]3.22)) {
                         continue
-                    } elseif ($ct -in 'databases','tables' -and (Get-TSRestApiVersion) -lt [version]3.6) {
+                    } elseif ($ct -in 'databases','tables' -and (Get-TableauRestVersion) -lt [version]3.6) {
                         continue
                     }
                     foreach ($tpl in 'View','Explore','Denied','Publish','Administer','None') {
-                        $tplPermissionTable = @{contentType=$ct; granteeType="User"; granteeId=(Get-TSCurrentUserId); template=$tpl}
-                        $permissions = Set-TSDefaultPermission -ProjectId $testProjectId -PermissionTable $tplPermissionTable
+                        $tplPermissionTable = @{contentType=$ct; granteeType="User"; granteeId=(Get-TableauCurrentUserId); template=$tpl}
+                        $permissions = Set-TableauDefaultPermission -ProjectId $testProjectId -PermissionTable $tplPermissionTable
                         if ($tpl -eq 'None') {
                             $permissions.Length | Should -Be 0
                         } else {
@@ -492,48 +492,48 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 } else {
                     $userName = New-Guid
                 }
-                $user = Add-TSUser -Name $userName -SiteRole Unlicensed
+                $user = New-TableauUser -Name $userName -SiteRole Unlicensed
                 $user.id | Should -BeOfType String
                 $script:testUserId = $user.id
             }
             It "Update user <testUserId> on <ConfigFile.server>" {
-                $user = Update-TSUser -UserId $script:testUserId -SiteRole Viewer
+                $user = Set-TableauUser -UserId $script:testUserId -SiteRole Viewer
                 $user.siteRole | Should -Be "Viewer"
                 if ($ConfigFile.test_password) {
                     $fullName = New-Guid
-                    $user = Update-TSUser -UserId $script:testUserId -SiteRole Viewer -FullName $fullName -SecurePassword (ConvertTo-SecureString $ConfigFile.test_password -AsPlainText -Force)
+                    $user = Set-TableauUser -UserId $script:testUserId -SiteRole Viewer -FullName $fullName -SecurePassword (ConvertTo-SecureString $ConfigFile.test_password -AsPlainText -Force)
                     $user.siteRole | Should -Be "Viewer"
                     $user.fullName | Should -Be $fullName
                 }
             }
             It "Query users on <ConfigFile.server>" {
-                $users = Get-TSUser
+                $users = Get-TableauUser
                 ($users | Measure-Object).Count | Should -BeGreaterThan 0
                 $users | Where-Object id -eq $script:testUserId | Should -Not -BeNullOrEmpty
-                $user = Get-TSUser -UserId $script:testUserId
+                $user = Get-TableauUser -UserId $script:testUserId
                 $user.id | Should -Be $script:testUserId
             }
             It "Query users with options on <ConfigFile.server>" {
-                $userName = Get-TSUser | Where-Object id -eq $script:testUserId | Select-Object -First 1 -ExpandProperty name
-                $users = Get-TSUser -Filter "name:eq:$userName" -Sort name:asc -Fields _all_
+                $userName = Get-TableauUser | Where-Object id -eq $script:testUserId | Select-Object -First 1 -ExpandProperty name
+                $users = Get-TableauUser -Filter "name:eq:$userName" -Sort name:asc -Fields _all_
                 ($users | Measure-Object).Count | Should -Be 1
                 ($users | Get-Member -MemberType Property | Measure-Object).Count | Should -BeGreaterThan 5
             }
             It "Remove user <testUserId> on <ConfigFile.server>" {
-                $response = Remove-TSUser -UserId $script:testUserId
+                $response = Remove-TableauUser -UserId $script:testUserId
                 $response | Should -BeOfType String
                 $script:testUserId = $null
             }
             It "Import users via CSV file on <ConfigFile.server>" {
                 if ($ConfigFile.tableau_cloud) {
-                    $job = Import-TSUsersWithCSV -CsvFile './Tests/Assets/Misc/users_to_add_cloud.csv' -AuthSetting ServerDefault
+                    $job = Import-TableauUsersCsv -CsvFile './Tests/Assets/Misc/users_to_add_cloud.csv' -AuthSetting ServerDefault
                 } else {
-                    $job = Import-TSUsersWithCSV -CsvFile './Tests/Assets/Misc/users_to_add.csv'
+                    $job = Import-TableauUsersCsv -CsvFile './Tests/Assets/Misc/users_to_add.csv'
                 }
                 $job | Should -Not -BeNullOrEmpty
                 $job.type | Should -Be "UserImport"
                 $job.mode | Should -Be "Asynchronous"
-                $jobFinished = Wait-TSJob -JobId $job.id -Timeout 300
+                $jobFinished = Wait-TableauJob -JobId $job.id -Timeout 300
                 Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobFinished.completedAt, $jobFinished.finishCode)
                 if ($jobFinished.extractRefreshJob.notes) {
                     Write-Verbose ("Job notes: {0}" -f $jobFinished.extractRefreshJob.notes)
@@ -547,22 +547,22 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             }
             It "Remove users via CSV file on <ConfigFile.server>" {
                 if ($ConfigFile.tableau_cloud) {
-                    # $job = Remove-TSUsersWithCSV -CsvFile './Tests/Assets/Misc/users_to_remove_cloud.csv'
-                    $user = Get-TSUser -Filter "name:eq:user1@domain.com"
-                    $response = Remove-TSUser -UserId $user.id
+                    # $job = Remove-TableauUsersCsv -CsvFile './Tests/Assets/Misc/users_to_remove_cloud.csv'
+                    $user = Get-TableauUser -Filter "name:eq:user1@domain.com"
+                    $response = Remove-TableauUser -UserId $user.id
                     $response | Should -BeOfType String
-                    $user = Get-TSUser -Filter "name:eq:user2@domain.com"
-                    $response = Remove-TSUser -UserId $user.id
+                    $user = Get-TableauUser -Filter "name:eq:user2@domain.com"
+                    $response = Remove-TableauUser -UserId $user.id
                     $response | Should -BeOfType String
                 } else {
                     # TODO test this method on Tableau Server, on Tableau Cloud this doesn't work for some reason
-                    $job = Remove-TSUsersWithCSV -CsvFile './Tests/Assets/Misc/users_to_remove.csv'
+                    $job = Remove-TableauUsersCsv -CsvFile './Tests/Assets/Misc/users_to_remove.csv'
                     $job | Should -Not -BeNullOrEmpty
                 }
                 if ($job) {
                     $job.type | Should -Be "UserDelete"
                     $job.mode | Should -Be "Asynchronous"
-                    $jobFinished = Wait-TSJob -JobId $job.id -Timeout 300
+                    $jobFinished = Wait-TableauJob -JobId $job.id -Timeout 300
                     Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobFinished.completedAt, $jobFinished.finishCode)
                     if ($jobFinished.extractRefreshJob.notes) {
                         Write-Verbose ("Job notes: {0}" -f $jobFinished.extractRefreshJob.notes)
@@ -579,29 +579,29 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
         Context "Group operations" -Tag Group {
             It "Add new group on <ConfigFile.server>" {
                 $groupName = New-Guid
-                $group = Add-TSGroup -Name $groupName -MinimumSiteRole Viewer
+                $group = New-TableauGroup -Name $groupName -MinimumSiteRole Viewer
                 $group.id | Should -BeOfType String
                 $script:testGroupId = $group.id
             }
             It "Update group <testGroupId> on <ConfigFile.server>" {
                 $groupName = New-Guid
-                $group = Update-TSGroup -GroupId $script:testGroupId -Name $groupName
+                $group = Set-TableauGroup -GroupId $script:testGroupId -Name $groupName
                 $group.id | Should -Be $script:testGroupId
                 $group.name | Should -Be $groupName
             }
             It "Query groups on <ConfigFile.server>" {
-                $groups = Get-TSGroup
+                $groups = Get-TableauGroup
                 ($groups | Measure-Object).Count | Should -BeGreaterThan 0
                 $groups | Where-Object id -eq $script:testGroupId | Should -Not -BeNullOrEmpty
             }
             It "Query groups with options on <ConfigFile.server>" {
-                $groupName = Get-TSGroup | Where-Object id -eq $script:testGroupId | Select-Object -First 1 -ExpandProperty name
-                $groups = Get-TSGroup -Filter "name:eq:$groupName" -Sort name:asc -Fields id,name
+                $groupName = Get-TableauGroup | Where-Object id -eq $script:testGroupId | Select-Object -First 1 -ExpandProperty name
+                $groups = Get-TableauGroup -Filter "name:eq:$groupName" -Sort name:asc -Fields id,name
                 ($groups | Measure-Object).Count | Should -Be 1
                 ($groups | Get-Member -MemberType Property | Measure-Object).Count | Should -BeGreaterOrEqual 2
             }
             It "Remove group <testGroupId> on <ConfigFile.server>" {
-                $response = Remove-TSGroup -GroupId $script:testGroupId
+                $response = Remove-TableauGroup -GroupId $script:testGroupId
                 $response | Should -BeOfType String
                 $script:testGroupId = $null
             }
@@ -613,93 +613,93 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 } else {
                     $userName = New-Guid
                 }
-                $user = Add-TSUser -Name $userName -SiteRole Unlicensed -AuthSetting "ServerDefault"
+                $user = New-TableauUser -Name $userName -SiteRole Unlicensed -AuthSetting "ServerDefault"
                 $user.id | Should -BeOfType String
                 $script:testUserId = $user.id
                 $groupName = New-Guid
-                $group = Add-TSGroup -Name $groupName -MinimumSiteRole Viewer -GrantLicenseMode onLogin
+                $group = New-TableauGroup -Name $groupName -MinimumSiteRole Viewer -GrantLicenseMode onLogin
                 $group.id | Should -BeOfType String
                 $script:testGroupId = $group.id
             }
             It "Add user to group on <ConfigFile.server>" {
-                $user = Add-TSUserToGroup -UserId $script:testUserId -GroupId $script:testGroupId
+                $user = Add-TableauUserToGroup -UserId $script:testUserId -GroupId $script:testGroupId
                 $user.id | Should -Be $script:testUserId
                 # $user.siteRole | Should -Be "Viewer" # doesn't work on Tableau Cloud
             }
             It "Query groups for user on <ConfigFile.server>" {
-                $groups = Get-TSGroupsForUser -UserId $script:testUserId
+                $groups = Get-TableauGroupsForUser -UserId $script:testUserId
                 ($groups | Measure-Object).Count | Should -BeGreaterThan 0
                 $groups | Where-Object id -eq $script:testGroupId | Should -Not -BeNullOrEmpty
             }
             It "Query users in group on <ConfigFile.server>" {
-                $users = Get-TSUsersInGroup -GroupId $script:testGroupId
+                $users = Get-TableauUsersInGroup -GroupId $script:testGroupId
                 ($users | Measure-Object).Count | Should -BeGreaterThan 0
                 $users | Where-Object id -eq $script:testUserId | Should -Not -BeNullOrEmpty
             }
             It "Remove user from group on <ConfigFile.server>" {
-                $response = Remove-TSUserFromGroup -UserId $script:testUserId -GroupId $script:testGroupId
+                $response = Remove-TableauUserFromGroup -UserId $script:testUserId -GroupId $script:testGroupId
                 $response | Should -BeOfType String
-                $users = Get-TSUsersInGroup -GroupId $script:testGroupId
+                $users = Get-TableauUsersInGroup -GroupId $script:testGroupId
                 ($users | Measure-Object).Count | Should -Be 0
             }
         }
         Context "Workbook operations" -Tag Workbook {
             It "Get workbooks on <ConfigFile.server>" {
-                $workbooks = Get-TSWorkbook
+                $workbooks = Get-TableauWorkbook
                 ($workbooks | Measure-Object).Count | Should -BeGreaterThan 0
                 $workbookId = $workbooks | Select-Object -First 1 -ExpandProperty id
                 $workbookId | Should -BeOfType String
-                $workbook = Get-TSWorkbook -WorkbookId $workbookId
+                $workbook = Get-TableauWorkbook -WorkbookId $workbookId
                 $workbook.id | Should -Be $workbookId
-                $workbookConnections = Get-TSWorkbookConnection -WorkbookId $workbookId
+                $workbookConnections = Get-TableauWorkbookConnection -WorkbookId $workbookId
                 ($workbookConnections | Measure-Object).Count | Should -BeGreaterThan 0
             }
             It "Query workbooks with options on <ConfigFile.server>" {
-                $workbookName = Get-TSWorkbook | Select-Object -First 1 -ExpandProperty name
-                $workbooks = Get-TSWorkbook -Filter "name:eq:$workbookName" -Sort name:asc -Fields id,name
+                $workbookName = Get-TableauWorkbook | Select-Object -First 1 -ExpandProperty name
+                $workbooks = Get-TableauWorkbook -Filter "name:eq:$workbookName" -Sort name:asc -Fields id,name
                 ($workbooks | Measure-Object).Count | Should -BeGreaterOrEqual 1
                 ($workbooks | Get-Member -MemberType Property | Measure-Object).Count | Should -BeGreaterOrEqual 2
             }
             It "Get workbook connections on <ConfigFile.server>" {
-                $workbookId = Get-TSWorkbook | Select-Object -First 1 -ExpandProperty id
-                $connections = Get-TSWorkbookConnection -WorkbookId $workbookId
+                $workbookId = Get-TableauWorkbook | Select-Object -First 1 -ExpandProperty id
+                $connections = Get-TableauWorkbookConnection -WorkbookId $workbookId
                 ($connections | Measure-Object).Count | Should -BeGreaterThan 0
             }
             It "Get workbook revisions on <ConfigFile.server>" {
-                $workbookId = Get-TSWorkbook | Select-Object -First 1 -ExpandProperty id
-                $revisions = Get-TSWorkbook -WorkbookId $workbookId -Revisions
+                $workbookId = Get-TableauWorkbook | Select-Object -First 1 -ExpandProperty id
+                $revisions = Get-TableauWorkbook -WorkbookId $workbookId -Revisions
                 ($revisions | Measure-Object).Count | Should -BeGreaterThan 0
                 $revisions | Select-Object -First 1 -ExpandProperty revisionNumber | Should -BeGreaterThan 0
             }
             Context "Publish, download, revisions for sample workbook on <ConfigFile.server>" {
                 BeforeAll {
-                    $project = Add-TSProject -Name (New-Guid)
+                    $project = New-TableauProject -Name (New-Guid)
                     $script:samplesProjectId = $project.id
                     $script:samplesProjectName = $project.name
                 }
                 AfterAll {
                     if ($samplesProjectId) {
-                        Remove-TSProject -ProjectId $samplesProjectId
+                        Remove-TableauProject -ProjectId $samplesProjectId
                         $script:samplesProjectId = $null
                     }
                 }
                 It "Publish samples into project <samplesProjectName> on <ConfigFile.server>" {
-                    $project = Update-TSProject -ProjectId $samplesProjectId -PublishSamples
+                    $project = Set-TableauProject -ProjectId $samplesProjectId -PublishSamples
                     $project.id | Should -Be $samplesProjectId
                     # Start-Sleep -s 3
                 }
                 It "Query workbooks for current user on <ConfigFile.server>" {
-                    $workbooks = Get-TSWorkbooksForUser -UserId (Get-TSCurrentUserId)
+                    $workbooks = Get-TableauWorkbooksForUser -UserId (Get-TableauCurrentUserId)
                     ($workbooks | Measure-Object).Count | Should -BeGreaterThan 0
                     $workbooks | Select-Object -First 1 -ExpandProperty id | Should -BeOfType String
-                    $workbooks = Get-TSWorkbooksForUser -UserId (Get-TSCurrentUserId) -IsOwner
+                    $workbooks = Get-TableauWorkbooksForUser -UserId (Get-TableauCurrentUserId) -IsOwner
                     ($workbooks | Measure-Object).Count | Should -BeGreaterThan 0
                     $workbooks | Select-Object -First 1 -ExpandProperty id | Should -BeOfType String
                 }
                 It "Get sample workbook id from <ConfigFile.server>" {
-                    $workbook = Get-TSWorkbook -Filter "projectName:eq:$samplesProjectName","name:eq:Superstore" | Select-Object -First 1
+                    $workbook = Get-TableauWorkbook -Filter "projectName:eq:$samplesProjectName","name:eq:Superstore" | Select-Object -First 1
                     # if (-not $workbook) { # fallback: perform filter in PS
-                    #     $workbook = Get-TSWorkbook | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
+                    #     $workbook = Get-TableauWorkbook | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
                     # }
                     $script:sampleWorkbookId = $workbook.id
                     $script:sampleWorkbookName = $workbook.name
@@ -707,8 +707,8 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $sampleWorkbookId | Should -BeOfType String
                 }
                 It "Get sample workbook by content URL from <ConfigFile.server>" {
-                    if ((Get-TSRestApiVersion) -ge [version]3.17) {
-                        $workbook = Get-TSWorkbook -ContentUrl $sampleWorkbookContentUrl
+                    if ((Get-TableauRestVersion) -ge [version]3.17) {
+                        $workbook = Get-TableauWorkbook -ContentUrl $sampleWorkbookContentUrl
                         $workbook.id | Should -Be $script:sampleWorkbookId
                         $workbook.name | Should -Be $script:sampleWorkbookName
                     } else {
@@ -716,51 +716,51 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     }
                 }
                 It "Download sample workbook from <ConfigFile.server>" {
-                    Export-TSWorkbook -WorkbookId $sampleWorkbookId -OutFile "Tests/Output/$sampleWorkbookName.twbx"
+                    Export-TableauWorkbook -WorkbookId $sampleWorkbookId -OutFile "Tests/Output/$sampleWorkbookName.twbx"
                     Test-Path -Path "Tests/Output/$sampleWorkbookName.twbx" | Should -BeTrue
-                    Export-TSWorkbook -WorkbookId $sampleWorkbookId -OutFile "Tests/Output/$sampleWorkbookName.twb" -ExcludeExtract
+                    Export-TableauWorkbook -WorkbookId $sampleWorkbookId -OutFile "Tests/Output/$sampleWorkbookName.twb" -ExcludeExtract
                     Test-Path -Path "Tests/Output/$sampleWorkbookName.twb" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/$sampleWorkbookName.twb"
                 }
                 It "Download sample workbook as PDF from <ConfigFile.server>" {
-                    Export-TSWorkbookToFormat -WorkbookId $sampleWorkbookId -Format pdf -OutFile "Tests/Output/$sampleWorkbookName.pdf"
+                    Export-TableauWorkbookToFormat -WorkbookId $sampleWorkbookId -Format pdf -OutFile "Tests/Output/$sampleWorkbookName.pdf"
                     Test-Path -Path "Tests/Output/$sampleWorkbookName.pdf" | Should -BeTrue
-                    Export-TSWorkbookToFormat -WorkbookId $sampleWorkbookId -Format pdf -OutFile "Tests/Output/$sampleWorkbookName.pdf" -PageType 'A3' -PageOrientation 'Landscape' -MaxAge 1
+                    Export-TableauWorkbookToFormat -WorkbookId $sampleWorkbookId -Format pdf -OutFile "Tests/Output/$sampleWorkbookName.pdf" -PageType 'A3' -PageOrientation 'Landscape' -MaxAge 1
                     Test-Path -Path "Tests/Output/$sampleWorkbookName.pdf" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/$sampleWorkbookName.pdf"
                 }
                 It "Download sample workbook as PowerPoint from <ConfigFile.server>" {
-                    Export-TSWorkbookToFormat -WorkbookId $sampleWorkbookId -Format powerpoint -OutFile "Tests/Output/$sampleWorkbookName.pptx"
+                    Export-TableauWorkbookToFormat -WorkbookId $sampleWorkbookId -Format powerpoint -OutFile "Tests/Output/$sampleWorkbookName.pptx"
                     Test-Path -Path "Tests/Output/$sampleWorkbookName.pptx" | Should -BeTrue
-                    # Export-TSWorkbookToFormat -WorkbookId $sampleWorkbookId -Format powerpoint -OutFile "Tests/Output/$sampleWorkbookName.pptx" -MaxAge 1
+                    # Export-TableauWorkbookToFormat -WorkbookId $sampleWorkbookId -Format powerpoint -OutFile "Tests/Output/$sampleWorkbookName.pptx" -MaxAge 1
                     # Test-Path -Path "Tests/Output/$sampleWorkbookName.pptx" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/$sampleWorkbookName.pptx"
                 }
                 It "Download sample workbook as PNG from <ConfigFile.server>" {
-                    Export-TSWorkbookToFormat -WorkbookId $sampleWorkbookId -Format image -OutFile "Tests/Output/$sampleWorkbookName.png"
+                    Export-TableauWorkbookToFormat -WorkbookId $sampleWorkbookId -Format image -OutFile "Tests/Output/$sampleWorkbookName.png"
                     Test-Path -Path "Tests/Output/$sampleWorkbookName.png" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/$sampleWorkbookName.png"
                 }
                 It "Publish sample workbook on <ConfigFile.server>" {
-                    $workbook = Publish-TSWorkbook -Name $sampleWorkbookName -InFile "Tests/Output/$sampleWorkbookName.twbx" -ProjectId $samplesProjectId -Overwrite
+                    $workbook = Publish-TableauWorkbook -Name $sampleWorkbookName -InFile "Tests/Output/$sampleWorkbookName.twbx" -ProjectId $samplesProjectId -Overwrite
                     $workbook.id | Should -BeOfType String
                     $script:sampleWorkbookId = $workbook.id
                 }
                 It "Publish sample workbook (chunks) on <ConfigFile.server>" {
-                    $workbook = Publish-TSWorkbook -Name $sampleWorkbookName -InFile "Tests/Output/$sampleWorkbookName.twbx" -ProjectId $samplesProjectId -Overwrite -Chunked
+                    $workbook = Publish-TableauWorkbook -Name $sampleWorkbookName -InFile "Tests/Output/$sampleWorkbookName.twbx" -ProjectId $samplesProjectId -Overwrite -Chunked
                     $workbook.id | Should -BeOfType String
                     $script:sampleWorkbookId = $workbook.id
                 }
                 It "Publish sample workbook (hidden views) on <ConfigFile.server>" {
-                    $workbook = Publish-TSWorkbook -Name $sampleWorkbookName -InFile "Tests/Output/$sampleWorkbookName.twbx" -ProjectId $samplesProjectId -Overwrite -HideViews @{Shipping="true";Performance="true";Forecast="true"}
+                    $workbook = Publish-TableauWorkbook -Name $sampleWorkbookName -InFile "Tests/Output/$sampleWorkbookName.twbx" -ProjectId $samplesProjectId -Overwrite -HideViews @{Shipping="true";Performance="true";Forecast="true"}
                     $workbook.id | Should -BeOfType String
                     $workbook.showTabs | Should -Be false
                     $script:sampleWorkbookId = $workbook.id
                 }
                 It "Publish sample workbook (with options) on <ConfigFile.server>" {
-                    if ((Get-TSRestApiVersion) -ge [version]3.21) {
+                    if ((Get-TableauRestVersion) -ge [version]3.21) {
                         $description = "Testing sample workbook - description 123"
-                        $workbook = Publish-TSWorkbook -Name $sampleWorkbookName -InFile "Tests/Output/$sampleWorkbookName.twbx" -ProjectId $samplesProjectId -Overwrite -ShowTabs -ThumbnailsUserId (Get-TSCurrentUserId) -Description $description
+                        $workbook = Publish-TableauWorkbook -Name $sampleWorkbookName -InFile "Tests/Output/$sampleWorkbookName.twbx" -ProjectId $samplesProjectId -Overwrite -ShowTabs -ThumbnailsUserId (Get-TableauCurrentUserId) -Description $description
                         $workbook.id | Should -BeOfType String
                         $workbook.showTabs | Should -Be true
                         $workbook.description | Should -Be $description
@@ -770,61 +770,61 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     }
                 }
                 It "Update sample workbook (showTabs) on <ConfigFile.server>" {
-                    $workbook = Update-TSWorkbook -WorkbookId $sampleWorkbookId -ShowTabs:$false
+                    $workbook = Set-TableauWorkbook -WorkbookId $sampleWorkbookId -ShowTabs:$false
                     $workbook.showTabs | Should -Be false
-                    $workbook = Update-TSWorkbook -WorkbookId $sampleWorkbookId -Description "Test description"
+                    $workbook = Set-TableauWorkbook -WorkbookId $sampleWorkbookId -Description "Test description"
                     $workbook.showTabs | Should -Be false
-                    $workbook = Update-TSWorkbook -WorkbookId $sampleWorkbookId -ShowTabs
+                    $workbook = Set-TableauWorkbook -WorkbookId $sampleWorkbookId -ShowTabs
                     $workbook.showTabs | Should -Be true
-                    $workbook = Update-TSWorkbook -WorkbookId $sampleWorkbookId -Description "Test description"
+                    $workbook = Set-TableauWorkbook -WorkbookId $sampleWorkbookId -Description "Test description"
                     $workbook.showTabs | Should -Be true
                 }
                 It "Update sample workbook (description) on <ConfigFile.server>" {
-                    if ((Get-TSRestApiVersion) -ge [version]3.21) {
+                    if ((Get-TableauRestVersion) -ge [version]3.21) {
                         $description = "Testing sample workbook - description 456" # - special symbols äöü©®!?
-                        $workbook = Update-TSWorkbook -WorkbookId $sampleWorkbookId -Description $description
+                        $workbook = Set-TableauWorkbook -WorkbookId $sampleWorkbookId -Description $description
                         $workbook.description | Should -Be $description
                     } else {
                         Set-ItResult -Skipped -Because "feature not available for this version"
                     }
                 }
                 It "Download & remove previous workbook revision on <ConfigFile.server>" {
-                    $revisions = Get-TSWorkbook -WorkbookId $sampleWorkbookId -Revisions
+                    $revisions = Get-TableauWorkbook -WorkbookId $sampleWorkbookId -Revisions
                     if (($revisions | Measure-Object).Count -gt 1) {
                         $revision = $revisions | Sort-Object revisionNumber -Descending | Select-Object -Skip 1 -First 1 -ExpandProperty revisionNumber
-                        Export-TSWorkbook -WorkbookId $sampleWorkbookId -Revision $revision -OutFile "Tests/Output/download_revision.twbx"
+                        Export-TableauWorkbook -WorkbookId $sampleWorkbookId -Revision $revision -OutFile "Tests/Output/download_revision.twbx"
                         Test-Path -Path "Tests/Output/download_revision.twbx" | Should -BeTrue
                         Remove-Item -Path "Tests/Output/download_revision.twbx"
-                        Remove-TSWorkbook -WorkbookId $sampleWorkbookId -Revision $revision
+                        Remove-TableauWorkbook -WorkbookId $sampleWorkbookId -Revision $revision
                     } else {
                         Set-ItResult -Skipped -Because "only one revision was found"
                     }
                 }
                 It "Download latest workbook revision on <ConfigFile.server>" {
-                    $revision = Get-TSWorkbook -WorkbookId $sampleWorkbookId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
-                    Export-TSWorkbook -WorkbookId $sampleWorkbookId -Revision $revision -OutFile "Tests/Output/download_revision.twbx"
+                    $revision = Get-TableauWorkbook -WorkbookId $sampleWorkbookId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
+                    Export-TableauWorkbook -WorkbookId $sampleWorkbookId -Revision $revision -OutFile "Tests/Output/download_revision.twbx"
                     Test-Path -Path "Tests/Output/download_revision.twbx" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/download_revision.twbx"
                 }
                 It "Add/remove tags for sample workbook on <ConfigFile.server>" {
-                    Add-TSTagsToContent -WorkbookId $sampleWorkbookId -Tags "active","test"
-                    ((Get-TSWorkbook -WorkbookId $sampleWorkbookId).tags.tag | Measure-Object).Count | Should -Be 2
-                    Remove-TSTagFromContent -WorkbookId $sampleWorkbookId -Tag "test"
-                    ((Get-TSWorkbook -WorkbookId $sampleWorkbookId).tags.tag | Measure-Object).Count | Should -Be 1
-                    Remove-TSTagFromContent -WorkbookId $sampleWorkbookId -Tag "active"
-                    (Get-TSWorkbook -WorkbookId $sampleWorkbookId).tags | Should -BeNullOrEmpty
+                    Add-TableauContentTag -WorkbookId $sampleWorkbookId -Tags "active","test"
+                    ((Get-TableauWorkbook -WorkbookId $sampleWorkbookId).tags.tag | Measure-Object).Count | Should -Be 2
+                    Remove-TableauContentTag -WorkbookId $sampleWorkbookId -Tag "test"
+                    ((Get-TableauWorkbook -WorkbookId $sampleWorkbookId).tags.tag | Measure-Object).Count | Should -Be 1
+                    Remove-TableauContentTag -WorkbookId $sampleWorkbookId -Tag "active"
+                    (Get-TableauWorkbook -WorkbookId $sampleWorkbookId).tags | Should -BeNullOrEmpty
                 }
                 It "Query/remove/add/set workbook permissions on <ConfigFile.server>" {
-                    $permissions = Get-TSContentPermission -WorkbookId $sampleWorkbookId
+                    $permissions = Get-TableauContentPermission -WorkbookId $sampleWorkbookId
                     $permissions.workbook.id | Should -Be $sampleWorkbookId
                     $permissions.workbook.name | Should -Be $sampleWorkbookName
-                    $savedPermissionTable = $permissions | ConvertTo-TSPermissionTable
+                    $savedPermissionTable = $permissions | ConvertTo-TableauPermissionTable
                     # remove all permissions for all grantees
-                    Remove-TSContentPermission -WorkbookId $sampleWorkbookId -All
-                    $permissions = Get-TSContentPermission -WorkbookId $sampleWorkbookId
+                    Remove-TableauContentPermission -WorkbookId $sampleWorkbookId -All
+                    $permissions = Get-TableauContentPermission -WorkbookId $sampleWorkbookId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # attempt to set permissions with empty capabilities
-                    $permissions = Set-TSContentPermission -WorkbookId $sampleWorkbookId -PermissionTable @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{}}
+                    $permissions = Set-TableauContentPermission -WorkbookId $sampleWorkbookId -PermissionTable @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{}}
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # add all possible permissions (random Allow/Deny) for the current user
                     $possibleCap = 'Read','Filter','ViewComments','AddComment','ExportImage','ExportData','ShareView','ViewUnderlyingData','WebAuthoring','RunExplainData','ExportXml','Write','CreateRefreshMetrics','ChangeHierarchy','Delete','ChangePermissions'
@@ -833,8 +833,8 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     foreach ($cap in $possibleCap) {
                         $capabilitiesHashtable.Add($cap, (Get-Random -InputObject 'Allow','Deny'))
                     }
-                    $allPermissionTable += @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=$capabilitiesHashtable}
-                    $permissions = Add-TSContentPermission -WorkbookId $sampleWorkbookId -PermissionTable $allPermissionTable
+                    $allPermissionTable += @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=$capabilitiesHashtable}
+                    $permissions = Add-TableauContentPermission -WorkbookId $sampleWorkbookId -PermissionTable $allPermissionTable
                     $permissions.workbook.id | Should -Be $sampleWorkbookId
                     $permissions.workbook.name | Should -Be $sampleWorkbookName
                     $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
@@ -845,19 +845,19 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     foreach ($cap in $possibleCap) {
                         $capabilitiesHashtable.Add($cap, "Allow")
                     }
-                    $allPermissionTable += @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=$capabilitiesHashtable}
-                    $permissions = Set-TSContentPermission -WorkbookId $sampleWorkbookId -PermissionTable $allPermissionTable
+                    $allPermissionTable += @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=$capabilitiesHashtable}
+                    $permissions = Set-TableauContentPermission -WorkbookId $sampleWorkbookId -PermissionTable $allPermissionTable
                     $permissions.workbook.id | Should -Be $sampleWorkbookId
                     $permissions.workbook.name | Should -Be $sampleWorkbookName
                     $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
                     ($permissions.granteeCapabilities.capabilities.capability | Measure-Object).Count | Should -Be $possibleCap.Length
                     # remove all permissions for the current user
-                    Remove-TSContentPermission -WorkbookId $sampleWorkbookId -GranteeType User -GranteeId (Get-TSCurrentUserId)
-                    $permissions = Get-TSContentPermission -WorkbookId $sampleWorkbookId
+                    Remove-TableauContentPermission -WorkbookId $sampleWorkbookId -GranteeType User -GranteeId (Get-TableauCurrentUserId)
+                    $permissions = Get-TableauContentPermission -WorkbookId $sampleWorkbookId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # add back initial permissions configuration
                     if ($savedPermissionTable.Length -gt 0) {
-                        $permissions = Add-TSContentPermission -WorkbookId $sampleWorkbookId -PermissionTable $savedPermissionTable
+                        $permissions = Add-TableauContentPermission -WorkbookId $sampleWorkbookId -PermissionTable $savedPermissionTable
                         ($permissions.granteeCapabilities | Measure-Object).Count | Should -Be $savedPermissionTable.Length
                         # remove again each permission/capability one-by-one
                         if ($permissions.granteeCapabilities) {
@@ -872,34 +872,34 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                                 $_.capabilities.capability | ForEach-Object {
                                     $capName = $_.name
                                     $capMode = $_.mode
-                                    Remove-TSContentPermission -WorkbookId $sampleWorkbookId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode
+                                    Remove-TableauContentPermission -WorkbookId $sampleWorkbookId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode
                                 }
                             }
                         }
-                        $permissions = Get-TSContentPermission -WorkbookId $sampleWorkbookId
+                        $permissions = Get-TableauContentPermission -WorkbookId $sampleWorkbookId
                         $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     }
                     # permissions by template for the current user
                     foreach ($pt in 'View','Denied','Explore','Publish','None','Administer') {
-                        $permissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); template=$pt}
-                        $permissions = Set-TSContentPermission -WorkbookId $sampleWorkbookId -PermissionTable $permissionTable
+                        $permissionTable = @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); template=$pt}
+                        $permissions = Set-TableauContentPermission -WorkbookId $sampleWorkbookId -PermissionTable $permissionTable
                         $permissions.workbook.id | Should -Be $sampleWorkbookId
-                        $actualPermissionTable = Get-TSContentPermission -WorkbookId $sampleWorkbookId | ConvertTo-TSPermissionTable
+                        $actualPermissionTable = Get-TableauContentPermission -WorkbookId $sampleWorkbookId | ConvertTo-TableauPermissionTable
                         switch ($pt) {
                             'View' {
-                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; Filter="Allow"; ViewComments="Allow"; AddComment="Allow"; ExportImage="Allow"; ExportData="Allow"}}
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{Read="Allow"; Filter="Allow"; ViewComments="Allow"; AddComment="Allow"; ExportImage="Allow"; ExportData="Allow"}}
                             }
                             'Explore' {
-                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; Filter="Allow"; ViewComments="Allow"; AddComment="Allow"; ExportImage="Allow"; ExportData="Allow"; ShareView="Allow"; ViewUnderlyingData="Allow"; WebAuthoring="Allow"; RunExplainData="Allow"}}
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{Read="Allow"; Filter="Allow"; ViewComments="Allow"; AddComment="Allow"; ExportImage="Allow"; ExportData="Allow"; ShareView="Allow"; ViewUnderlyingData="Allow"; WebAuthoring="Allow"; RunExplainData="Allow"}}
                             }
                             'Publish' {
-                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; Filter="Allow"; ViewComments="Allow"; AddComment="Allow"; ExportImage="Allow"; ExportData="Allow"; ShareView="Allow"; ViewUnderlyingData="Allow"; WebAuthoring="Allow"; RunExplainData="Allow"; ExportXml="Allow"; Write="Allow"; CreateRefreshMetrics="Allow"}}
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{Read="Allow"; Filter="Allow"; ViewComments="Allow"; AddComment="Allow"; ExportImage="Allow"; ExportData="Allow"; ShareView="Allow"; ViewUnderlyingData="Allow"; WebAuthoring="Allow"; RunExplainData="Allow"; ExportXml="Allow"; Write="Allow"; CreateRefreshMetrics="Allow"}}
                             }
                             'Administer' {
-                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; Filter="Allow"; ViewComments="Allow"; AddComment="Allow"; ExportImage="Allow"; ExportData="Allow"; ShareView="Allow"; ViewUnderlyingData="Allow"; WebAuthoring="Allow"; RunExplainData="Allow"; ExportXml="Allow"; Write="Allow"; CreateRefreshMetrics="Allow"; ChangeHierarchy="Allow"; Delete="Allow"; ChangePermissions="Allow"}}
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{Read="Allow"; Filter="Allow"; ViewComments="Allow"; AddComment="Allow"; ExportImage="Allow"; ExportData="Allow"; ShareView="Allow"; ViewUnderlyingData="Allow"; WebAuthoring="Allow"; RunExplainData="Allow"; ExportXml="Allow"; Write="Allow"; CreateRefreshMetrics="Allow"; ChangeHierarchy="Allow"; Delete="Allow"; ChangePermissions="Allow"}}
                             }
                             'Denied' {
-                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Deny"; Filter="Deny"; ViewComments="Deny"; AddComment="Deny"; ExportImage="Deny"; ExportData="Deny"; ShareView="Deny"; ViewUnderlyingData="Deny"; WebAuthoring="Deny"; RunExplainData="Deny"; ExportXml="Deny"; Write="Deny"; CreateRefreshMetrics="Deny"; ChangeHierarchy="Deny"; Delete="Deny"; ChangePermissions="Deny"}}
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{Read="Deny"; Filter="Deny"; ViewComments="Deny"; AddComment="Deny"; ExportImage="Deny"; ExportData="Deny"; ShareView="Deny"; ViewUnderlyingData="Deny"; WebAuthoring="Deny"; RunExplainData="Deny"; ExportXml="Deny"; Write="Deny"; CreateRefreshMetrics="Deny"; ChangeHierarchy="Deny"; Delete="Deny"; ChangePermissions="Deny"}}
                             }
                             default {
                                 $expectedPermissionTable = $null
@@ -909,42 +909,42 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     }
                 }
                 It "Publish workbook with invalid extension on <ConfigFile.server>" {
-                    {Publish-TSWorkbook -Name "Workbook" -InFile "Tests/Assets/Misc/Workbook.txt" -ProjectId $samplesProjectId} | Should -Throw
+                    {Publish-TableauWorkbook -Name "Workbook" -InFile "Tests/Assets/Misc/Workbook.txt" -ProjectId $samplesProjectId} | Should -Throw
                 }
                 It "Publish workbook with invalid contents on <ConfigFile.server>" {
-                    {Publish-TSWorkbook -Name "invalid" -InFile "Tests/Assets/Misc/invalid.twbx" -ProjectId $samplesProjectId} | Should -Throw
+                    {Publish-TableauWorkbook -Name "invalid" -InFile "Tests/Assets/Misc/invalid.twbx" -ProjectId $samplesProjectId} | Should -Throw
                 }
                 It "Publish TWB workbook with embed credentials on <ConfigFile.server>" -Tag WorkbookP {
                     # this request/test is done first to unsuspend the database (free SQL tier, suspended after 1h of inactivity)
                     $securePw = Test-GetSecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
                     $credentials = @{username="sqladmin"; password=$securePw; embed="true" }
                     try {
-                        $workbook = Publish-TSWorkbook -Name "AW Customer Address" -InFile "Tests/Assets/Misc/AW_Customer_Address.twb" -ProjectId $samplesProjectId -Credentials $credentials
+                        $workbook = Publish-TableauWorkbook -Name "AW Customer Address" -InFile "Tests/Assets/Misc/AW_Customer_Address.twb" -ProjectId $samplesProjectId -Credentials $credentials
                         $workbook | Should -Not -BeNullOrEmpty
-                        $view = Get-TSView -Filter "workbookName:eq:AW Customer Address","projectName:eq:$samplesProjectName" | Select-Object -First 1
+                        $view = Get-TableauView -Filter "workbookName:eq:AW Customer Address","projectName:eq:$samplesProjectName" | Select-Object -First 1
                         $view | Should -Not -BeNullOrEmpty
-                        Export-TSViewToFormat -ViewId $view.id -Format image -OutFile "Tests/Output/Sheet1.png"
+                        Export-TableauViewToFormat -ViewId $view.id -Format image -OutFile "Tests/Output/Sheet1.png"
                     } catch [Microsoft.PowerShell.Commands.WriteErrorException] {
                         # Write-Verbose $_.Exception.Message
                         Write-Verbose "The workbook couldn't be published, but the SQL database is now starting for other tests."
                     }
                 }
                 It "Publish workbook without embed credentials on <ConfigFile.server>" -Tag WorkbookP {
-                    $workbook = Publish-TSWorkbook -Name "AW Customer Address 1" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId
+                    $workbook = Publish-TableauWorkbook -Name "AW Customer Address 1" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId
                     $workbook | Should -Not -BeNullOrEmpty
-                    # Remove-TSWorkbook -WorkbookId $workbook.id
+                    # Remove-TableauWorkbook -WorkbookId $workbook.id
                 }
                 It "Publish workbook with embed credentials on <ConfigFile.server>" -Tag WorkbookP {
                     $securePw = Test-GetSecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
                     $credentials = @{username="sqladmin"; password=$securePw; embed="true" }
-                    $workbook = Publish-TSWorkbook -Name "AW Customer Address 2" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -Credentials $credentials
+                    $workbook = Publish-TableauWorkbook -Name "AW Customer Address 2" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -Credentials $credentials
                     $workbook | Should -Not -BeNullOrEmpty
                     Write-Verbose "Queueing extract refresh job"
-                    $job = Update-TSWorkbookNow -WorkbookId $workbook.id
+                    $job = Update-TableauWorkbookNow -WorkbookId $workbook.id
                     $job | Should -Not -BeNullOrEmpty
                     $job.type | Should -Be "RefreshExtract"
                     $job.mode | Should -Be "Asynchronous"
-                    $jobFinished = Wait-TSJob -JobId $job.id -Timeout 300
+                    $jobFinished = Wait-TableauJob -JobId $job.id -Timeout 300
                     Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobFinished.completedAt, $jobFinished.finishCode)
                     if ($jobFinished.extractRefreshJob.notes) {
                         Write-Verbose ("Job notes: {0}" -f $jobFinished.extractRefreshJob.notes)
@@ -955,19 +955,19 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                         }
                     }
                     $jobFinished.finishCode | Should -Be 0
-                    # Remove-TSWorkbook -WorkbookId $workbook.id
+                    # Remove-TableauWorkbook -WorkbookId $workbook.id
                 }
                 It "Publish workbook with connections on <ConfigFile.server>" -Tag WorkbookP {
                     $securePw = Test-GetSecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
                     $connections = @( @{serverAddress="asl-tableau-testsql.database.windows.net"; serverPort="3389"; credentials=@{username="sqladmin"; password=$securePw; embed="true" }} )
-                    $workbook = Publish-TSWorkbook -Name "AW Customer Address 3" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -Connections $connections
+                    $workbook = Publish-TableauWorkbook -Name "AW Customer Address 3" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -Connections $connections
                     $workbook | Should -Not -BeNullOrEmpty
                     Write-Verbose "Queueing extract refresh job"
-                    $job = Update-TSWorkbookNow -WorkbookId $workbook.id
+                    $job = Update-TableauWorkbookNow -WorkbookId $workbook.id
                     $job | Should -Not -BeNullOrEmpty
                     $job.type | Should -Be "RefreshExtract"
                     $job.mode | Should -Be "Asynchronous"
-                    $jobFinished = Wait-TSJob -JobId $job.id -Timeout 300
+                    $jobFinished = Wait-TableauJob -JobId $job.id -Timeout 300
                     Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobFinished.completedAt, $jobFinished.finishCode)
                     if ($jobFinished.extractRefreshJob.notes) {
                         Write-Verbose ("Job notes: {0}" -f $jobFinished.extractRefreshJob.notes)
@@ -978,15 +978,15 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                         }
                     }
                     $jobFinished.finishCode | Should -Be 0
-                    # Remove-TSWorkbook -WorkbookId $workbook.id
+                    # Remove-TableauWorkbook -WorkbookId $workbook.id
                 }
                 It "Publish workbook as background job on <ConfigFile.server>" -Tag WorkbookP {
-                    $job = Publish-TSWorkbook -Name "AW Customer Address 4" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -BackgroundTask
+                    $job = Publish-TableauWorkbook -Name "AW Customer Address 4" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -BackgroundTask
                     $job | Should -Not -BeNullOrEmpty
-                    $jobFinished = Wait-TSJob -JobId $job.id -Timeout 60
+                    $jobFinished = Wait-TableauJob -JobId $job.id -Timeout 60
                     Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobFinished.completedAt, $jobFinished.finishCode)
                     $jobFinished.finishCode | Should -Be 0
-                    # Remove-TSWorkbook -WorkbookId $workbook.id
+                    # Remove-TableauWorkbook -WorkbookId $workbook.id
                 }
                 Context "Publish / download workbooks from test assets on <ConfigFile.server>" -Tag WorkbookSamples -ForEach $WorkbookFiles {
                     BeforeAll {
@@ -994,18 +994,18 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                         $script:sampleWorkbookFileName = (Get-Item -LiteralPath $_).Name
                     }
                     It "Publish file ""<sampleWorkbookFileName>"" into workbook ""<sampleWorkbookName>"" on <ConfigFile.server>" {
-                        $workbook = Publish-TSWorkbook -Name $sampleWorkbookName -InFile $_ -ProjectId $samplesProjectId -Overwrite -SkipConnectionCheck
+                        $workbook = Publish-TableauWorkbook -Name $sampleWorkbookName -InFile $_ -ProjectId $samplesProjectId -Overwrite -SkipConnectionCheck
                         $workbook.id | Should -BeOfType String
                         $script:sampleWorkbookId = $workbook.id
                     }
                     It "Publish file ""<sampleWorkbookFileName>"" into workbook ""<sampleWorkbookName>"" on <ConfigFile.server> (Chunked)" {
-                        $workbook = Publish-TSWorkbook -Name $sampleWorkbookName -InFile $_ -ProjectId $samplesProjectId -Overwrite -SkipConnectionCheck -Chunked
+                        $workbook = Publish-TableauWorkbook -Name $sampleWorkbookName -InFile $_ -ProjectId $samplesProjectId -Overwrite -SkipConnectionCheck -Chunked
                         $workbook.id | Should -BeOfType String
                         $script:sampleWorkbookId = $workbook.id
                     }
                     It "Download workbook ""<sampleWorkbookName>"" from <ConfigFile.server>" {
                         if ($sampleWorkbookId) {
-                            Export-TSWorkbook -WorkbookId $sampleWorkbookId -OutFile "Tests/Output/download.twbx"
+                            Export-TableauWorkbook -WorkbookId $sampleWorkbookId -OutFile "Tests/Output/download.twbx"
                             Test-Path -Path "Tests/Output/download.twbx" | Should -BeTrue
                             Remove-Item -Path "Tests/Output/download.twbx"
                         } else {
@@ -1017,128 +1017,128 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
         }
         Context "Datasource operations" -Tag Datasource {
             It "Get datasources on <ConfigFile.server>" {
-                $datasources = Get-TSDatasource
+                $datasources = Get-TableauDatasource
                 ($datasources | Measure-Object).Count | Should -BeGreaterThan 0
                 $datasourceId = $datasources | Select-Object -First 1 -ExpandProperty id
                 $datasourceId | Should -BeOfType String
-                $datasource = Get-TSDatasource -DatasourceId $datasourceId
+                $datasource = Get-TableauDatasource -DatasourceId $datasourceId
                 $datasource.id | Should -Be $datasourceId
-                $datasourceConnections = Get-TSDatasourceConnection -DatasourceId $datasourceId
+                $datasourceConnections = Get-TableauDatasourceConnection -DatasourceId $datasourceId
                 ($datasourceConnections | Measure-Object).Count | Should -BeGreaterThan 0
             }
             It "Query datasources with options on <ConfigFile.server>" {
-                $datasourceName = Get-TSDatasource | Select-Object -First 1 -ExpandProperty name
-                $datasources = Get-TSDatasource -Filter "name:eq:$datasourceName" -Sort name:asc -Fields id,name
+                $datasourceName = Get-TableauDatasource | Select-Object -First 1 -ExpandProperty name
+                $datasources = Get-TableauDatasource -Filter "name:eq:$datasourceName" -Sort name:asc -Fields id,name
                 ($datasources | Measure-Object).Count | Should -BeGreaterOrEqual 1
                 ($datasources | Get-Member -MemberType Property | Measure-Object).Count | Should -BeGreaterOrEqual 2
             }
             It "Get datasource connections on <ConfigFile.server>" {
-                $datasourceId = Get-TSDatasource | Select-Object -First 1 -ExpandProperty id
-                $connections = Get-TSDatasourceConnection -DatasourceId $datasourceId
+                $datasourceId = Get-TableauDatasource | Select-Object -First 1 -ExpandProperty id
+                $connections = Get-TableauDatasourceConnection -DatasourceId $datasourceId
                 ($connections | Measure-Object).Count | Should -BeGreaterThan 0
             }
             It "Get datasource revisions on <ConfigFile.server>" {
-                $datasourceId = Get-TSDatasource | Select-Object -First 1 -ExpandProperty id
-                $revisions = Get-TSDatasource -DatasourceId $datasourceId -Revisions
+                $datasourceId = Get-TableauDatasource | Select-Object -First 1 -ExpandProperty id
+                $revisions = Get-TableauDatasource -DatasourceId $datasourceId -Revisions
                 ($revisions | Measure-Object).Count | Should -BeGreaterThan 0
                 $revisions | Select-Object -First 1 -ExpandProperty revisionNumber | Should -BeGreaterThan 0
             }
             Context "Publish, download, revisions for sample datasource on <ConfigFile.server>" {
                 BeforeAll {
-                    $project = Add-TSProject -Name (New-Guid)
+                    $project = New-TableauProject -Name (New-Guid)
                     $script:samplesProjectId = $project.id
                     $script:samplesProjectName = $project.name
                 }
                 AfterAll {
                     if ($samplesProjectId) {
-                        Remove-TSProject -ProjectId $samplesProjectId
+                        Remove-TableauProject -ProjectId $samplesProjectId
                         $script:samplesProjectId = $null
                     }
                 }
                 It "Publish samples into project <samplesProjectName> on <ConfigFile.server>" {
-                    $project = Update-TSProject -ProjectId $samplesProjectId -PublishSamples
+                    $project = Set-TableauProject -ProjectId $samplesProjectId -PublishSamples
                     $project.id | Should -Be $samplesProjectId
                     # Start-Sleep -s 3
                 }
                 It "Get sample datasource id from <ConfigFile.server>" {
-                    $datasource = Get-TSDatasource -Filter "projectName:eq:$samplesProjectName" | Select-Object -First 1
+                    $datasource = Get-TableauDatasource -Filter "projectName:eq:$samplesProjectName" | Select-Object -First 1
                     if (-not $datasource) { # fallback: perform filter in PS
-                        $datasource = Get-TSDatasource | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
+                        $datasource = Get-TableauDatasource | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
                     }
                     $script:sampleDatasourceId = $datasource.id
                     $script:sampleDatasourceName = $datasource.name
                     $sampleDatasourceId | Should -BeOfType String
                 }
                 It "Download sample datasource from <ConfigFile.server>" {
-                    Export-TSDatasource -DatasourceId $sampleDatasourceId -OutFile "Tests/Output/$sampleDatasourceName.tdsx"
+                    Export-TableauDatasource -DatasourceId $sampleDatasourceId -OutFile "Tests/Output/$sampleDatasourceName.tdsx"
                     Test-Path -Path "Tests/Output/$sampleDatasourceName.tdsx" | Should -BeTrue
                     # Remove-Item -Path "Tests/Output/$sampleDatasourceName.tdsx"
                 }
                 It "Publish sample datasource on <ConfigFile.server>" {
-                    $datasource = Publish-TSDatasource -Name $sampleDatasourceName -InFile "Tests/Output/$sampleDatasourceName.tdsx" -ProjectId $samplesProjectId -Overwrite
+                    $datasource = Publish-TableauDatasource -Name $sampleDatasourceName -InFile "Tests/Output/$sampleDatasourceName.tdsx" -ProjectId $samplesProjectId -Overwrite
                     $datasource.id | Should -BeOfType String
                 }
                 It "Publish sample datasource (chunks) on <ConfigFile.server>" {
-                    $datasource = Publish-TSDatasource -Name $sampleDatasourceName -InFile "Tests/Output/$sampleDatasourceName.tdsx" -ProjectId $samplesProjectId -Overwrite -Chunked
+                    $datasource = Publish-TableauDatasource -Name $sampleDatasourceName -InFile "Tests/Output/$sampleDatasourceName.tdsx" -ProjectId $samplesProjectId -Overwrite -Chunked
                     $datasource.id | Should -BeOfType String
                     $script:sampleDatasourceId = $datasource.id
                 }
                 It "Download & remove previous datasource revision on <ConfigFile.server>" {
-                    $revisions = Get-TSDatasource -DatasourceId $sampleDatasourceId -Revisions
+                    $revisions = Get-TableauDatasource -DatasourceId $sampleDatasourceId -Revisions
                     if (($revisions | Measure-Object).Count -gt 1) {
                         $revision = $revisions | Sort-Object revisionNumber -Descending | Select-Object -Skip 1 -First 1 -ExpandProperty revisionNumber
-                        Export-TSDatasource -DatasourceId $sampleDatasourceId -Revision $revision -OutFile "Tests/Output/download_revision.tdsx"
+                        Export-TableauDatasource -DatasourceId $sampleDatasourceId -Revision $revision -OutFile "Tests/Output/download_revision.tdsx"
                         Test-Path -Path "Tests/Output/download_revision.tdsx" | Should -BeTrue
                         Remove-Item -Path "Tests/Output/download_revision.tdsx"
-                        Remove-TSDatasource -DatasourceId $sampleDatasourceId -Revision $revision
+                        Remove-TableauDatasource -DatasourceId $sampleDatasourceId -Revision $revision
                     } else {
                         Set-ItResult -Skipped -Because "only one revision was found"
                     }
                 }
                 It "Download latest datasource revision on <ConfigFile.server>" {
-                    $revision = Get-TSDatasource -DatasourceId $sampleDatasourceId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
-                    Export-TSDatasource -DatasourceId $sampleDatasourceId -Revision $revision -OutFile "Tests/Output/download_revision.tdsx"
+                    $revision = Get-TableauDatasource -DatasourceId $sampleDatasourceId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
+                    Export-TableauDatasource -DatasourceId $sampleDatasourceId -Revision $revision -OutFile "Tests/Output/download_revision.tdsx"
                     Test-Path -Path "Tests/Output/download_revision.tdsx" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/download_revision.tdsx"
                 }
                 It "Publish datasource with invalid extension on <ConfigFile.server>" {
-                    {Publish-TSDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/Datasource.txt" -ProjectId $samplesProjectId} | Should -Throw
+                    {Publish-TableauDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/Datasource.txt" -ProjectId $samplesProjectId} | Should -Throw
                 }
                 It "Publish datasource with invalid contents on <ConfigFile.server>" {
-                    {Publish-TSDatasource -Name "invalid" -InFile "Tests/Assets/Misc/invalid.tdsx" -ProjectId $samplesProjectId} | Should -Throw
+                    {Publish-TableauDatasource -Name "invalid" -InFile "Tests/Assets/Misc/invalid.tdsx" -ProjectId $samplesProjectId} | Should -Throw
                 }
                 It "Publish datasource with append option on <ConfigFile.server>" {
-                    $datasource = Publish-TSDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/append.hyper" -ProjectId $samplesProjectId -Overwrite
+                    $datasource = Publish-TableauDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/append.hyper" -ProjectId $samplesProjectId -Overwrite
                     $datasource.id | Should -BeOfType String
-                    {Publish-TSDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/append.hyper" -ProjectId $samplesProjectId -Overwrite -Append} | Should -Throw
-                    $datasource = Publish-TSDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/append.hyper" -ProjectId $samplesProjectId -Append
+                    {Publish-TableauDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/append.hyper" -ProjectId $samplesProjectId -Overwrite -Append} | Should -Throw
+                    $datasource = Publish-TableauDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/append.hyper" -ProjectId $samplesProjectId -Append
                     $datasource.id | Should -BeOfType String
-                    $datasource = Publish-TSDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/append.hyper" -ProjectId $samplesProjectId -Append -Chunked
+                    $datasource = Publish-TableauDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/append.hyper" -ProjectId $samplesProjectId -Append -Chunked
                     $datasource.id | Should -BeOfType String
                 }
                 It "Publish a Parquet file on <ConfigFile.server>" {
-                    $datasource = Publish-TSDatasource -Name "Titanic" -InFile './Tests/Assets/Misc/Titanic.parquet' -ProjectId $samplesProjectId -Overwrite
+                    $datasource = Publish-TableauDatasource -Name "Titanic" -InFile './Tests/Assets/Misc/Titanic.parquet' -ProjectId $samplesProjectId -Overwrite
                     $datasource.id | Should -BeOfType String
                 }
                 It "Add/remove tags for sample datasource on <ConfigFile.server>" {
-                    Add-TSTagsToContent -DatasourceId $sampleDatasourceId -Tags "active","test"
-                    ((Get-TSDatasource -DatasourceId $sampleDatasourceId).tags.tag | Measure-Object).Count | Should -Be 2
-                    Remove-TSTagFromContent -DatasourceId $sampleDatasourceId -Tag "test"
-                    ((Get-TSDatasource -DatasourceId $sampleDatasourceId).tags.tag | Measure-Object).Count | Should -Be 1
-                    Remove-TSTagFromContent -DatasourceId $sampleDatasourceId -Tag "active"
-                    (Get-TSDatasource -DatasourceId $sampleDatasourceId).tags | Should -BeNullOrEmpty
+                    Add-TableauContentTag -DatasourceId $sampleDatasourceId -Tags "active","test"
+                    ((Get-TableauDatasource -DatasourceId $sampleDatasourceId).tags.tag | Measure-Object).Count | Should -Be 2
+                    Remove-TableauContentTag -DatasourceId $sampleDatasourceId -Tag "test"
+                    ((Get-TableauDatasource -DatasourceId $sampleDatasourceId).tags.tag | Measure-Object).Count | Should -Be 1
+                    Remove-TableauContentTag -DatasourceId $sampleDatasourceId -Tag "active"
+                    (Get-TableauDatasource -DatasourceId $sampleDatasourceId).tags | Should -BeNullOrEmpty
                 }
                 It "Query/remove/add/set datasource permissions on <ConfigFile.server>" {
-                    $permissions = Get-TSContentPermission -DatasourceId $sampleDatasourceId
+                    $permissions = Get-TableauContentPermission -DatasourceId $sampleDatasourceId
                     $permissions.datasource.id | Should -Be $sampleDatasourceId
                     $permissions.datasource.name | Should -Be $sampleDatasourceName
-                    $savedPermissionTable = $permissions | ConvertTo-TSPermissionTable
+                    $savedPermissionTable = $permissions | ConvertTo-TableauPermissionTable
                     # remove all permissions for all grantees
-                    Remove-TSContentPermission -DatasourceId $sampleDatasourceId -All
-                    $permissions = Get-TSContentPermission -DatasourceId $sampleDatasourceId
+                    Remove-TableauContentPermission -DatasourceId $sampleDatasourceId -All
+                    $permissions = Get-TableauContentPermission -DatasourceId $sampleDatasourceId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # attempt to set permissions with empty capabilities
-                    $permissions = Set-TSContentPermission -DatasourceId $sampleDatasourceId -PermissionTable @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{}}
+                    $permissions = Set-TableauContentPermission -DatasourceId $sampleDatasourceId -PermissionTable @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{}}
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # add all possible permissions (random Allow/Deny) for the current user
                     $possibleCap = 'Read','Connect','ExportXml','Write','SaveAs','ChangeHierarchy','Delete','ChangePermissions'
@@ -1147,8 +1147,8 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     foreach ($cap in $possibleCap) {
                         $capabilitiesHashtable.Add($cap, (Get-Random -InputObject 'Allow','Deny'))
                     }
-                    $allPermissionTable += @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=$capabilitiesHashtable}
-                    $permissions = Add-TSContentPermission -DatasourceId $sampleDatasourceId -PermissionTable $allPermissionTable
+                    $allPermissionTable += @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=$capabilitiesHashtable}
+                    $permissions = Add-TableauContentPermission -DatasourceId $sampleDatasourceId -PermissionTable $allPermissionTable
                     $permissions.datasource.id | Should -Be $sampleDatasourceId
                     $permissions.datasource.name | Should -Be $sampleDatasourceName
                     $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
@@ -1159,19 +1159,19 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     foreach ($cap in $possibleCap) {
                         $capabilitiesHashtable.Add($cap, "Allow")
                     }
-                    $allPermissionTable += @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=$capabilitiesHashtable}
-                    $permissions = Set-TSContentPermission -DatasourceId $sampleDatasourceId -PermissionTable $allPermissionTable
+                    $allPermissionTable += @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=$capabilitiesHashtable}
+                    $permissions = Set-TableauContentPermission -DatasourceId $sampleDatasourceId -PermissionTable $allPermissionTable
                     $permissions.datasource.id | Should -Be $sampleDatasourceId
                     $permissions.datasource.name | Should -Be $sampleDatasourceName
                     $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
                     ($permissions.granteeCapabilities.capabilities.capability | Measure-Object).Count | Should -Be $possibleCap.Length
                     # remove all permissions for the current user
-                    Remove-TSContentPermission -DatasourceId $sampleDatasourceId -GranteeType User -GranteeId (Get-TSCurrentUserId)
-                    $permissions = Get-TSContentPermission -DatasourceId $sampleDatasourceId
+                    Remove-TableauContentPermission -DatasourceId $sampleDatasourceId -GranteeType User -GranteeId (Get-TableauCurrentUserId)
+                    $permissions = Get-TableauContentPermission -DatasourceId $sampleDatasourceId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # add back initial permissions configuration
                     if ($savedPermissionTable.Length -gt 0) {
-                        $permissions = Add-TSContentPermission -DatasourceId $sampleDatasourceId -PermissionTable $savedPermissionTable
+                        $permissions = Add-TableauContentPermission -DatasourceId $sampleDatasourceId -PermissionTable $savedPermissionTable
                         ($permissions.granteeCapabilities | Measure-Object).Count | Should -Be $savedPermissionTable.Length
                         # remove again each permission/capability one-by-one
                         if ($permissions.granteeCapabilities) {
@@ -1186,34 +1186,34 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                                 $_.capabilities.capability | ForEach-Object {
                                     $capName = $_.name
                                     $capMode = $_.mode
-                                    Remove-TSContentPermission -DatasourceId $sampleDatasourceId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode
+                                    Remove-TableauContentPermission -DatasourceId $sampleDatasourceId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode
                                 }
                             }
                         }
-                        $permissions = Get-TSContentPermission -DatasourceId $sampleDatasourceId
+                        $permissions = Get-TableauContentPermission -DatasourceId $sampleDatasourceId
                         $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     }
                     # permissions by template for the current user
                     foreach ($pt in 'None','View','Explore','Denied','Publish','Administer') {
-                        $permissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); template=$pt}
-                        $permissions = Set-TSContentPermission -DatasourceId $sampleDatasourceId -PermissionTable $permissionTable
+                        $permissionTable = @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); template=$pt}
+                        $permissions = Set-TableauContentPermission -DatasourceId $sampleDatasourceId -PermissionTable $permissionTable
                         $permissions.datasource.id | Should -Be $sampleDatasourceId
-                        $actualPermissionTable = Get-TSContentPermission -DatasourceId $sampleDatasourceId | ConvertTo-TSPermissionTable
+                        $actualPermissionTable = Get-TableauContentPermission -DatasourceId $sampleDatasourceId | ConvertTo-TableauPermissionTable
                         switch ($pt) {
                             'View' {
-                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; Connect="Allow"}}
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{Read="Allow"; Connect="Allow"}}
                             }
                             'Explore' {
-                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; Connect="Allow"; ExportXml="Allow"}}
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{Read="Allow"; Connect="Allow"; ExportXml="Allow"}}
                             }
                             'Publish' {
-                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; Connect="Allow"; ExportXml="Allow"; Write="Allow"; SaveAs="Allow"}}
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{Read="Allow"; Connect="Allow"; ExportXml="Allow"; Write="Allow"; SaveAs="Allow"}}
                             }
                             'Administer' {
-                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; Connect="Allow"; ExportXml="Allow"; Write="Allow"; SaveAs="Allow"; ChangeHierarchy="Allow"; Delete="Allow"; ChangePermissions="Allow"}}
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{Read="Allow"; Connect="Allow"; ExportXml="Allow"; Write="Allow"; SaveAs="Allow"; ChangeHierarchy="Allow"; Delete="Allow"; ChangePermissions="Allow"}}
                             }
                             'Denied' {
-                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Deny"; Connect="Deny"; ExportXml="Deny"; Write="Deny"; SaveAs="Deny"; ChangeHierarchy="Deny"; Delete="Deny"; ChangePermissions="Deny"}}
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{Read="Deny"; Connect="Deny"; ExportXml="Deny"; Write="Deny"; SaveAs="Deny"; ChangeHierarchy="Deny"; Delete="Deny"; ChangePermissions="Deny"}}
                             }
                             default {
                                 $expectedPermissionTable = $null
@@ -1223,20 +1223,20 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     }
                 }
                 It "Publish datasource without embed credentials on <ConfigFile.server>" -Tag DatasourceP {
-                    $datasource = Publish-TSDatasource -Name "AW SalesOrders 0" -InFile "Tests/Assets/Misc/AW_SalesOrders.tdsx" -ProjectId $samplesProjectId
+                    $datasource = Publish-TableauDatasource -Name "AW SalesOrders 0" -InFile "Tests/Assets/Misc/AW_SalesOrders.tdsx" -ProjectId $samplesProjectId
                     $datasource | Should -Not -BeNullOrEmpty
                 }
                 It "Publish datasource with embed credentials on <ConfigFile.server>" -Tag DatasourceP {
                     $securePw = Test-GetSecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
                     $credentials = @{username="sqladmin"; password=$securePw; embed="true" }
-                    $datasource = Publish-TSDatasource -Name "AW SalesOrders 1" -InFile "Tests/Assets/Misc/AW_SalesOrders.tdsx" -ProjectId $samplesProjectId -Credentials $credentials
+                    $datasource = Publish-TableauDatasource -Name "AW SalesOrders 1" -InFile "Tests/Assets/Misc/AW_SalesOrders.tdsx" -ProjectId $samplesProjectId -Credentials $credentials
                     $datasource | Should -Not -BeNullOrEmpty
                     Write-Verbose "Queueing extract refresh job"
-                    $job = Update-TSDatasourceNow -DatasourceId $datasource.id
+                    $job = Update-TableauDatasourceNow -DatasourceId $datasource.id
                     $job | Should -Not -BeNullOrEmpty
                     $job.type | Should -Be "RefreshExtract"
                     $job.mode | Should -Be "Asynchronous"
-                    $jobFinished = Wait-TSJob -JobId $job.id -Timeout 300
+                    $jobFinished = Wait-TableauJob -JobId $job.id -Timeout 300
                     Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobFinished.completedAt, $jobFinished.finishCode)
                     if ($jobFinished.extractRefreshJob.notes) {
                         Write-Verbose ("Job notes: {0}" -f $jobFinished.extractRefreshJob.notes)
@@ -1247,21 +1247,21 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                         }
                     }
                     $jobFinished.finishCode | Should -Be 0
-                    # Remove-TSDatasource -DatasourceId $datasource.id
+                    # Remove-TableauDatasource -DatasourceId $datasource.id
                 }
                 It "Publish datasource with connections on <ConfigFile.server>" -Tag DatasourceP -Skip {
                     # note: this option is still not supported by the API as of v2023.3
                     # although it's coded the same way in the tsc python module
                     $securePw = Test-GetSecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
                     $connections = @( @{serverAddress="asl-tableau-testsql.database.windows.net"; serverPort="3389"; credentials=@{username="sqladmin"; password=$securePw; embed="true" }} )
-                    $datasource = Publish-TSDatasource -Name "AW SalesOrders 2" -InFile "Tests/Assets/Misc/AW_SalesOrders.tdsx" -ProjectId $samplesProjectId -Connections $connections
+                    $datasource = Publish-TableauDatasource -Name "AW SalesOrders 2" -InFile "Tests/Assets/Misc/AW_SalesOrders.tdsx" -ProjectId $samplesProjectId -Connections $connections
                     $datasource | Should -Not -BeNullOrEmpty
                     Write-Verbose "Queueing extract refresh job"
-                    $job = Update-TSDatasourceNow -DatasourceId $datasource.id
+                    $job = Update-TableauDatasourceNow -DatasourceId $datasource.id
                     $job | Should -Not -BeNullOrEmpty
                     $job.type | Should -Be "RefreshExtract"
                     $job.mode | Should -Be "Asynchronous"
-                    $jobFinished = Wait-TSJob -JobId $job.id -Timeout 300
+                    $jobFinished = Wait-TableauJob -JobId $job.id -Timeout 300
                     Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobFinished.completedAt, $jobFinished.finishCode)
                     if ($jobFinished.extractRefreshJob.notes) {
                         Write-Verbose ("Job notes: {0}" -f $jobFinished.extractRefreshJob.notes)
@@ -1272,15 +1272,15 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                         }
                     }
                     $jobFinished.finishCode | Should -Be 0
-                    # Remove-TSDatasource -DatasourceId $datasource.id
+                    # Remove-TableauDatasource -DatasourceId $datasource.id
                 }
                 It "Publish datasource as background job on <ConfigFile.server>" -Tag DatasourceP {
-                    $job = Publish-TSDatasource -Name "AW SalesOrders 3" -InFile "Tests/Assets/Misc/AW_SalesOrders.tdsx" -ProjectId $samplesProjectId -BackgroundTask -Overwrite
+                    $job = Publish-TableauDatasource -Name "AW SalesOrders 3" -InFile "Tests/Assets/Misc/AW_SalesOrders.tdsx" -ProjectId $samplesProjectId -BackgroundTask -Overwrite
                     $job | Should -Not -BeNullOrEmpty
-                    $jobFinished = Wait-TSJob -JobId $job.id -Timeout 60
+                    $jobFinished = Wait-TableauJob -JobId $job.id -Timeout 60
                     Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobFinished.completedAt, $jobFinished.finishCode)
                     $jobFinished.finishCode | Should -Be 0
-                    # Remove-TSDatasource -DatasourceId $datasource.id
+                    # Remove-TableauDatasource -DatasourceId $datasource.id
                 }
                 Context "Publish / download datasources from test assets on <ConfigFile.server>"  -Tag DatasourceSamples -ForEach $DatasourceFiles {
                     BeforeAll {
@@ -1288,24 +1288,24 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                         $script:sampleDatasourceFileName = (Get-Item -LiteralPath $_).Name
                     }
                     It "Publish file ""<sampleDatasourceFileName>"" into datasource ""<sampleDatasourceName>"" on <ConfigFile.server>" {
-                        $datasource = Publish-TSDatasource -Name $sampleDatasourceName -InFile $_ -ProjectId $samplesProjectId -Overwrite
+                        $datasource = Publish-TableauDatasource -Name $sampleDatasourceName -InFile $_ -ProjectId $samplesProjectId -Overwrite
                         $datasource.id | Should -BeOfType String
                         $script:sampleDatasourceId = $datasource.id
                     }
                     It "Publish file ""<sampleDatasourceFileName>"" into datasource ""<sampleDatasourceName>"" on <ConfigFile.server> (Chunked)" {
-                        $datasource = Publish-TSDatasource -Name $sampleDatasourceName -InFile $_ -ProjectId $samplesProjectId -Overwrite -Chunked
+                        $datasource = Publish-TableauDatasource -Name $sampleDatasourceName -InFile $_ -ProjectId $samplesProjectId -Overwrite -Chunked
                         $datasource.id | Should -BeOfType String
                         $script:sampleDatasourceId = $datasource.id
                     }
                     It "Download datasource ""<sampleDatasourceName>"" from <ConfigFile.server>" {
-                        Export-TSDatasource -DatasourceId $sampleDatasourceId -OutFile "Tests/Output/download.tdsx"
+                        Export-TableauDatasource -DatasourceId $sampleDatasourceId -OutFile "Tests/Output/download.tdsx"
                         Test-Path -Path "Tests/Output/download.tdsx" | Should -BeTrue
                         Remove-Item -Path "Tests/Output/download.tdsx"
                     }
                 }
                 Context "Publish live-to-Hyper assets on <ConfigFile.server>"  -Tag Hyper {
                     It "Publish initial Hyper file" {
-                        $datasource = Publish-TSDatasource -Name "World Indicators Data" -InFile './Tests/Assets/Misc/World Indicators.hyper' -ProjectId $samplesProjectId -Overwrite
+                        $datasource = Publish-TableauDatasource -Name "World Indicators Data" -InFile './Tests/Assets/Misc/World Indicators.hyper' -ProjectId $samplesProjectId -Overwrite
                         $datasource.id | Should -BeOfType String
                         $script:hyperDatasourceId = $datasource.id
                     }
@@ -1314,11 +1314,11 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                             'target-table'='Extract'; 'target-schema'='Extract';
                             'condition'=@{op='eq'; 'target-col'='Region'; const=@{type='string'; v='Europe'}}
                         }
-                        $job = Update-TSHyperData -InFile './Tests/Assets/Misc/World Indicators.hyper' -Action $action -DatasourceId $hyperDatasourceId
+                        $job = Update-TableauHyperData -InFile './Tests/Assets/Misc/World Indicators.hyper' -Action $action -DatasourceId $hyperDatasourceId
                         $job | Should -Not -BeNullOrEmpty
                         $job.type | Should -Be "updateUploadedFile"
                         $job.mode | Should -Be "Asynchronous"
-                        $jobFinished = Wait-TSJob -JobId $job.id -Timeout 300
+                        $jobFinished = Wait-TableauJob -JobId $job.id -Timeout 300
                         Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobFinished.completedAt, $jobFinished.finishCode)
                         if ($jobFinished.extractRefreshJob.notes) {
                             Write-Verbose ("Job notes: {0}" -f $jobFinished.extractRefreshJob.notes)
@@ -1335,11 +1335,11 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                             'source-table'='Extract'; 'source-schema'='Extract';
                             'target-table'='Extract'; 'target-schema'='Extract'
                         }
-                        $job = Update-TSHyperData -InFile './Tests/Assets/Misc/World Indicators.hyper' -Action $action -DatasourceId $hyperDatasourceId
+                        $job = Update-TableauHyperData -InFile './Tests/Assets/Misc/World Indicators.hyper' -Action $action -DatasourceId $hyperDatasourceId
                         $job | Should -Not -BeNullOrEmpty
                         $job.type | Should -Be "updateUploadedFile"
                         $job.mode | Should -Be "Asynchronous"
-                        $jobFinished = Wait-TSJob -JobId $job.id -Timeout 300
+                        $jobFinished = Wait-TableauJob -JobId $job.id -Timeout 300
                         Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobFinished.completedAt, $jobFinished.finishCode)
                         if ($jobFinished.extractRefreshJob.notes) {
                             Write-Verbose ("Job notes: {0}" -f $jobFinished.extractRefreshJob.notes)
@@ -1352,16 +1352,16 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                         $jobFinished.finishCode | Should -Be 0
                     }
                     It "Single table append for published Hyper file (with connection)" {
-                        $connection = Get-TSDatasourceConnection -DatasourceId $hyperDatasourceId
+                        $connection = Get-TableauDatasourceConnection -DatasourceId $hyperDatasourceId
                         $action = @{action='insert';
                             'source-table'='Extract'; 'source-schema'='Extract';
                             'target-table'='Extract'; 'target-schema'='Extract'
                         }
-                        $job = Update-TSHyperData -InFile './Tests/Assets/Misc/World Indicators.hyper' -Action $action -DatasourceId $hyperDatasourceId -ConnectionId $connection.id
+                        $job = Update-TableauHyperData -InFile './Tests/Assets/Misc/World Indicators.hyper' -Action $action -DatasourceId $hyperDatasourceId -ConnectionId $connection.id
                         $job | Should -Not -BeNullOrEmpty
                         $job.type | Should -Be "updateUploadedFile"
                         $job.mode | Should -Be "Asynchronous"
-                        $jobFinished = Wait-TSJob -JobId $job.id -Timeout 300
+                        $jobFinished = Wait-TableauJob -JobId $job.id -Timeout 300
                         Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobFinished.completedAt, $jobFinished.finishCode)
                         if ($jobFinished.extractRefreshJob.notes) {
                             Write-Verbose ("Job notes: {0}" -f $jobFinished.extractRefreshJob.notes)
@@ -1380,130 +1380,130 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
         }
         Context "View operations" -Tag View {
             It "Get views on <ConfigFile.server>" {
-                $views = Get-TSView
+                $views = Get-TableauView
                 ($views | Measure-Object).Count | Should -BeGreaterThan 0
                 $viewId = $views | Select-Object -First 1 -ExpandProperty id
                 $viewId | Should -BeOfType String
-                $view = Get-TSView -ViewId $viewId
+                $view = Get-TableauView -ViewId $viewId
                 $view.id | Should -Be $viewId
             }
             It "Query views with options on <ConfigFile.server>" {
-                $viewName = Get-TSView | Select-Object -First 1 -ExpandProperty name
-                $views = Get-TSView -Filter "name:eq:$viewName" -Sort name:asc -Fields id,name
+                $viewName = Get-TableauView | Select-Object -First 1 -ExpandProperty name
+                $views = Get-TableauView -Filter "name:eq:$viewName" -Sort name:asc -Fields id,name
                 ($views | Measure-Object).Count | Should -BeGreaterOrEqual 1
                 ($views | Get-Member -MemberType Property | Measure-Object).Count | Should -BeGreaterOrEqual 2
             }
             It "Query views for a workbook on <ConfigFile.server>" {
-                $workbookId = Get-TSWorkbook | Select-Object -First 1 -ExpandProperty id
-                $views = Get-TSView -WorkbookId $workbookId -IncludeUsageStatistics
+                $workbookId = Get-TableauWorkbook | Select-Object -First 1 -ExpandProperty id
+                $views = Get-TableauView -WorkbookId $workbookId -IncludeUsageStatistics
                 ($views | Measure-Object).Count | Should -BeGreaterThan 0
                 $views | Select-Object -First 1 -ExpandProperty id | Should -BeOfType String
                 $views | Select-Object -First 1 -ExpandProperty usage | Should -Not -BeNullOrEmpty
             }
             Context "Download views from a sample workbook on <ConfigFile.server>" {
                 BeforeAll {
-                    $project = Add-TSProject -Name (New-Guid)
+                    $project = New-TableauProject -Name (New-Guid)
                     $script:samplesProjectId = $project.id
                     $script:samplesProjectName = $project.name
                 }
                 AfterAll {
                     if ($samplesProjectId) {
-                        Remove-TSProject -ProjectId $samplesProjectId
+                        Remove-TableauProject -ProjectId $samplesProjectId
                         $script:samplesProjectId = $null
                     }
                 }
                 It "Publish samples into project <samplesProjectName> on <ConfigFile.server>" {
-                    $project = Update-TSProject -ProjectId $samplesProjectId -PublishSamples
+                    $project = Set-TableauProject -ProjectId $samplesProjectId -PublishSamples
                     $project.id | Should -Be $samplesProjectId
                     # Start-Sleep -s 3
                 }
                 It "Get sample view id from <ConfigFile.server>" {
-                    $view = Get-TSView -Filter "workbookName:eq:World Indicators","projectName:eq:$samplesProjectName","name:eq:Population" | Select-Object -First 1
+                    $view = Get-TableauView -Filter "workbookName:eq:World Indicators","projectName:eq:$samplesProjectName","name:eq:Population" | Select-Object -First 1
                     # if (-not $view) { # fallback: perform filter in PS
-                    #     $workbook = Get-TSWorkbook | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId -and $_.name -eq "Superstore"} | Select-Object -First 1
-                    #     $view = Get-TSView | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId -and $_.workbook.id -eq $workbook.id} | Select-Object -First 1
+                    #     $workbook = Get-TableauWorkbook | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId -and $_.name -eq "Superstore"} | Select-Object -First 1
+                    #     $view = Get-TableauView | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId -and $_.workbook.id -eq $workbook.id} | Select-Object -First 1
                     # }
                     $script:sampleViewId = $view.id
                     $sampleViewId | Should -BeOfType String
-                    $script:sampleViewName = (Get-TSView -ViewId $sampleViewId).name
+                    $script:sampleViewName = (Get-TableauView -ViewId $sampleViewId).name
                 }
                 It "Download sample view as PDF from <ConfigFile.server>" {
-                    Export-TSViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "Tests/Output/$sampleViewName.pdf"
+                    Export-TableauViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "Tests/Output/$sampleViewName.pdf"
                     Test-Path -Path "Tests/Output/$sampleViewName.pdf" | Should -BeTrue
-                    Export-TSViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "Tests/Output/$sampleViewName.pdf" -PageType 'A5' -PageOrientation 'Landscape' -MaxAge 1
+                    Export-TableauViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "Tests/Output/$sampleViewName.pdf" -PageType 'A5' -PageOrientation 'Landscape' -MaxAge 1
                     Test-Path -Path "Tests/Output/$sampleViewName.pdf" | Should -BeTrue
-                    Export-TSViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "Tests/Output/$sampleViewName.pdf" -VizWidth 500 -VizHeight 300
+                    Export-TableauViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "Tests/Output/$sampleViewName.pdf" -VizWidth 500 -VizHeight 300
                     Test-Path -Path "Tests/Output/$sampleViewName.pdf" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/$sampleViewName.pdf"
                 }
                 It "Query view preview image from <ConfigFile.server>" {
-                    $view = Get-TSView -ViewId $sampleViewId
-                    Export-TSViewPreviewImage -ViewId $sampleViewId -Workbook $view.workbook.id -OutFile "Tests/Output/$sampleViewName.png"
+                    $view = Get-TableauView -ViewId $sampleViewId
+                    Export-TableauViewImage -ViewId $sampleViewId -Workbook $view.workbook.id -OutFile "Tests/Output/$sampleViewName.png"
                     Test-Path -Path "Tests/Output/$sampleViewName.png" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/$sampleViewName.png"
                 }
                 It "Download sample view as PNG from <ConfigFile.server>" {
-                    Export-TSViewToFormat -ViewId $sampleViewId -Format image -OutFile "Tests/Output/$sampleViewName.png"
+                    Export-TableauViewToFormat -ViewId $sampleViewId -Format image -OutFile "Tests/Output/$sampleViewName.png"
                     Test-Path -Path "Tests/Output/$sampleViewName.png" | Should -BeTrue
-                    Export-TSViewToFormat -ViewId $sampleViewId -Format image -OutFile "Tests/Output/$sampleViewName.png" -Resolution high
+                    Export-TableauViewToFormat -ViewId $sampleViewId -Format image -OutFile "Tests/Output/$sampleViewName.png" -Resolution high
                     Test-Path -Path "Tests/Output/$sampleViewName.png" | Should -BeTrue
-                    Export-TSViewToFormat -ViewId $sampleViewId -Format image -OutFile "Tests/Output/$sampleViewName.png" -Resolution standard
+                    Export-TableauViewToFormat -ViewId $sampleViewId -Format image -OutFile "Tests/Output/$sampleViewName.png" -Resolution standard
                     Test-Path -Path "Tests/Output/$sampleViewName.png" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/$sampleViewName.png"
                 }
                 It "Download sample workbook as CSV from <ConfigFile.server>" {
-                    Export-TSViewToFormat -ViewId $sampleViewId -Format csv -OutFile "Tests/Output/$sampleViewName.csv"
+                    Export-TableauViewToFormat -ViewId $sampleViewId -Format csv -OutFile "Tests/Output/$sampleViewName.csv"
                     Test-Path -Path "Tests/Output/$sampleViewName.csv" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/$sampleViewName.csv"
                 }
                 It "Download sample workbook as Excel from <ConfigFile.server>" {
-                    Export-TSViewToFormat -ViewId $sampleViewId -Format excel -OutFile "Tests/Output/$sampleViewName.xlsx"
+                    Export-TableauViewToFormat -ViewId $sampleViewId -Format excel -OutFile "Tests/Output/$sampleViewName.xlsx"
                     Test-Path -Path "Tests/Output/$sampleViewName.xlsx" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/$sampleViewName.xlsx"
                 }
                 It "Download sample view with data filters applied from <ConfigFile.server>" {
-                    Export-TSViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "Tests/Output/$sampleViewName.pdf" -ViewFilters @{Region="Europe"}
+                    Export-TableauViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "Tests/Output/$sampleViewName.pdf" -ViewFilters @{Region="Europe"}
                     Test-Path -Path "Tests/Output/$sampleViewName.pdf" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/$sampleViewName.pdf"
-                    Export-TSViewToFormat -ViewId $sampleViewId -Format image -OutFile "Tests/Output/$sampleViewName.png" -ViewFilters @{Region="Africa"}
+                    Export-TableauViewToFormat -ViewId $sampleViewId -Format image -OutFile "Tests/Output/$sampleViewName.png" -ViewFilters @{Region="Africa"}
                     Test-Path -Path "Tests/Output/$sampleViewName.png" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/$sampleViewName.png"
-                    Export-TSViewToFormat -ViewId $sampleViewId -Format csv -OutFile "Tests/Output/$sampleViewName.csv" -ViewFilters @{"Ease of Business (clusters)"="Low"}
+                    Export-TableauViewToFormat -ViewId $sampleViewId -Format csv -OutFile "Tests/Output/$sampleViewName.csv" -ViewFilters @{"Ease of Business (clusters)"="Low"}
                     Test-Path -Path "Tests/Output/$sampleViewName.csv" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/$sampleViewName.csv"
-                    Export-TSViewToFormat -ViewId $sampleViewId -Format excel -OutFile "Tests/Output/$sampleViewName.xlsx" -ViewFilters @{"Country/Region"="Kyrgyzstan"}
+                    Export-TableauViewToFormat -ViewId $sampleViewId -Format excel -OutFile "Tests/Output/$sampleViewName.xlsx" -ViewFilters @{"Country/Region"="Kyrgyzstan"}
                     Test-Path -Path "Tests/Output/$sampleViewName.xlsx" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/$sampleViewName.xlsx"
                 }
                 It "Add/remove tags for sample view on <ConfigFile.server>" {
-                    Add-TSTagsToContent -ViewId $sampleViewId -Tags "active","test"
-                    ((Get-TSView -ViewId $sampleViewId).tags.tag | Measure-Object).Count | Should -Be 2
-                    Remove-TSTagFromContent -ViewId $sampleViewId -Tag "test"
-                    ((Get-TSView -ViewId $sampleViewId).tags.tag | Measure-Object).Count | Should -Be 1
-                    Remove-TSTagFromContent -ViewId $sampleViewId -Tag "active"
-                    (Get-TSView -ViewId $sampleViewId).tags | Should -BeNullOrEmpty
+                    Add-TableauContentTag -ViewId $sampleViewId -Tags "active","test"
+                    ((Get-TableauView -ViewId $sampleViewId).tags.tag | Measure-Object).Count | Should -Be 2
+                    Remove-TableauContentTag -ViewId $sampleViewId -Tag "test"
+                    ((Get-TableauView -ViewId $sampleViewId).tags.tag | Measure-Object).Count | Should -Be 1
+                    Remove-TableauContentTag -ViewId $sampleViewId -Tag "active"
+                    (Get-TableauView -ViewId $sampleViewId).tags | Should -BeNullOrEmpty
                 }
                 It "Update sample workbook (showTabs=false) on <ConfigFile.server>" {
-                    $workbook = Get-TSWorkbook -Filter "name:eq:World Indicators","projectName:eq:$samplesProjectName"
+                    $workbook = Get-TableauWorkbook -Filter "name:eq:World Indicators","projectName:eq:$samplesProjectName"
                     # if (-not $workbook) { # fallback: perform filter in PS
-                    #     $workbook = Get-TSWorkbook | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId -and $_.name -eq "Superstore"} | Select-Object -First 1
+                    #     $workbook = Get-TableauWorkbook | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId -and $_.name -eq "Superstore"} | Select-Object -First 1
                     # }
                     $workbook.id | Should -BeOfType String
-                    $workbook = Update-TSWorkbook -WorkbookId $workbook.id -ShowTabs:$false
+                    $workbook = Set-TableauWorkbook -WorkbookId $workbook.id -ShowTabs:$false
                     $workbook.showTabs | Should -Be "false"
                 }
                 It "Query/remove/add/set view permissions on <ConfigFile.server>" {
                     # note: setting permissions on views only supported on workbooks with ShowTabs=$false
-                    $permissions = Get-TSContentPermission -ViewId $sampleViewId
+                    $permissions = Get-TableauContentPermission -ViewId $sampleViewId
                     $permissions.view.id | Should -Be $sampleViewId
                     $permissions.view.name | Should -Be $sampleViewName
-                    $savedPermissionTable = $permissions | ConvertTo-TSPermissionTable
+                    $savedPermissionTable = $permissions | ConvertTo-TableauPermissionTable
                     # remove all permissions for all grantees
-                    Remove-TSContentPermission -ViewId $sampleViewId -All
-                    $permissions = Get-TSContentPermission -ViewId $sampleViewId
+                    Remove-TableauContentPermission -ViewId $sampleViewId -All
+                    $permissions = Get-TableauContentPermission -ViewId $sampleViewId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # attempt to set permissions with empty capabilities
-                    $permissions = Set-TSContentPermission -ViewId $sampleViewId -PermissionTable @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{}}
+                    $permissions = Set-TableauContentPermission -ViewId $sampleViewId -PermissionTable @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{}}
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # add all possible permissions (random Allow/Deny) for the current user
                     $possibleCap = 'Read','Filter','ViewComments','AddComment','ExportImage','ExportData','ShareView','ViewUnderlyingData','WebAuthoring','Delete','ChangePermissions' # 'ExportXml','Write','ChangeHierarchy','RunExplainData' capabilities are not supported (cf. Workbooks)
@@ -1512,8 +1512,8 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     foreach ($cap in $possibleCap) {
                         $capabilitiesHashtable.Add($cap, (Get-Random -InputObject 'Allow','Deny'))
                     }
-                    $allPermissionTable += @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=$capabilitiesHashtable}
-                    $permissions = Add-TSContentPermission -ViewId $sampleViewId -PermissionTable $allPermissionTable
+                    $allPermissionTable += @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=$capabilitiesHashtable}
+                    $permissions = Add-TableauContentPermission -ViewId $sampleViewId -PermissionTable $allPermissionTable
                     $permissions.view.id | Should -Be $sampleViewId
                     $permissions.view.name | Should -Be $sampleViewName
                     $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
@@ -1524,19 +1524,19 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     foreach ($cap in $possibleCap) {
                         $capabilitiesHashtable.Add($cap, "Allow")
                     }
-                    $allPermissionTable += @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=$capabilitiesHashtable}
-                    $permissions = Set-TSContentPermission -ViewId $sampleViewId -PermissionTable $allPermissionTable
+                    $allPermissionTable += @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=$capabilitiesHashtable}
+                    $permissions = Set-TableauContentPermission -ViewId $sampleViewId -PermissionTable $allPermissionTable
                     $permissions.view.id | Should -Be $sampleViewId
                     $permissions.view.name | Should -Be $sampleViewName
                     $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
                     ($permissions.granteeCapabilities.capabilities.capability | Measure-Object).Count | Should -Be $possibleCap.Length
                     # remove all permissions for the current user
-                    Remove-TSContentPermission -ViewId $sampleViewId -GranteeType User -GranteeId (Get-TSCurrentUserId)
-                    $permissions = Get-TSContentPermission -ViewId $sampleViewId
+                    Remove-TableauContentPermission -ViewId $sampleViewId -GranteeType User -GranteeId (Get-TableauCurrentUserId)
+                    $permissions = Get-TableauContentPermission -ViewId $sampleViewId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # add back initial permissions configuration
                     if ($savedPermissionTable.Length -gt 0) {
-                        $permissions = Add-TSContentPermission -ViewId $sampleViewId -PermissionTable $savedPermissionTable
+                        $permissions = Add-TableauContentPermission -ViewId $sampleViewId -PermissionTable $savedPermissionTable
                         ($permissions.granteeCapabilities | Measure-Object).Count | Should -Be $savedPermissionTable.Length
                         # remove again each permission/capability one-by-one
                         if ($permissions.granteeCapabilities) {
@@ -1551,34 +1551,34 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                                 $_.capabilities.capability | ForEach-Object {
                                     $capName = $_.name
                                     $capMode = $_.mode
-                                    Remove-TSContentPermission -ViewId $sampleViewId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode
+                                    Remove-TableauContentPermission -ViewId $sampleViewId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode
                                 }
                             }
                         }
-                        $permissions = Get-TSContentPermission -ViewId $sampleViewId
+                        $permissions = Get-TableauContentPermission -ViewId $sampleViewId
                         $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     }
                     # permissions by template for the current user
                     foreach ($pt in 'Denied','View','None','Explore','Publish','Administer') {
-                        $permissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); template=$pt}
-                        $permissions = Set-TSContentPermission -ViewId $sampleViewId -PermissionTable $permissionTable
+                        $permissionTable = @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); template=$pt}
+                        $permissions = Set-TableauContentPermission -ViewId $sampleViewId -PermissionTable $permissionTable
                         $permissions.view.id | Should -Be $sampleViewId
-                        $actualPermissionTable = Get-TSContentPermission -ViewId $sampleViewId | ConvertTo-TSPermissionTable
+                        $actualPermissionTable = Get-TableauContentPermission -ViewId $sampleViewId | ConvertTo-TableauPermissionTable
                         switch ($pt) {
                             'View' {
-                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; Filter="Allow"; ViewComments="Allow"; AddComment="Allow"; ExportImage="Allow"; ExportData="Allow"}}
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{Read="Allow"; Filter="Allow"; ViewComments="Allow"; AddComment="Allow"; ExportImage="Allow"; ExportData="Allow"}}
                             }
                             'Explore' {
-                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; Filter="Allow"; ViewComments="Allow"; AddComment="Allow"; ExportImage="Allow"; ExportData="Allow"; ShareView="Allow"; ViewUnderlyingData="Allow"; WebAuthoring="Allow"}}
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{Read="Allow"; Filter="Allow"; ViewComments="Allow"; AddComment="Allow"; ExportImage="Allow"; ExportData="Allow"; ShareView="Allow"; ViewUnderlyingData="Allow"; WebAuthoring="Allow"}}
                             }
                             'Publish' {
-                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; Filter="Allow"; ViewComments="Allow"; AddComment="Allow"; ExportImage="Allow"; ExportData="Allow"; ShareView="Allow"; ViewUnderlyingData="Allow"; WebAuthoring="Allow"}}
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{Read="Allow"; Filter="Allow"; ViewComments="Allow"; AddComment="Allow"; ExportImage="Allow"; ExportData="Allow"; ShareView="Allow"; ViewUnderlyingData="Allow"; WebAuthoring="Allow"}}
                             }
                             'Administer' {
-                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; Filter="Allow"; ViewComments="Allow"; AddComment="Allow"; ExportImage="Allow"; ExportData="Allow"; ShareView="Allow"; ViewUnderlyingData="Allow"; WebAuthoring="Allow"; Delete="Allow"; ChangePermissions="Allow"}}
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{Read="Allow"; Filter="Allow"; ViewComments="Allow"; AddComment="Allow"; ExportImage="Allow"; ExportData="Allow"; ShareView="Allow"; ViewUnderlyingData="Allow"; WebAuthoring="Allow"; Delete="Allow"; ChangePermissions="Allow"}}
                             }
                             'Denied' {
-                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Deny"; Filter="Deny"; ViewComments="Deny"; AddComment="Deny"; ExportImage="Deny"; ExportData="Deny"; ShareView="Deny"; ViewUnderlyingData="Deny"; WebAuthoring="Deny"; Delete="Deny"; ChangePermissions="Deny"}}
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{Read="Deny"; Filter="Deny"; ViewComments="Deny"; AddComment="Deny"; ExportImage="Deny"; ExportData="Deny"; ShareView="Deny"; ViewUnderlyingData="Deny"; WebAuthoring="Deny"; Delete="Deny"; ChangePermissions="Deny"}}
                             }
                             default {
                                 $expectedPermissionTable = $null
@@ -1600,106 +1600,106 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
         Context "Flow operations" -Tag Flow {
             Context "Get, publish, download sample flow on <ConfigFile.server>" {
                 BeforeAll {
-                    $project = Add-TSProject -Name (New-Guid)
+                    $project = New-TableauProject -Name (New-Guid)
                     $script:samplesProjectId = $project.id
                     $script:samplesProjectName = $project.name
                 }
                 AfterAll {
                     if ($samplesProjectId) {
-                        Remove-TSProject -ProjectId $samplesProjectId
+                        Remove-TableauProject -ProjectId $samplesProjectId
                         $script:samplesProjectId = $null
                     }
                 }
                 It "Publish samples into project <samplesProjectName> on <ConfigFile.server>" {
-                    $project = Update-TSProject -ProjectId $samplesProjectId -PublishSamples
+                    $project = Set-TableauProject -ProjectId $samplesProjectId -PublishSamples
                     $project.id | Should -Be $samplesProjectId
                     # Start-Sleep -s 3
                 }
                 It "Get sample flow id from <ConfigFile.server>" {
-                    $flow = Get-TSFlow -Filter "projectName:eq:$samplesProjectName" | Select-Object -First 1
+                    $flow = Get-TableauFlow -Filter "projectName:eq:$samplesProjectName" | Select-Object -First 1
                     # if (-not $flow) { # fallback: perform filter in PS
-                    #     $flow = Get-TSFlow | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
+                    #     $flow = Get-TableauFlow | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
                     # }
                     $script:sampleflowId = $flow.id
                     $script:sampleFlowName = $flow.name
                     $sampleflowId | Should -BeOfType String
                 }
                 It "Get flows on <ConfigFile.server>" {
-                    $flows = Get-TSFlow
+                    $flows = Get-TableauFlow
                     ($flows | Measure-Object).Count | Should -BeGreaterThan 0
                     $flowId = $flows | Select-Object -First 1 -ExpandProperty id
                     $flowId | Should -BeOfType String
-                    $flow = Get-TSFlow -FlowId $flowId
+                    $flow = Get-TableauFlow -FlowId $flowId
                     $flow.id | Should -Be $flowId
-                    $connections = Get-TSFlowConnection -FlowId $flowId
+                    $connections = Get-TableauFlowConnection -FlowId $flowId
                     ($connections | Measure-Object).Count | Should -BeGreaterThan 0
                 }
                 It "Query flows with options on <ConfigFile.server>" {
-                    $flowName = Get-TSFlow | Select-Object -First 1 -ExpandProperty name
-                    $flows = Get-TSFlow -Filter "name:eq:$flowName" -Sort name:asc -Fields id,name
+                    $flowName = Get-TableauFlow | Select-Object -First 1 -ExpandProperty name
+                    $flows = Get-TableauFlow -Filter "name:eq:$flowName" -Sort name:asc -Fields id,name
                     ($flows | Measure-Object).Count | Should -BeGreaterOrEqual 1
                     ($flows | Get-Member -MemberType Property | Measure-Object).Count | Should -BeGreaterOrEqual 2
                 }
                 It "Query flows for current user on <ConfigFile.server>" {
-                    $flows = Get-TSFlowsForUser -UserId (Get-TSCurrentUserId)
+                    $flows = Get-TableauFlowsForUser -UserId (Get-TableauCurrentUserId)
                     ($flows | Measure-Object).Count | Should -BeGreaterThan 0
                     $flows | Select-Object -First 1 -ExpandProperty id | Should -BeOfType String
-                    $flows = Get-TSFlowsForUser -UserId (Get-TSCurrentUserId) -IsOwner
+                    $flows = Get-TableauFlowsForUser -UserId (Get-TableauCurrentUserId) -IsOwner
                     ($flows | Measure-Object).Count | Should -BeGreaterThan 0
                     $flows | Select-Object -First 1 -ExpandProperty id | Should -BeOfType String
                 }
                 It "Download sample flow from <ConfigFile.server>" {
-                    Export-TSFlow -FlowId $sampleflowId -OutFile "Tests/Output/$sampleFlowName.tflx"
+                    Export-TableauFlow -FlowId $sampleflowId -OutFile "Tests/Output/$sampleFlowName.tflx"
                     Test-Path -Path "Tests/Output/$sampleFlowName.tflx" | Should -BeTrue
                 }
                 It "Publish sample flow on <ConfigFile.server>" {
-                    $flow = Publish-TSFlow -Name $sampleFlowName -InFile "Tests/Output/$sampleFlowName.tflx" -ProjectId $samplesProjectId -Overwrite
+                    $flow = Publish-TableauFlow -Name $sampleFlowName -InFile "Tests/Output/$sampleFlowName.tflx" -ProjectId $samplesProjectId -Overwrite
                     $flow.id | Should -BeOfType String
                     $script:sampleFlowId = $flow.id
                 }
                 It "Publish sample flow (chunks) on <ConfigFile.server>" {
-                    $flow = Publish-TSFlow -Name $sampleFlowName -InFile "Tests/Output/$sampleFlowName.tflx" -ProjectId $samplesProjectId -Overwrite -Chunked
+                    $flow = Publish-TableauFlow -Name $sampleFlowName -InFile "Tests/Output/$sampleFlowName.tflx" -ProjectId $samplesProjectId -Overwrite -Chunked
                     $flow.id | Should -BeOfType String
                     $script:sampleFlowId = $flow.id
                 }
-                It "Download & remove previous flow revision on <ConfigFile.server>" {
-                    Set-ItResult -Skipped -Because "flow revisions are currently not supported via REST API"
-                    $revisions = Get-TSFlow -FlowId $sampleFlowId -Revisions
-                    if (($revisions | Measure-Object).Count -gt 1) {
-                        $revision = $revisions | Sort-Object revisionNumber -Descending | Select-Object -Skip 1 -First 1 -ExpandProperty revisionNumber
-                        Export-TSFlow -FlowId $sampleFlowId -Revision $revision -OutFile "Tests/Output/download_revision.tflx"
-                        Test-Path -Path "Tests/Output/download_revision.tflx" | Should -BeTrue
-                        Remove-Item -Path "Tests/Output/download_revision.tflx"
-                        Remove-TSFlow -FlowId $sampleFlowId -Revision $revision
-                    } else {
-                        Set-ItResult -Skipped -Because "only one revision was found"
-                    }
-                }
+                # It "Download & remove previous flow revision on <ConfigFile.server>" {
+                #     Set-ItResult -Skipped -Because "flow revisions are currently not supported via REST API"
+                #     $revisions = Get-TableauFlow -FlowId $sampleFlowId -Revisions
+                #     if (($revisions | Measure-Object).Count -gt 1) {
+                #         $revision = $revisions | Sort-Object revisionNumber -Descending | Select-Object -Skip 1 -First 1 -ExpandProperty revisionNumber
+                #         Export-TableauFlow -FlowId $sampleFlowId -Revision $revision -OutFile "Tests/Output/download_revision.tflx"
+                #         Test-Path -Path "Tests/Output/download_revision.tflx" | Should -BeTrue
+                #         Remove-Item -Path "Tests/Output/download_revision.tflx"
+                #         Remove-TableauFlow -FlowId $sampleFlowId -Revision $revision
+                #     } else {
+                #         Set-ItResult -Skipped -Because "only one revision was found"
+                #     }
+                # }
                 It "Download latest flow revision on <ConfigFile.server>" -Skip {
-                    $revision = Get-TSFlow -FlowId $sampleFlowId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
-                    Export-TSFlow -FlowId $sampleFlowId -Revision $revision -OutFile "Tests/Output/download_revision.tflx"
+                    $revision = Get-TableauFlow -FlowId $sampleFlowId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
+                    Export-TableauFlow -FlowId $sampleFlowId -Revision $revision -OutFile "Tests/Output/download_revision.tflx"
                     Test-Path -Path "Tests/Output/download_revision.tflx" | Should -BeTrue
                     Remove-Item -Path "Tests/Output/download_revision.tflx"
                 }
                 It "Add/remove tags for sample flow on <ConfigFile.server>" {
-                    Add-TSTagsToContent -FlowId $sampleFlowId -Tags "active","test"
-                    ((Get-TSFlow -FlowId $sampleFlowId).tags.tag | Measure-Object).Count | Should -Be 2
-                    Remove-TSTagFromContent -FlowId $sampleFlowId -Tag "test"
-                    ((Get-TSFlow -FlowId $sampleFlowId).tags.tag | Measure-Object).Count | Should -Be 1
-                    Remove-TSTagFromContent -FlowId $sampleFlowId -Tag "active"
-                    (Get-TSFlow -FlowId $sampleFlowId).tags | Should -BeNullOrEmpty
+                    Add-TableauContentTag -FlowId $sampleFlowId -Tags "active","test"
+                    ((Get-TableauFlow -FlowId $sampleFlowId).tags.tag | Measure-Object).Count | Should -Be 2
+                    Remove-TableauContentTag -FlowId $sampleFlowId -Tag "test"
+                    ((Get-TableauFlow -FlowId $sampleFlowId).tags.tag | Measure-Object).Count | Should -Be 1
+                    Remove-TableauContentTag -FlowId $sampleFlowId -Tag "active"
+                    (Get-TableauFlow -FlowId $sampleFlowId).tags | Should -BeNullOrEmpty
                 }
                 It "Query/remove/add/set flow permissions on <ConfigFile.server>" {
-                    $permissions = Get-TSContentPermission -FlowId $sampleFlowId
+                    $permissions = Get-TableauContentPermission -FlowId $sampleFlowId
                     $permissions.flow.id | Should -Be $sampleFlowId
                     $permissions.flow.name | Should -Be $sampleFlowName
-                    $savedPermissionTable = $permissions | ConvertTo-TSPermissionTable
+                    $savedPermissionTable = $permissions | ConvertTo-TableauPermissionTable
                     # remove all permissions for all grantees
-                    Remove-TSContentPermission -FlowId $sampleFlowId -All
-                    $permissions = Get-TSContentPermission -FlowId $sampleFlowId
+                    Remove-TableauContentPermission -FlowId $sampleFlowId -All
+                    $permissions = Get-TableauContentPermission -FlowId $sampleFlowId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # attempt to set permissions with empty capabilities
-                    $permissions = Set-TSContentPermission -FlowId $sampleFlowId -PermissionTable @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{}}
+                    $permissions = Set-TableauContentPermission -FlowId $sampleFlowId -PermissionTable @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{}}
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # add all possible permissions (random Allow/Deny) for the current user
                     $possibleCap = 'Read','ExportXml','Execute','WebAuthoringForFlows','Write','ChangeHierarchy','Delete','ChangePermissions'
@@ -1708,8 +1708,8 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     foreach ($cap in $possibleCap) {
                         $capabilitiesHashtable.Add($cap, (Get-Random -InputObject 'Allow','Deny'))
                     }
-                    $allPermissionTable += @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=$capabilitiesHashtable}
-                    $permissions = Add-TSContentPermission -FlowId $sampleFlowId -PermissionTable $allPermissionTable
+                    $allPermissionTable += @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=$capabilitiesHashtable}
+                    $permissions = Add-TableauContentPermission -FlowId $sampleFlowId -PermissionTable $allPermissionTable
                     $permissions.flow.id | Should -Be $sampleFlowId
                     $permissions.flow.name | Should -Be $sampleFlowName
                     $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
@@ -1720,19 +1720,19 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     foreach ($cap in $possibleCap) {
                         $capabilitiesHashtable.Add($cap, "Allow")
                     }
-                    $allPermissionTable += @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=$capabilitiesHashtable}
-                    $permissions = Set-TSContentPermission -FlowId $sampleFlowId -PermissionTable $allPermissionTable
+                    $allPermissionTable += @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=$capabilitiesHashtable}
+                    $permissions = Set-TableauContentPermission -FlowId $sampleFlowId -PermissionTable $allPermissionTable
                     $permissions.flow.id | Should -Be $sampleFlowId
                     $permissions.flow.name | Should -Be $sampleFlowName
                     $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
                     ($permissions.granteeCapabilities.capabilities.capability | Measure-Object).Count | Should -Be $possibleCap.Length
                     # remove all permissions for the current user
-                    Remove-TSContentPermission -FlowId $sampleFlowId -GranteeType User -GranteeId (Get-TSCurrentUserId)
-                    $permissions = Get-TSContentPermission -FlowId $sampleFlowId
+                    Remove-TableauContentPermission -FlowId $sampleFlowId -GranteeType User -GranteeId (Get-TableauCurrentUserId)
+                    $permissions = Get-TableauContentPermission -FlowId $sampleFlowId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # add back initial permissions configuration
                     if ($savedPermissionTable.Length -gt 0) {
-                        $permissions = Add-TSContentPermission -FlowId $sampleFlowId -PermissionTable $savedPermissionTable
+                        $permissions = Add-TableauContentPermission -FlowId $sampleFlowId -PermissionTable $savedPermissionTable
                         ($permissions.granteeCapabilities | Measure-Object).Count | Should -Be $savedPermissionTable.Length
                         # remove again each permission/capability one-by-one
                         if ($permissions.granteeCapabilities) {
@@ -1747,34 +1747,34 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                                 $_.capabilities.capability | ForEach-Object {
                                     $capName = $_.name
                                     $capMode = $_.mode
-                                    Remove-TSContentPermission -FlowId $sampleFlowId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode
+                                    Remove-TableauContentPermission -FlowId $sampleFlowId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode
                                 }
                             }
                         }
-                        $permissions = Get-TSContentPermission -FlowId $sampleFlowId
+                        $permissions = Get-TableauContentPermission -FlowId $sampleFlowId
                         $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     }
                     # permissions by template for the current user
                     foreach ($pt in 'View','Explore','None','Publish','Denied','Administer') {
-                        $permissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); template=$pt}
-                        $permissions = Set-TSContentPermission -FlowId $sampleFlowId -PermissionTable $permissionTable
+                        $permissionTable = @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); template=$pt}
+                        $permissions = Set-TableauContentPermission -FlowId $sampleFlowId -PermissionTable $permissionTable
                         $permissions.flow.id | Should -Be $sampleFlowId
-                        $actualPermissionTable = Get-TSContentPermission -FlowId $sampleFlowId | ConvertTo-TSPermissionTable
+                        $actualPermissionTable = Get-TableauContentPermission -FlowId $sampleFlowId | ConvertTo-TableauPermissionTable
                         switch ($pt) {
                             'View' {
-                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"}}
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{Read="Allow"}}
                             }
                             'Explore' {
-                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; ExportXml="Allow"}}
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{Read="Allow"; ExportXml="Allow"}}
                             }
                             'Publish' {
-                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; ExportXml="Allow"; Execute="Allow"; Write="Allow"; WebAuthoringForFlows="Allow"}}
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{Read="Allow"; ExportXml="Allow"; Execute="Allow"; Write="Allow"; WebAuthoringForFlows="Allow"}}
                             }
                             'Administer' {
-                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Allow"; ExportXml="Allow"; Execute="Allow"; Write="Allow"; WebAuthoringForFlows="Allow"; ChangeHierarchy="Allow"; Delete="Allow"; ChangePermissions="Allow"}}
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{Read="Allow"; ExportXml="Allow"; Execute="Allow"; Write="Allow"; WebAuthoringForFlows="Allow"; ChangeHierarchy="Allow"; Delete="Allow"; ChangePermissions="Allow"}}
                             }
                             'Denied' {
-                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TSCurrentUserId); capabilities=@{Read="Deny"; ExportXml="Deny"; Execute="Deny"; Write="Deny"; WebAuthoringForFlows="Deny"; ChangeHierarchy="Deny"; Delete="Deny"; ChangePermissions="Deny"}}
+                                $expectedPermissionTable = @{granteeType="User"; granteeId=(Get-TableauCurrentUserId); capabilities=@{Read="Deny"; ExportXml="Deny"; Execute="Deny"; Write="Deny"; WebAuthoringForFlows="Deny"; ChangeHierarchy="Deny"; Delete="Deny"; ChangePermissions="Deny"}}
                             }
                             default {
                                 $expectedPermissionTable = $null
@@ -1784,26 +1784,26 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     }
                 }
                 It "Remove sample flow on <ConfigFile.server>" {
-                    Remove-TSFlow -FlowId $sampleFlowId
+                    Remove-TableauFlow -FlowId $sampleFlowId
                 }
                 It "Publish flow with invalid extension on <ConfigFile.server>" {
-                    {Publish-TSFlow -Name "Flow" -InFile "Tests/Assets/Misc/Flow.txt" -ProjectId $samplesProjectId} | Should -Throw
+                    {Publish-TableauFlow -Name "Flow" -InFile "Tests/Assets/Misc/Flow.txt" -ProjectId $samplesProjectId} | Should -Throw
                 }
                 It "Publish flow with invalid contents on <ConfigFile.server>" {
-                    {Publish-TSFlow -Name "invalid" -InFile "Tests/Assets/Misc/invalid.tflx" -ProjectId $samplesProjectId} | Should -Throw
+                    {Publish-TableauFlow -Name "invalid" -InFile "Tests/Assets/Misc/invalid.tflx" -ProjectId $samplesProjectId} | Should -Throw
                 }
                 It "Publish and check flow with output steps on <ConfigFile.server>" -Skip {
-                    $flow = Publish-TSFlow -Name $sampleFlowName -InFile "Tests/Output/$sampleFlowName.tflx" -ProjectId $samplesProjectId -Overwrite
+                    $flow = Publish-TableauFlow -Name $sampleFlowName -InFile "Tests/Output/$sampleFlowName.tflx" -ProjectId $samplesProjectId -Overwrite
                     $flow.id | Should -BeOfType String
-                    $outputSteps = Get-TSFlow -FlowId $flow.id -OutputSteps
+                    $outputSteps = Get-TableauFlow -FlowId $flow.id -OutputSteps
                     ($outputSteps | Measure-Object).Count | Should -BeGreaterThan 0
                     $outputSteps.id | Select-Object -First 1 -ExpandProperty id | Should -BeOfType String
                 }
                 It "Publish flow with connections on <ConfigFile.server>" -Skip {
-                    Publish-TSFlow -Name "Flow" -InFile "Tests/Assets/Misc/Flow.txt" -ProjectId $samplesProjectId
+                    Publish-TableauFlow -Name "Flow" -InFile "Tests/Assets/Misc/Flow.txt" -ProjectId $samplesProjectId
                 }
                 It "Publish flow with credentials on <ConfigFile.server>" -Skip {
-                    Publish-TSFlow -Name "Flow" -InFile "Tests/Assets/Misc/Flow.txt" -ProjectId $samplesProjectId
+                    Publish-TableauFlow -Name "Flow" -InFile "Tests/Assets/Misc/Flow.txt" -ProjectId $samplesProjectId
                 }
                 Context "Publish / download flows from test assets on <ConfigFile.server>" -Tag FlowSamples -ForEach $FlowFiles {
                     BeforeAll {
@@ -1811,17 +1811,17 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                         $script:sampleFlowFileName = (Get-Item -LiteralPath $_).Name
                     }
                     It "Publish file ""<sampleFlowFileName>"" into flow ""<sampleFlowName>"" on <ConfigFile.server>" {
-                        $flow = Publish-TSFlow -Name $sampleFlowName -InFile $_ -ProjectId $samplesProjectId -Overwrite
+                        $flow = Publish-TableauFlow -Name $sampleFlowName -InFile $_ -ProjectId $samplesProjectId -Overwrite
                         $flow.id | Should -BeOfType String
                         $script:sampleflowId = $flow.id
                     }
                     It "Publish file ""<sampleFlowFileName>"" into flow ""<sampleFlowName>"" on <ConfigFile.server> (Chunked)" {
-                        $flow = Publish-TSFlow -Name $sampleFlowName -InFile $_ -ProjectId $samplesProjectId -Overwrite -Chunked
+                        $flow = Publish-TableauFlow -Name $sampleFlowName -InFile $_ -ProjectId $samplesProjectId -Overwrite -Chunked
                         $flow.id | Should -BeOfType String
                         $script:sampleflowId = $flow.id
                     }
                     It "Download flow ""<sampleFlowName>"" from <ConfigFile.server>" {
-                        Export-TSFlow -FlowId $sampleflowId -OutFile "Tests/Output/download.tflx"
+                        Export-TableauFlow -FlowId $sampleflowId -OutFile "Tests/Output/download.tflx"
                         Test-Path -Path "Tests/Output/download.tflx" | Should -BeTrue
                         Remove-Item -Path "Tests/Output/download.tflx"
                     }
@@ -1830,85 +1830,85 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
         }
         Context "Content filtering" -Tag QueryFilter {
             BeforeAll {
-                $project = Add-TSProject -Name (New-Guid)
+                $project = New-TableauProject -Name (New-Guid)
                 $script:samplesProjectId = $project.id
                 $script:samplesProjectName = $project.name
             }
             AfterAll {
                 if ($samplesProjectId) {
-                    # Remove-TSProject -ProjectId $samplesProjectId
+                    # Remove-TableauProject -ProjectId $samplesProjectId
                     $script:samplesProjectId = $null
                 }
             }
             It "Publish samples into project <samplesProjectName> on <ConfigFile.server>" {
-                $project = Update-TSProject -ProjectId $samplesProjectId -PublishSamples
+                $project = Set-TableauProject -ProjectId $samplesProjectId -PublishSamples
                 $project.id | Should -Be $samplesProjectId
                 # Start-Sleep -s 3
             }
             It "Filter users on <ConfigFile.server>" {
-                $user = Get-TSUser -UserId (Get-TSCurrentUserId)
-                Get-TSUser -Filter "name:eq:$($user.name)" | Should -Not -BeNullOrEmpty
-                Get-TSUser -Filter "siteRole:eq:$($user.siteRole)" | Should -Not -BeNullOrEmpty
-                Get-TSUser -Filter "friendlyName:eq:$($user.fullName)" | Should -Not -BeNullOrEmpty
+                $user = Get-TableauUser -UserId (Get-TableauCurrentUserId)
+                Get-TableauUser -Filter "name:eq:$($user.name)" | Should -Not -BeNullOrEmpty
+                Get-TableauUser -Filter "siteRole:eq:$($user.siteRole)" | Should -Not -BeNullOrEmpty
+                Get-TableauUser -Filter "friendlyName:eq:$($user.fullName)" | Should -Not -BeNullOrEmpty
             }
             It "Filter groups on <ConfigFile.server>" {
-                Get-TSGroup -Filter "name:eq:All Users" | Should -Not -BeNullOrEmpty
-                Get-TSGroup -Filter "isLocal:eq:true" | Should -Not -BeNullOrEmpty
+                Get-TableauGroup -Filter "name:eq:All Users" | Should -Not -BeNullOrEmpty
+                Get-TableauGroup -Filter "isLocal:eq:true" | Should -Not -BeNullOrEmpty
             }
             It "Filter projects on <ConfigFile.server>" {
-                $project = Get-TSProject -Filter "name:eq:$samplesProjectName"
+                $project = Get-TableauProject -Filter "name:eq:$samplesProjectName"
                 $project | Should -Not -BeNullOrEmpty
-                Get-TSProject -Filter "name:eq:Default","topLevelProject:eq:true" | Should -Not -BeNullOrEmpty
+                Get-TableauProject -Filter "name:eq:Default","topLevelProject:eq:true" | Should -Not -BeNullOrEmpty
             }
             It "Filter workbooks on <ConfigFile.server>" {
-                $workbook = Get-TSWorkbook -Filter "projectName:eq:$samplesProjectName" | Select-Object -First 1
+                $workbook = Get-TableauWorkbook -Filter "projectName:eq:$samplesProjectName" | Select-Object -First 1
                 $workbook | Should -Not -BeNullOrEmpty
-                Get-TSWorkbook -Filter "name:eq:$($workbook.name)" | Should -Not -BeNullOrEmpty
-                Get-TSWorkbook -Filter "contentUrl:eq:$($workbook.contentUrl)" | Should -Not -BeNullOrEmpty
-                Get-TSWorkbook -Filter "displayTabs:eq:$($workbook.showTabs)" | Should -Not -BeNullOrEmpty
+                Get-TableauWorkbook -Filter "name:eq:$($workbook.name)" | Should -Not -BeNullOrEmpty
+                Get-TableauWorkbook -Filter "contentUrl:eq:$($workbook.contentUrl)" | Should -Not -BeNullOrEmpty
+                Get-TableauWorkbook -Filter "displayTabs:eq:$($workbook.showTabs)" | Should -Not -BeNullOrEmpty
             }
             It "Filter views by project name on <ConfigFile.server>" {
-                $workbook = Get-TSWorkbook -Filter "projectName:eq:$samplesProjectName" | Select-Object -First 1
-                $view = Get-TSView -Filter "projectName:eq:$samplesProjectName" -Fields id,name,sheetType,contentUrl | Select-Object -First 1
+                $workbook = Get-TableauWorkbook -Filter "projectName:eq:$samplesProjectName" | Select-Object -First 1
+                $view = Get-TableauView -Filter "projectName:eq:$samplesProjectName" -Fields id,name,sheetType,contentUrl | Select-Object -First 1
                 $view | Should -Not -BeNullOrEmpty
                 $viewUrl = $view.contentUrl.Split("/")[-1]
-                Get-TSView -Filter "name:eq:$($view.name)" | Should -Not -BeNullOrEmpty
-                Get-TSView -Filter "sheetType:eq:$($view.sheetType)" | Should -Not -BeNullOrEmpty
-                Get-TSView -Filter "viewUrlName:eq:$viewUrl" | Should -Not -BeNullOrEmpty
-                Get-TSView -Filter "workbookName:eq:$($workbook.name)" | Should -Not -BeNullOrEmpty
+                Get-TableauView -Filter "name:eq:$($view.name)" | Should -Not -BeNullOrEmpty
+                Get-TableauView -Filter "sheetType:eq:$($view.sheetType)" | Should -Not -BeNullOrEmpty
+                Get-TableauView -Filter "viewUrlName:eq:$viewUrl" | Should -Not -BeNullOrEmpty
+                Get-TableauView -Filter "workbookName:eq:$($workbook.name)" | Should -Not -BeNullOrEmpty
             }
             # It "Filter custom views by <> on <ConfigFile.server>" {
             # }
             It "Filter datasources by project name on <ConfigFile.server>" {
-                if ((Get-TSRestApiVersion) -lt [version]3.13 -or (Get-TSRestApiVersion) -gt [version]3.17) { # this filter doesn't work in API 3.13 to 3.17
-                    $datasources = Get-TSDatasource -Filter "projectName:eq:$samplesProjectName"
+                if ((Get-TableauRestVersion) -lt [version]3.13 -or (Get-TableauRestVersion) -gt [version]3.17) { # this filter doesn't work in API 3.13 to 3.17
+                    $datasources = Get-TableauDatasource -Filter "projectName:eq:$samplesProjectName"
                     $datasources.Length | Should -BeGreaterThan 0
                 } else {
                     Write-Verbose "Filtering by projectName doesn't work for datasources in this version"
                 }
-                $datasource = Get-TSDatasource | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
+                $datasource = Get-TableauDatasource | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
                 $datasource | Should -Not -BeNullOrEmpty
-                Get-TSDatasource -Filter "name:eq:$($datasource.name)" | Should -Not -BeNullOrEmpty
+                Get-TableauDatasource -Filter "name:eq:$($datasource.name)" | Should -Not -BeNullOrEmpty
             }
             It "Filter flows by project name on <ConfigFile.server>" {
-                $flow = Get-TSFlow -Filter "projectName:eq:$samplesProjectName" | Select-Object -First 1
+                $flow = Get-TableauFlow -Filter "projectName:eq:$samplesProjectName" | Select-Object -First 1
                 $flow | Should -Not -BeNullOrEmpty
-                Get-TSFlow -Filter "projectId:eq:$($samplesProjectId)" | Should -Not -BeNullOrEmpty
-                Get-TSFlow -Filter "name:eq:$($flow.name)" | Should -Not -BeNullOrEmpty
+                Get-TableauFlow -Filter "projectId:eq:$($samplesProjectId)" | Should -Not -BeNullOrEmpty
+                Get-TableauFlow -Filter "name:eq:$($flow.name)" | Should -Not -BeNullOrEmpty
             }
             It "Filter flow runs on <ConfigFile.server>" {
-                $flowRun = Get-TSFlowRun | Select-Object -First 1
+                $flowRun = Get-TableauFlowRun | Select-Object -First 1
                 if ($flowRun) {
-                    Get-TSFlowRun -Filter "flowId:eq:$($flowRun.flowId)" | Should -Not -BeNullOrEmpty
+                    Get-TableauFlowRun -Filter "flowId:eq:$($flowRun.flowId)" | Should -Not -BeNullOrEmpty
                 } else {
                     Set-ItResult -Skipped -Because "flow runs not found"
                 }
             }
             It "Filter jobs on <ConfigFile.server>" {
-                $job = Get-TSJob | Select-Object -First 1
+                $job = Get-TableauJob | Select-Object -First 1
                 if ($job) {
-                    Get-TSJob -Filter "jobType:eq:$($job.jobType)" | Should -Not -BeNullOrEmpty
-                    Get-TSJob -Filter "priority:eq:$($job.priority)" | Should -Not -BeNullOrEmpty
+                    Get-TableauJob -Filter "jobType:eq:$($job.jobType)" | Should -Not -BeNullOrEmpty
+                    Get-TableauJob -Filter "priority:eq:$($job.priority)" | Should -Not -BeNullOrEmpty
                 } else {
                     Set-ItResult -Skipped -Because "jobs not found"
                 }
@@ -1918,71 +1918,71 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
         }
         Context "Favorite operations" -Tag Favorite {
             BeforeAll {
-                $project = Add-TSProject -Name (New-Guid)
+                $project = New-TableauProject -Name (New-Guid)
                 $script:samplesProjectId = $project.id
                 $script:samplesProjectName = $project.name
             }
             AfterAll {
                 if ($samplesProjectId) {
-                    Remove-TSProject -ProjectId $samplesProjectId
+                    Remove-TableauProject -ProjectId $samplesProjectId
                     $script:samplesProjectId = $null
                 }
             }
             It "Publish samples into project <samplesProjectName> on <ConfigFile.server>" {
-                $project = Update-TSProject -ProjectId $samplesProjectId -PublishSamples
+                $project = Set-TableauProject -ProjectId $samplesProjectId -PublishSamples
                 $project.id | Should -Be $samplesProjectId
                 # Start-Sleep -s 3
             }
             It "Add sample contents to user favorites on <ConfigFile.server>" {
-                Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -ProjectId $samplesProjectId
-                $workbooks = Get-TSWorkbook -Filter "projectName:eq:$samplesProjectName"
+                Add-TableauUserFavorite -UserId (Get-TableauCurrentUserId) -ProjectId $samplesProjectId
+                $workbooks = Get-TableauWorkbook -Filter "projectName:eq:$samplesProjectName"
                 # if (-not $workbooks) { # fallback: perform filter in PS
-                #     $workbooks = Get-TSWorkbook | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
+                #     $workbooks = Get-TableauWorkbook | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
                 # }
                 $workbooks | ForEach-Object {
-                    Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -WorkbookId $_.id
+                    Add-TableauUserFavorite -UserId (Get-TableauCurrentUserId) -WorkbookId $_.id
                 }
-                $datasources = Get-TSDatasource -Filter "projectName:eq:$samplesProjectName"
+                $datasources = Get-TableauDatasource -Filter "projectName:eq:$samplesProjectName"
                 if (-not $datasources) { # fallback: perform filter in PS
-                    $datasources = Get-TSDatasource | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
+                    $datasources = Get-TableauDatasource | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
                 }
                 $datasources | ForEach-Object {
-                    Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -DatasourceId $_.id
+                    Add-TableauUserFavorite -UserId (Get-TableauCurrentUserId) -DatasourceId $_.id
                 }
-                $views = Get-TSView -Filter "projectName:eq:$samplesProjectName"
+                $views = Get-TableauView -Filter "projectName:eq:$samplesProjectName"
                 # if (-not $views) { # fallback: perform filter in PS
-                #     $views = Get-TSView | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
+                #     $views = Get-TableauView | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
                 # }
                 $views | ForEach-Object {
-                    Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -ViewId $_.id
+                    Add-TableauUserFavorite -UserId (Get-TableauCurrentUserId) -ViewId $_.id
                 }
-                $flows = Get-TSFlow -Filter "projectName:eq:$samplesProjectName"
+                $flows = Get-TableauFlow -Filter "projectName:eq:$samplesProjectName"
                 # if (-not $flows) { # fallback: perform filter in PS
-                #     $flows = Get-TSFlow | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
+                #     $flows = Get-TableauFlow | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
                 # }
                 $flows | ForEach-Object {
-                    Add-TSUserFavorite -UserId (Get-TSCurrentUserId) -FlowId $_.id
+                    Add-TableauUserFavorite -UserId (Get-TableauCurrentUserId) -FlowId $_.id
                 }
             }
             It "Get/reorder user favorites for sample contents on <ConfigFile.server>" {
-                $workbooks = Get-TSWorkbook -Filter "projectName:eq:$samplesProjectName"
+                $workbooks = Get-TableauWorkbook -Filter "projectName:eq:$samplesProjectName"
                 $workbook_id = $workbooks | Select-Object -First 1 -ExpandProperty id
-                $datasources = Get-TSDatasource -Filter "projectName:eq:$samplesProjectName"
+                $datasources = Get-TableauDatasource -Filter "projectName:eq:$samplesProjectName"
                 if (-not $datasources) { # fallback: perform filter in PS
-                    $datasources = Get-TSDatasource | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId}
+                    $datasources = Get-TableauDatasource | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId}
                 }
                 $datasource_id = $datasources | Select-Object -First 1 -ExpandProperty id
-                $views = Get-TSView -Filter "projectName:eq:$samplesProjectName"
+                $views = Get-TableauView -Filter "projectName:eq:$samplesProjectName"
                 $totalCount = $datasources.Length + $workbooks.Length + $views.Length
-                $favorites = Get-TSUserFavorite -UserId (Get-TSCurrentUserId)
+                $favorites = Get-TableauUserFavorite -UserId (Get-TableauCurrentUserId)
                 ($favorites | Measure-Object).Count | Should -BeGreaterThan $totalCount
                 # swap favorites order for first workbook/datasource and sample
                 $pos_project = $favorites | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1 -ExpandProperty position
                 # if ($workbook_id) {
                     $pos_workbook = $favorites | Where-Object -FilterScript {$_.workbook.id -eq $workbook_id} | Select-Object -First 1 -ExpandProperty position
                     $pos_workbook | Should -BeLessThan $pos_project
-                    Move-TSUserFavorite -UserId (Get-TSCurrentUserId) -FavoriteId $workbook_id -FavoriteType Workbook -AfterFavoriteId $samplesProjectId -AfterFavoriteType Project
-                    $favorites = Get-TSUserFavorite -UserId (Get-TSCurrentUserId)
+                    Move-TableauUserFavorite -UserId (Get-TableauCurrentUserId) -FavoriteId $workbook_id -FavoriteType Workbook -AfterFavoriteId $samplesProjectId -AfterFavoriteType Project
+                    $favorites = Get-TableauUserFavorite -UserId (Get-TableauCurrentUserId)
                     $pos_project = $favorites | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1 -ExpandProperty position
                     $pos_workbook = $favorites | Where-Object -FilterScript {$_.workbook.id -eq $workbook_id} | Select-Object -First 1 -ExpandProperty position
                     $pos_workbook | Should -BeGreaterThan $pos_project
@@ -1990,8 +1990,8 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 # if ($datasource_id) {
                     $pos_datasource = $favorites | Where-Object -FilterScript {$_.datasource.id -eq $datasource_id} | Select-Object -First 1 -ExpandProperty position
                     $pos_datasource | Should -BeLessThan $pos_project
-                    Move-TSUserFavorite -UserId (Get-TSCurrentUserId) -FavoriteId $datasource_id -FavoriteType Datasource -AfterFavoriteId $samplesProjectId -AfterFavoriteType Project
-                    $favorites = Get-TSUserFavorite -UserId (Get-TSCurrentUserId)
+                    Move-TableauUserFavorite -UserId (Get-TableauCurrentUserId) -FavoriteId $datasource_id -FavoriteType Datasource -AfterFavoriteId $samplesProjectId -AfterFavoriteType Project
+                    $favorites = Get-TableauUserFavorite -UserId (Get-TableauCurrentUserId)
                     $pos_project = $favorites | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1 -ExpandProperty position
                     $pos_datasource = $favorites | Where-Object -FilterScript {$_.datasource.id -eq $datasource_id} | Select-Object -First 1 -ExpandProperty position
                     $pos_datasource | Should -BeGreaterThan $pos_project
@@ -2000,30 +2000,30 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $pos_view0 = $favorites | Where-Object -FilterScript {$_.view.id -eq $views[0].id} | Select-Object -First 1 -ExpandProperty position
                     $pos_view1 = $favorites | Where-Object -FilterScript {$_.view.id -eq $views[1].id} | Select-Object -First 1 -ExpandProperty position
                     $pos_view1 | Should -BeLessThan $pos_view0
-                    Move-TSUserFavorite -UserId (Get-TSCurrentUserId) -FavoriteId $views[1].id -FavoriteType View -AfterFavoriteId $views[0].id -AfterFavoriteType View
-                    $favorites = Get-TSUserFavorite -UserId (Get-TSCurrentUserId)
+                    Move-TableauUserFavorite -UserId (Get-TableauCurrentUserId) -FavoriteId $views[1].id -FavoriteType View -AfterFavoriteId $views[0].id -AfterFavoriteType View
+                    $favorites = Get-TableauUserFavorite -UserId (Get-TableauCurrentUserId)
                     $pos_view0 = $favorites | Where-Object -FilterScript {$_.view.id -eq $views[0].id} | Select-Object -First 1 -ExpandProperty position
                     $pos_view1 = $favorites | Where-Object -FilterScript {$_.view.id -eq $views[1].id} | Select-Object -First 1 -ExpandProperty position
                     $pos_view1| Should -BeGreaterThan $pos_view0
                 }
             }
             It "Remove sample contents from user favorites on <ConfigFile.server>" {
-                Remove-TSUserFavorite -UserId (Get-TSCurrentUserId) -ProjectId $samplesProjectId
-                $datasources = Get-TSDatasource -Filter "projectName:eq:$samplesProjectName"
+                Remove-TableauUserFavorite -UserId (Get-TableauCurrentUserId) -ProjectId $samplesProjectId
+                $datasources = Get-TableauDatasource -Filter "projectName:eq:$samplesProjectName"
                 if (-not $datasources) { # fallback: perform filter in PS
-                    $datasources = Get-TSDatasource | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId}
+                    $datasources = Get-TableauDatasource | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId}
                 }
                 $datasources | ForEach-Object {
-                    Remove-TSUserFavorite -UserId (Get-TSCurrentUserId) -DatasourceId $_.id
+                    Remove-TableauUserFavorite -UserId (Get-TableauCurrentUserId) -DatasourceId $_.id
                 }
-                Get-TSWorkbook -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
-                    Remove-TSUserFavorite -UserId (Get-TSCurrentUserId) -WorkbookId $_.id
+                Get-TableauWorkbook -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
+                    Remove-TableauUserFavorite -UserId (Get-TableauCurrentUserId) -WorkbookId $_.id
                 }
-                Get-TSView -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
-                    Remove-TSUserFavorite -UserId (Get-TSCurrentUserId) -ViewId $_.id
+                Get-TableauView -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
+                    Remove-TableauUserFavorite -UserId (Get-TableauCurrentUserId) -ViewId $_.id
                 }
-                Get-TSFlow -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
-                    Remove-TSUserFavorite -UserId (Get-TSCurrentUserId) -FlowId $_.id
+                Get-TableauFlow -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
+                    Remove-TableauUserFavorite -UserId (Get-TableauCurrentUserId) -FlowId $_.id
                 }
             }
         }
@@ -2031,7 +2031,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             It "Add new schedule on <ConfigFile.server>" {
                 if ($ConfigFile.server_admin) {
                     $scheduleName = New-Guid
-                    $schedule = Add-TSSchedule -Name $scheduleName -Type Extract -Frequency Daily -StartTime "11:30:00"
+                    $schedule = New-TableauSchedule -Name $scheduleName -Type Extract -Frequency Daily -StartTime "11:30:00"
                     $schedule.id | Should -BeOfType String
                     $script:testScheduleId = $schedule.id
                 } else {
@@ -2040,57 +2040,57 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             }
             It "Update schedule <testScheduleId> on <ConfigFile.server>" {
                 if ($ConfigFile.server_admin -and $testScheduleId) {
-                    $schedule = Update-TSSchedule -ScheduleId $testScheduleId -State Suspended -Priority 10 -Frequency Daily -StartTime "13:45:00"
+                    $schedule = Set-TableauSchedule -ScheduleId $testScheduleId -State Suspended -Priority 10 -Frequency Daily -StartTime "13:45:00"
                     $schedule.state | Should -Be "Suspended"
                     $schedule.priority | Should -Be 10
                     $schedule.frequencyDetails.start | Should -Be "13:45:00"
                     $scheduleNewName = New-Guid
-                    $schedule = Update-TSSchedule -ScheduleId $testScheduleId -Name $scheduleNewName -State Active -ExecutionOrder Serial
+                    $schedule = Set-TableauSchedule -ScheduleId $testScheduleId -Name $scheduleNewName -State Active -ExecutionOrder Serial
                     $schedule.state | Should -Be "Active"
                     $schedule.executionOrder | Should -Be "Serial"
                     $schedule.name | Should -Be $scheduleNewName
-                    $schedule = Update-TSSchedule -ScheduleId $testScheduleId -Frequency Hourly -StartTime "12:00:00" -EndTime "16:00:00" -IntervalHours 1
+                    $schedule = Set-TableauSchedule -ScheduleId $testScheduleId -Frequency Hourly -StartTime "12:00:00" -EndTime "16:00:00" -IntervalHours 1
                     $schedule.frequency | Should -Be "Hourly"
                     $schedule.frequencyDetails.start | Should -Be "12:00:00"
                     $schedule.frequencyDetails.intervals.interval.hours | Should -Be "1"
                     $schedule.frequencyDetails.end | Should -Be "16:00:00"
-                    $schedule = Update-TSSchedule -ScheduleId $testScheduleId -Frequency Hourly -StartTime "12:00:00" -EndTime "18:00:00" -IntervalHours 2
+                    $schedule = Set-TableauSchedule -ScheduleId $testScheduleId -Frequency Hourly -StartTime "12:00:00" -EndTime "18:00:00" -IntervalHours 2
                     $schedule.frequency | Should -Be "Hourly"
                     $schedule.frequencyDetails.intervals.interval.hours | Should -Be "2"
-                    $schedule = Update-TSSchedule -ScheduleId $testScheduleId -Frequency Hourly -StartTime "08:00:00" -EndTime "18:00:00" -IntervalHours 4
+                    $schedule = Set-TableauSchedule -ScheduleId $testScheduleId -Frequency Hourly -StartTime "08:00:00" -EndTime "18:00:00" -IntervalHours 4
                     $schedule.frequency | Should -Be "Hourly"
                     $schedule.frequencyDetails.intervals.interval.hours | Should -Be "4"
-                    $schedule = Update-TSSchedule -ScheduleId $testScheduleId -Frequency Hourly -StartTime "08:00:00" -EndTime "18:00:00" -IntervalHours 6
+                    $schedule = Set-TableauSchedule -ScheduleId $testScheduleId -Frequency Hourly -StartTime "08:00:00" -EndTime "18:00:00" -IntervalHours 6
                     $schedule.frequency | Should -Be "Hourly"
                     $schedule.frequencyDetails.intervals.interval.hours | Should -Be "6"
-                    $schedule = Update-TSSchedule -ScheduleId $testScheduleId -Frequency Hourly -StartTime "08:00:00" -EndTime "18:00:00" -IntervalHours 8
+                    $schedule = Set-TableauSchedule -ScheduleId $testScheduleId -Frequency Hourly -StartTime "08:00:00" -EndTime "18:00:00" -IntervalHours 8
                     $schedule.frequency | Should -Be "Hourly"
                     $schedule.frequencyDetails.intervals.interval.hours | Should -Be "8"
-                    $schedule = Update-TSSchedule -ScheduleId $testScheduleId -Frequency Hourly -StartTime "08:00:00" -EndTime "22:00:00" -IntervalHours 12
+                    $schedule = Set-TableauSchedule -ScheduleId $testScheduleId -Frequency Hourly -StartTime "08:00:00" -EndTime "22:00:00" -IntervalHours 12
                     $schedule.frequency | Should -Be "Hourly"
                     $schedule.frequencyDetails.intervals.interval.hours | Should -Be "12"
-                    $schedule = Update-TSSchedule -ScheduleId $testScheduleId -Frequency Hourly -StartTime "14:00:00" -EndTime "15:30:00" -IntervalMinutes 30
+                    $schedule = Set-TableauSchedule -ScheduleId $testScheduleId -Frequency Hourly -StartTime "14:00:00" -EndTime "15:30:00" -IntervalMinutes 30
                     $schedule.frequency | Should -Be "Hourly"
                     $schedule.frequencyDetails.start | Should -Be "14:00:00"
                     $schedule.frequencyDetails.intervals.interval.minutes | Should -Be "30"
                     $schedule.frequencyDetails.end | Should -Be "15:30:00"
-                    $schedule = Update-TSSchedule -ScheduleId $testScheduleId -Frequency Daily -StartTime "14:30:00" -EndTime "15:00:00" -IntervalMinutes 15
+                    $schedule = Set-TableauSchedule -ScheduleId $testScheduleId -Frequency Daily -StartTime "14:30:00" -EndTime "15:00:00" -IntervalMinutes 15
                     $schedule.frequency | Should -Be "Daily"
                     $schedule.frequencyDetails.start | Should -Be "14:30:00"
                     $schedule.frequencyDetails.end | Should -BeNullOrEmpty
                     $schedule.frequencyDetails.intervals.interval.minutes | Should -BeNullOrEmpty
-                    $schedule = Update-TSSchedule -ScheduleId $testScheduleId -Frequency Weekly -StartTime "10:00:00" -IntervalWeekdays Sunday
+                    $schedule = Set-TableauSchedule -ScheduleId $testScheduleId -Frequency Weekly -StartTime "10:00:00" -IntervalWeekdays Sunday
                     $schedule.frequency | Should -Be "Weekly"
                     $schedule.frequencyDetails.start | Should -Be "10:00:00"
                     $schedule.frequencyDetails.intervals.interval | Should -HaveCount 1
                     $schedule.frequencyDetails.intervals.interval.weekDay | Should -Be "Sunday"
-                    $schedule = Update-TSSchedule -ScheduleId $testScheduleId -Frequency Weekly -StartTime "10:00:00" -IntervalWeekdays Monday,Wednesday
+                    $schedule = Set-TableauSchedule -ScheduleId $testScheduleId -Frequency Weekly -StartTime "10:00:00" -IntervalWeekdays Monday,Wednesday
                     $schedule.frequency | Should -Be "Weekly"
                     $schedule.frequencyDetails.intervals.interval | Should -HaveCount 2
                     $schedule.frequencyDetails.intervals.interval.weekDay | Should -Contain "Monday"
                     $schedule.frequencyDetails.intervals.interval.weekDay | Should -Contain "Wednesday"
                     # note: updating monthly schedule via REST API doesn't seem to work
-                    # $schedule = Update-TSSchedule -ScheduleId $testScheduleId -Frequency Monthly -StartTime "08:00:00" -IntervalMonthday 3
+                    # $schedule = Set-TableauSchedule -ScheduleId $testScheduleId -Frequency Monthly -StartTime "08:00:00" -IntervalMonthday 3
                     # $schedule.frequency | Should -Be "Monthly"
                     # $schedule.frequencyDetails.start | Should -Be "08:00:00"
                     # $schedule.frequencyDetails.intervals.interval.monthDay | Should -Be "3"
@@ -2099,25 +2099,25 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 }
             }
             It "Query schedules on <ConfigFile.server>" {
-                $schedules = Get-TSSchedule
+                $schedules = Get-TableauSchedule
                 ($schedules | Measure-Object).Count | Should -BeGreaterThan 0
                 if ($testScheduleId) {
                     $schedules | Where-Object id -eq $testScheduleId | Should -Not -BeNullOrEmpty
-                    $schedule = Get-TSSchedule -ScheduleId $testScheduleId
+                    $schedule = Get-TableauSchedule -ScheduleId $testScheduleId
                     $schedule.id | Should -Be $testScheduleId
                 } else {
                     $firstScheduleId = $schedules | Select-Object -First 1 -ExpandProperty id
-                    $schedule = Get-TSSchedule -ScheduleId $firstScheduleId
+                    $schedule = Get-TableauSchedule -ScheduleId $firstScheduleId
                     $schedule.id | Should -Be $firstScheduleId
                 }
             }
             It "Query extract refresh tasks on <ConfigFile.server>" {
-                $extractScheduleId = Get-TSSchedule | Where-Object type -eq "Extract" | Select-Object -First 1 -ExpandProperty id
-                (Get-TSExtractRefreshTasksInSchedule -ScheduleId $extractScheduleId | Measure-Object).Count | Should -BeGreaterOrEqual 0
+                $extractScheduleId = Get-TableauSchedule | Where-Object type -eq "Extract" | Select-Object -First 1 -ExpandProperty id
+                (Get-TableauExtractRefreshTask -ScheduleId $extractScheduleId | Measure-Object).Count | Should -BeGreaterOrEqual 0
             }
             It "Remove schedule <testScheduleId> on <ConfigFile.server>" {
                 if ($ConfigFile.server_admin -and $testScheduleId) {
-                    $response = Remove-TSSchedule -ScheduleId $testScheduleId
+                    $response = Remove-TableauSchedule -ScheduleId $testScheduleId
                     $response | Should -BeOfType String
                     $script:testScheduleId = $null
                 } else {
@@ -2126,19 +2126,19 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             }
             It "Add/remove monthly schedule on <ConfigFile.server>" {
                 if ($ConfigFile.server_admin) {
-                    $schedule = Add-TSSchedule -Name (New-Guid) -Type Extract -Frequency Monthly -StartTime "08:00:00" -IntervalMonthday 3
+                    $schedule = New-TableauSchedule -Name (New-Guid) -Type Extract -Frequency Monthly -StartTime "08:00:00" -IntervalMonthday 3
                     $schedule.frequency | Should -Be "Monthly"
                     $schedule.state | Should -Be "Active"
                     $schedule.type | Should -Be "Extract"
                     $schedule.frequencyDetails.intervals.interval.monthDay | Should -Be "3"
-                    $response = Remove-TSSchedule -ScheduleId $schedule.id
+                    $response = Remove-TableauSchedule -ScheduleId $schedule.id
                     $response | Should -BeOfType String
-                    $schedule = Add-TSSchedule -Name (New-Guid) -Type Subscription -Frequency Monthly -StartTime "08:00:00" -IntervalMonthday 0
+                    $schedule = New-TableauSchedule -Name (New-Guid) -Type Subscription -Frequency Monthly -StartTime "08:00:00" -IntervalMonthday 0
                     $schedule.frequency | Should -Be "Monthly"
                     $schedule.state | Should -Be "Active"
                     $schedule.type | Should -Be "Subscription"
                     $schedule.frequencyDetails.intervals.interval.monthDay | Should -Be "LastDay"
-                    $response = Remove-TSSchedule -ScheduleId $schedule.id
+                    $response = Remove-TableauSchedule -ScheduleId $schedule.id
                     $response | Should -BeOfType String
                 } else {
                     Set-ItResult -Skipped -Because "Server admin privileges required"
@@ -2148,20 +2148,20 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
         Context "Common schedule operations" -Tag Schedule {
             BeforeAll {
                 if (-Not $ConfigFile.tableau_cloud) {
-                    $project = Add-TSProject -Name (New-Guid)
+                    $project = New-TableauProject -Name (New-Guid)
                     $script:samplesProjectId = $project.id
                     $script:samplesProjectName = $project.name
                 }
             }
             AfterAll {
                 if ($samplesProjectId) {
-                    Remove-TSProject -ProjectId $samplesProjectId
+                    Remove-TableauProject -ProjectId $samplesProjectId
                     $script:samplesProjectId = $null
                 }
             }
             It "Publish samples into project <samplesProjectName> on <ConfigFile.server>" {
                 if ($samplesProjectId) {
-                    $project = Update-TSProject -ProjectId $samplesProjectId -PublishSamples
+                    $project = Set-TableauProject -ProjectId $samplesProjectId -PublishSamples
                     $project.id | Should -Be $samplesProjectId
                     # Start-Sleep -s 3
                 } else {
@@ -2170,33 +2170,33 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             }
             It "Add extract refresh tasks into a schedule on <ConfigFile.server>" {
                 if (-Not $ConfigFile.tableau_cloud) {
-                    $extractScheduleId = Get-TSSchedule | Where-Object type -eq "Extract" | Select-Object -First 1 -ExpandProperty id
-                    $workbooks = Get-TSWorkbook -Filter "projectName:eq:$samplesProjectName"
+                    $extractScheduleId = Get-TableauSchedule | Where-Object type -eq "Extract" | Select-Object -First 1 -ExpandProperty id
+                    $workbooks = Get-TableauWorkbook -Filter "projectName:eq:$samplesProjectName"
                     $workbooks | ForEach-Object {
-                        $null = Add-TSContentToSchedule -ScheduleId $extractScheduleId -WorkbookId $_.id
+                        $null = Add-TableauContentToSchedule -ScheduleId $extractScheduleId -WorkbookId $_.id
                     }
-                    $datasources = Get-TSDatasource -Filter "projectName:eq:$samplesProjectName"
+                    $datasources = Get-TableauDatasource -Filter "projectName:eq:$samplesProjectName"
                     if (-not $datasources) { # fallback: perform filter in PS
-                        $datasources = Get-TSDatasource | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
+                        $datasources = Get-TableauDatasource | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
                     }
                     $datasources | ForEach-Object {
-                        $null = Add-TSContentToSchedule -ScheduleId $extractScheduleId -DatasourceId $_.id
+                        $null = Add-TableauContentToSchedule -ScheduleId $extractScheduleId -DatasourceId $_.id
                     }
                 } else {
                     Set-ItResult -Skipped -Because "feature not available for Tableau Cloud"
                 }
-                (Get-TSExtractRefreshTasksInSchedule -ScheduleId $extractScheduleId | Measure-Object).Count | Should -BeGreaterThan 0
+                (Get-TableauExtractRefreshTask -ScheduleId $extractScheduleId | Measure-Object).Count | Should -BeGreaterThan 0
             }
         }
         Context "Tasks operations" -Tag Task {
             BeforeAll {
-                $project = Add-TSProject -Name (New-Guid)
+                $project = New-TableauProject -Name (New-Guid)
                 $script:samplesProjectId = $project.id
                 $script:samplesProjectName = $project.name
             }
             AfterAll {
                 if ($samplesProjectId) {
-                    Remove-TSProject -ProjectId $samplesProjectId
+                    Remove-TableauProject -ProjectId $samplesProjectId
                     $script:samplesProjectId = $null
                     $script:workbookForTasks = $null
                     $script:datasourceForTasks = $null
@@ -2206,75 +2206,75 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             It "Publish test content into project <samplesProjectName> on <ConfigFile.server>" {
                 $securePw = Test-GetSecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
                 $credentials = @{username="sqladmin"; password=$securePw; embed="true" }
-                $script:workbookForTasks = Publish-TSWorkbook -Name "AW Customer Address" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -Credentials $credentials
+                $script:workbookForTasks = Publish-TableauWorkbook -Name "AW Customer Address" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -Credentials $credentials
                 $workbookForTasks | Should -Not -BeNullOrEmpty
-                $script:datasourceForTasks = Publish-TSDatasource -Name "AW SalesOrders" -InFile "Tests/Assets/Misc/AW_SalesOrders.tdsx" -ProjectId $samplesProjectId -Credentials $credentials
+                $script:datasourceForTasks = Publish-TableauDatasource -Name "AW SalesOrders" -InFile "Tests/Assets/Misc/AW_SalesOrders.tdsx" -ProjectId $samplesProjectId -Credentials $credentials
                 $datasourceForTasks | Should -Not -BeNullOrEmpty
                 $connections = @( @{serverAddress="asl-tableau-testsql.database.windows.net"; serverPort="3389"; credentials=@{username="sqladmin"; password=$securePw; embed="true" }} )
-                $script:flowForTasks = Publish-TSFlow -Name "AW ProductDescription Flow" -InFile "Tests/Assets/Misc/AW_ProductDescription.tfl" -ProjectId $samplesProjectId -Connections $connections
+                $script:flowForTasks = Publish-TableauFlow -Name "AW ProductDescription Flow" -InFile "Tests/Assets/Misc/AW_ProductDescription.tfl" -ProjectId $samplesProjectId -Connections $connections
                 $flowForTasks | Should -Not -BeNullOrEmpty
                 # Start-Sleep -s 3
             }
             It "Schedule and run extract refresh tasks on <ConfigFile.server>" {
                 if (-Not $ConfigFile.tableau_cloud) {
-                    $extractScheduleId = Get-TSSchedule | Where-Object type -eq "Extract" | Select-Object -First 1 -ExpandProperty id
+                    $extractScheduleId = Get-TableauSchedule | Where-Object type -eq "Extract" | Select-Object -First 1 -ExpandProperty id
                     Write-Verbose "Extract schedule $extractScheduleId found"
                     Write-Verbose ("Adding workbook {0}" -f $workbookForTasks.id)
-                    $contentScheduleTask = Add-TSContentToSchedule -ScheduleId $extractScheduleId -WorkbookId $workbookForTasks.id
-                    $extractTaskId = Get-TSTask -Type ExtractRefresh | Where-Object -FilterScript {$_.workbook.id -eq $workbookForTasks.id} | Select-Object -First 1 -ExpandProperty id
+                    $contentScheduleTask = Add-TableauContentToSchedule -ScheduleId $extractScheduleId -WorkbookId $workbookForTasks.id
+                    $extractTaskId = Get-TableauTask -Type ExtractRefresh | Where-Object -FilterScript {$_.workbook.id -eq $workbookForTasks.id} | Select-Object -First 1 -ExpandProperty id
                     $extractTaskId | Should -Be $contentScheduleTask.extractRefresh.id
                     Write-Verbose "Extract task id: $extractTaskId"
-                    $job = Start-TSTaskNow -Type ExtractRefresh -TaskId $extractTaskId
+                    $job = Start-TableauTaskNow -Type ExtractRefresh -TaskId $extractTaskId
                     $job | Should -Not -BeNullOrEmpty
-                    Stop-TSJob -JobId $job.id
-                    Remove-TSTask -Type ExtractRefresh -TaskId $extractTaskId
+                    Stop-TableauJob -JobId $job.id
+                    Remove-TableauTask -Type ExtractRefresh -TaskId $extractTaskId
                     Write-Verbose ("Adding datasource {0}" -f $datasourceForTasks.id)
-                    $contentScheduleTask = Add-TSContentToSchedule -ScheduleId $extractScheduleId -DatasourceId $datasourceForTasks.id
-                    $extractTaskId = Get-TSTask -Type ExtractRefresh | Where-Object -FilterScript {$_.datasource.id -eq $datasourceForTasks.id} | Select-Object -First 1 -ExpandProperty id
+                    $contentScheduleTask = Add-TableauContentToSchedule -ScheduleId $extractScheduleId -DatasourceId $datasourceForTasks.id
+                    $extractTaskId = Get-TableauTask -Type ExtractRefresh | Where-Object -FilterScript {$_.datasource.id -eq $datasourceForTasks.id} | Select-Object -First 1 -ExpandProperty id
                     $extractTaskId | Should -Be $contentScheduleTask.extractRefresh.id
                     Write-Verbose "Extract task id: $extractTaskId"
-                    $job = Start-TSTaskNow -Type ExtractRefresh -TaskId $extractTaskId
+                    $job = Start-TableauTaskNow -Type ExtractRefresh -TaskId $extractTaskId
                     $job | Should -Not -BeNullOrEmpty
-                    Stop-TSJob -JobId $job.id
-                    Remove-TSTask -Type ExtractRefresh -TaskId $extractTaskId
+                    Stop-TableauJob -JobId $job.id
+                    Remove-TableauTask -Type ExtractRefresh -TaskId $extractTaskId
                 } else { # Tableau Cloud methods
                     Write-Verbose ("Adding workbook {0}" -f $workbookForTasks.id)
-                    $extractTaskResult = Add-TSExtractsRefreshTask -WorkbookId $workbookForTasks.id -Type FullRefresh -Frequency Daily -StartTime 12:00:00 -IntervalHours 24 -IntervalWeekdays 'Sunday','Monday'
+                    $extractTaskResult = Add-TableauExtractRefreshTask -WorkbookId $workbookForTasks.id -Type FullRefresh -Frequency Daily -StartTime 12:00:00 -IntervalHours 24 -IntervalWeekdays 'Sunday','Monday'
                     $extractTaskResult | Should -Not -BeNullOrEmpty
-                    $extractTaskId = Get-TSTask -Type ExtractRefresh | Where-Object -FilterScript {$_.workbook.id -eq $workbookForTasks.id} | Select-Object -First 1 -ExpandProperty id
+                    $extractTaskId = Get-TableauTask -Type ExtractRefresh | Where-Object -FilterScript {$_.workbook.id -eq $workbookForTasks.id} | Select-Object -First 1 -ExpandProperty id
                     $extractTaskId | Should -Be $extractTaskResult.extractRefresh.id
                     Write-Verbose "Extract task id: $extractTaskId"
-                    $extractTaskResult = Update-TSExtractsRefreshTask -TaskId $extractTaskId -WorkbookId $workbookForTasks.id -Type FullRefresh -Frequency Hourly -StartTime 08:00:00 -EndTime 20:00:00 -IntervalHours 6 -IntervalWeekdays 'Tuesday'
+                    $extractTaskResult = Set-TableauExtractRefreshTask -TaskId $extractTaskId -WorkbookId $workbookForTasks.id -Type FullRefresh -Frequency Hourly -StartTime 08:00:00 -EndTime 20:00:00 -IntervalHours 6 -IntervalWeekdays 'Tuesday'
                     $extractTaskResult | Should -Not -BeNullOrEmpty
-                    $job = Start-TSTaskNow -Type ExtractRefresh -TaskId $extractTaskId
+                    $job = Start-TableauTaskNow -Type ExtractRefresh -TaskId $extractTaskId
                     $job | Should -Not -BeNullOrEmpty
-                    Stop-TSJob -JobId $job.id
-                    Remove-TSTask -Type ExtractRefresh -TaskId $extractTaskId
+                    Stop-TableauJob -JobId $job.id
+                    Remove-TableauTask -Type ExtractRefresh -TaskId $extractTaskId
                     Write-Verbose ("Adding datasource {0}" -f $datasourceForTasks.id)
-                    $extractTaskResult = Add-TSExtractsRefreshTask -DatasourceId $datasourceForTasks.id -Type FullRefresh -Frequency Daily -StartTime 12:00:00 -IntervalHours 2 -IntervalWeekdays 'Sunday','Monday'
+                    $extractTaskResult = Add-TableauExtractRefreshTask -DatasourceId $datasourceForTasks.id -Type FullRefresh -Frequency Daily -StartTime 12:00:00 -IntervalHours 2 -IntervalWeekdays 'Sunday','Monday'
                     $extractTaskResult | Should -Not -BeNullOrEmpty
-                    $extractTaskId = Get-TSTask -Type ExtractRefresh | Where-Object -FilterScript {$_.datasource.id -eq $datasourceForTasks.id} | Select-Object -First 1 -ExpandProperty id
+                    $extractTaskId = Get-TableauTask -Type ExtractRefresh | Where-Object -FilterScript {$_.datasource.id -eq $datasourceForTasks.id} | Select-Object -First 1 -ExpandProperty id
                     $extractTaskId | Should -Be $extractTaskResult.extractRefresh.id
                     Write-Verbose "Extract task id: $extractTaskId"
-                    $extractTaskResult = Update-TSExtractsRefreshTask -TaskId $extractTaskId -DatasourceId $datasourceForTasks.id -Type FullRefresh -Frequency Monthly -StartTime 08:00:00 -IntervalMonthdays 1,15
+                    $extractTaskResult = Set-TableauExtractRefreshTask -TaskId $extractTaskId -DatasourceId $datasourceForTasks.id -Type FullRefresh -Frequency Monthly -StartTime 08:00:00 -IntervalMonthdays 1,15
                     $extractTaskResult | Should -Not -BeNullOrEmpty
-                    $job = Start-TSTaskNow -Type ExtractRefresh -TaskId $extractTaskId
+                    $job = Start-TableauTaskNow -Type ExtractRefresh -TaskId $extractTaskId
                     $job | Should -Not -BeNullOrEmpty
-                    Stop-TSJob -JobId $job.id
-                    Remove-TSTask -Type ExtractRefresh -TaskId $extractTaskId
+                    Stop-TableauJob -JobId $job.id
+                    Remove-TableauTask -Type ExtractRefresh -TaskId $extractTaskId
                 }
             }
             It "Schedule and run flow task on <ConfigFile.server>" {
                 if ($ConfigFile.prep_conductor) {
-                    $runFlowScheduleId = Get-TSSchedule | Where-Object type -eq "Flow" | Select-Object -First 1 -ExpandProperty id
+                    $runFlowScheduleId = Get-TableauSchedule | Where-Object type -eq "Flow" | Select-Object -First 1 -ExpandProperty id
                     Write-Verbose "Flow schedule $runFlowScheduleId found"
-                    $contentScheduleTask = Add-TSContentToSchedule -ScheduleId $runFlowScheduleId -FlowId $flowForTasks.id
-                    $flowTaskId = Get-TSTask -Type FlowRun | Where-Object -FilterScript {$_.flow.id -eq $flowForTasks.id} | Select-Object -First 1 -ExpandProperty id
+                    $contentScheduleTask = Add-TableauContentToSchedule -ScheduleId $runFlowScheduleId -FlowId $flowForTasks.id
+                    $flowTaskId = Get-TableauTask -Type FlowRun | Where-Object -FilterScript {$_.flow.id -eq $flowForTasks.id} | Select-Object -First 1 -ExpandProperty id
                     $flowTaskId | Should -Be $contentScheduleTask.flowRun.id
                     Write-Verbose "Flow task id: $flowTaskId"
-                    $job = Start-TSTaskNow -Type FlowRun -TaskId $flowTaskId
+                    $job = Start-TableauTaskNow -Type FlowRun -TaskId $flowTaskId
                     $job | Should -Not -BeNullOrEmpty
-                    Stop-TSJob -JobId $job.id
+                    Stop-TableauJob -JobId $job.id
                 } else {
                     Set-ItResult -Skipped -Because "Prep Conductor is not activated"
                 }
@@ -2282,111 +2282,111 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
         }
         Context "Subscription operations" -Tag Subscription {
             BeforeAll {
-                $project = Add-TSProject -Name (New-Guid)
+                $project = New-TableauProject -Name (New-Guid)
                 $script:samplesProjectId = $project.id
                 $script:samplesProjectName = $project.name
             }
             AfterAll {
                 if ($samplesProjectId) {
-                    Remove-TSProject -ProjectId $samplesProjectId
+                    Remove-TableauProject -ProjectId $samplesProjectId
                     $script:samplesProjectId = $null
                 }
             }
             It "Publish samples into project <samplesProjectName> on <ConfigFile.server>" {
-                $project = Update-TSProject -ProjectId $samplesProjectId -PublishSamples
+                $project = Set-TableauProject -ProjectId $samplesProjectId -PublishSamples
                 $project.id | Should -Be $samplesProjectId
                 # Start-Sleep -s 3
             }
             It "Add/update subscriptions on <ConfigFile.server>" {
                 if ($ConfigFile.tableau_cloud) {
-                    $views = Get-TSView -Filter "projectName:eq:$samplesProjectName" | Select-Object -First 2
+                    $views = Get-TableauView -Filter "projectName:eq:$samplesProjectName" | Select-Object -First 2
                     $views | ForEach-Object {
                         Write-Verbose ("Adding subscription for view '{0}'" -f $_.name)
-                        $subscription = Add-TSSubscription -ContentType View -ContentId $_.id -Subject "test" -Message "Test subscription" -UserId (Get-TSCurrentUserId) -Frequency Weekly -StartTime 12:00:00 -IntervalWeekdays 'Sunday'
+                        $subscription = Add-TableauSubscription -ContentType View -ContentId $_.id -Subject "test" -Message "Test subscription" -UserId (Get-TableauCurrentUserId) -Frequency Weekly -StartTime 12:00:00 -IntervalWeekdays 'Sunday'
                         $subscription | Should -Not -BeNullOrEmpty
-                        $subscription = Update-TSSubscription -SubscriptionId $subscription.id -ContentType View -ContentId $_.id -Subject "test1" -Message "Test subscription1" -UserId (Get-TSCurrentUserId) -Frequency Monthly -StartTime 14:00:00 -IntervalMonthdays 5,10
+                        $subscription = Set-TableauSubscription -SubscriptionId $subscription.id -ContentType View -ContentId $_.id -Subject "test1" -Message "Test subscription1" -UserId (Get-TableauCurrentUserId) -Frequency Monthly -StartTime 14:00:00 -IntervalMonthdays 5,10
                         $subscription | Should -Not -BeNullOrEmpty
                     }
-                    $workbooks = Get-TSWorkbook -Filter "projectName:eq:$samplesProjectName" | Select-Object -First 2
+                    $workbooks = Get-TableauWorkbook -Filter "projectName:eq:$samplesProjectName" | Select-Object -First 2
                     $workbooks | ForEach-Object {
                         Write-Verbose ("Adding subscription for workbook '{0}'" -f $_.name)
-                        $subscription = Add-TSSubscription -ContentType Workbook -ContentId $_.id -Subject "test" -Message "Test subscription" -UserId (Get-TSCurrentUserId) -Frequency Weekly -StartTime 12:00:00 -IntervalWeekdays 'Sunday'
+                        $subscription = Add-TableauSubscription -ContentType Workbook -ContentId $_.id -Subject "test" -Message "Test subscription" -UserId (Get-TableauCurrentUserId) -Frequency Weekly -StartTime 12:00:00 -IntervalWeekdays 'Sunday'
                         $subscription | Should -Not -BeNullOrEmpty
-                        $subscription = Update-TSSubscription -SubscriptionId $subscription.id -ContentType Workbook -ContentId $_.id -Subject "test1" -Message "Test subscription1" -UserId (Get-TSCurrentUserId) -Frequency Monthly -StartTime 14:00:00 -IntervalMonthdays 5,10
+                        $subscription = Set-TableauSubscription -SubscriptionId $subscription.id -ContentType Workbook -ContentId $_.id -Subject "test1" -Message "Test subscription1" -UserId (Get-TableauCurrentUserId) -Frequency Monthly -StartTime 14:00:00 -IntervalMonthdays 5,10
                         $subscription | Should -Not -BeNullOrEmpty
                     }
                 } else {
-                    $subscriptionScheduleId = Get-TSSchedule | Where-Object type -eq "Subscription" | Select-Object -First 1 -ExpandProperty id
-                    $views = Get-TSView -Filter "projectName:eq:$samplesProjectName" | Select-Object -First 2
+                    $subscriptionScheduleId = Get-TableauSchedule | Where-Object type -eq "Subscription" | Select-Object -First 1 -ExpandProperty id
+                    $views = Get-TableauView -Filter "projectName:eq:$samplesProjectName" | Select-Object -First 2
                     $views | ForEach-Object {
                         Write-Verbose ("Adding view '{0}' to subscription schedule {1}" -f $_.name, $subscriptionScheduleId)
-                        $subscription = Add-TSSubscription -ScheduleId $subscriptionScheduleId -ContentType View -ContentId $_.id -Subject "test" -Message "Test subscription" -UserId (Get-TSCurrentUserId)
+                        $subscription = Add-TableauSubscription -ScheduleId $subscriptionScheduleId -ContentType View -ContentId $_.id -Subject "test" -Message "Test subscription" -UserId (Get-TableauCurrentUserId)
                         $subscription | Should -Not -BeNullOrEmpty
-                        $subscription = Update-TSSubscription -SubscriptionId $subscription.id -ScheduleId $subscriptionScheduleId -ContentType View -ContentId $_.id -SendIfViewEmpty false -Subject "test1" -Message "Test subscription1"
+                        $subscription = Set-TableauSubscription -SubscriptionId $subscription.id -ScheduleId $subscriptionScheduleId -ContentType View -ContentId $_.id -SendIfViewEmpty false -Subject "test1" -Message "Test subscription1"
                         $subscription | Should -Not -BeNullOrEmpty
                     }
-                    $workbooks = Get-TSWorkbook -Filter "projectName:eq:$samplesProjectName" | Select-Object -First 2
+                    $workbooks = Get-TableauWorkbook -Filter "projectName:eq:$samplesProjectName" | Select-Object -First 2
                     $workbooks | ForEach-Object {
                         Write-Verbose ("Adding workbook '{0}' to subscription schedule {1}" -f $_.name, $subscriptionScheduleId)
-                        $subscription = Add-TSSubscription -ScheduleId $subscriptionScheduleId -ContentType Workbook -ContentId $_.id -Subject "test" -Message "Test subscription" -UserId (Get-TSCurrentUserId)
+                        $subscription = Add-TableauSubscription -ScheduleId $subscriptionScheduleId -ContentType Workbook -ContentId $_.id -Subject "test" -Message "Test subscription" -UserId (Get-TableauCurrentUserId)
                         $subscription | Should -Not -BeNullOrEmpty
-                        $subscription = Update-TSSubscription -SubscriptionId $subscription.id -ScheduleId $subscriptionScheduleId -ContentType Workbook -ContentId $_.id -Subject "test1" -Message "Test subscription1"
+                        $subscription = Set-TableauSubscription -SubscriptionId $subscription.id -ScheduleId $subscriptionScheduleId -ContentType Workbook -ContentId $_.id -Subject "test1" -Message "Test subscription1"
                         $subscription | Should -Not -BeNullOrEmpty
                     }
                 }
             }
             It "Get subscriptions on <ConfigFile.server>" {
-                $subscriptions = Get-TSSubscription
+                $subscriptions = Get-TableauSubscription
                 $subscriptions | Should -Not -BeNullOrEmpty
                 $subscriptionId = $subscriptions | Select-Object -First 1 -ExpandProperty id
-                $subscription = Get-TSSubscription -SubscriptionId $subscriptionId
+                $subscription = Get-TableauSubscription -SubscriptionId $subscriptionId
                 $subscription | Should -Not -BeNullOrEmpty
             }
             It "Remove subscription on <ConfigFile.server>" {
-                $subscriptionId = Get-TSSubscription | Select-Object -First 1 -ExpandProperty id
+                $subscriptionId = Get-TableauSubscription | Select-Object -First 1 -ExpandProperty id
                 $subscriptionId | Should -Not -BeNullOrEmpty
-                Remove-TSSubscription -SubscriptionId $subscriptionId
+                Remove-TableauSubscription -SubscriptionId $subscriptionId
             }
         }
         Context "Metadata operations" -Tag Metadata {
             It "Query databases on <ConfigFile.server>" {
-                $databases = Get-TSDatabase
+                $databases = Get-TableauDatabase
                 ($databases | Measure-Object).Count | Should -BeGreaterThan 0
                 $databaseId = $databases | Select-Object -First 1 -ExpandProperty id
                 $databaseId | Should -BeOfType String
-                $database = Get-TSDatabase -DatabaseId $databaseId
+                $database = Get-TableauDatabase -DatabaseId $databaseId
                 $database.id | Should -Be $databaseId
             }
             It "Query tables on <ConfigFile.server>" {
-                $tables = Get-TSTable
+                $tables = Get-TableauTable
                 ($tables | Measure-Object).Count | Should -BeGreaterThan 0
                 $script:tableId = $tables | Select-Object -First 1 -ExpandProperty id
                 $script:tableId | Should -BeOfType String
-                $table = Get-TSTable -TableId $script:tableId
+                $table = Get-TableauTable -TableId $script:tableId
                 $table.id | Should -Be $script:tableId
             }
             It "Query columns in <tableId> on <ConfigFile.server>" {
-                $columns = Get-TSTableColumn -TableId $script:tableId
+                $columns = Get-TableauTableColumn -TableId $script:tableId
                 ($columns | Measure-Object).Count | Should -BeGreaterThan 0
                 $columnId = $columns | Select-Object -First 1 -ExpandProperty id
                 $columnId | Should -BeOfType String
-                $column = Get-TSTableColumn -TableId $script:tableId -ColumnId $columnId
+                $column = Get-TableauTableColumn -TableId $script:tableId -ColumnId $columnId
                 $column.id | Should -Be $columnId
             }
             It "Simple GraphQL queries on <ConfigFile.server>" {
                 $query = Get-Content "Tests/Assets/GraphQL/workbooks.gql" | Out-String
-                $results = Get-TSMetadataGraphQL -Query $query
+                $results = Get-TableauMetadataGraphQL -Query $query
                 ($results | Measure-Object).Count | Should -BeGreaterThan 0
             }
             It "Paginated GraphQL queries on <ConfigFile.server>" {
                 $query = Get-Content "Tests/Assets/GraphQL/fields-paginated.gql" | Out-String
-                $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection"
+                $results = Get-TableauMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection"
                 ($results | Measure-Object).Count | Should -BeGreaterThan 100
-                $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 500
+                $results = Get-TableauMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 500
                 ($results | Measure-Object).Count | Should -BeGreaterThan 100
-                $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 1000
+                $results = Get-TableauMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 1000
                 ($results | Measure-Object).Count | Should -BeGreaterThan 100
-                $results = Get-TSMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 20000
+                $results = Get-TableauMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 20000
                 ($results | Measure-Object).Count | Should -BeGreaterThan 100
             }
         }
