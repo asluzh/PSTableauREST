@@ -116,6 +116,10 @@ Param(
             $uri += "sessions"
             if ($Param) { $uri += "/$Param" }
         }
+        'Domain' {
+            $uri += "domains"
+            if ($Param) { $uri += "/$Param" }
+        }
         'ServerSchedule' {
             $uri += "schedules"
             if ($Param) { $uri += "/$Param" }
@@ -1093,7 +1097,7 @@ Param(
         $el_project.SetAttribute("parentProjectId", $ParentProjectId)
     }
     if ($OwnerId) {
-        Assert-TableauRestVersion -AtLeast 3.21
+        # Assert-TableauRestVersion -AtLeast 3.21
         $el_owner = $el_project.AppendChild($xml.CreateElement("owner"))
         $el_owner.SetAttribute("id", $OwnerId)
     }
@@ -1167,7 +1171,7 @@ Param(
         $el_project.SetAttribute("parentProjectId", $ParentProjectId)
     }
     if ($OwnerId) {
-        Assert-TableauRestVersion -AtLeast 3.21
+        # Assert-TableauRestVersion -AtLeast 3.21
         $el_owner = $el_project.AppendChild($xml.CreateElement("owner"))
         $el_owner.SetAttribute("id", $OwnerId)
     }
