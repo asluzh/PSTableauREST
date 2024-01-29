@@ -51,7 +51,7 @@ This example uses Sign-in via Personal Access Token
 
     $credentials = Connect-TableauServer -Server $server -Site $site -Username $username -SecurePassword $securePw
     $query = Get-Content "fields-paginated.graphql" | Out-String
-    $results = Get-TableauMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 500
+    $results = Query-TableauMetadata -Query $query -PaginatedEntity "fieldsConnection" -PageSize 500
 
 ## Help Files
 The help files for each cmdlet are located in the *docs* folder.

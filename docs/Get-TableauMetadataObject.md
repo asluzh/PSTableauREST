@@ -1,18 +1,18 @@
 ---
 author: tto
 category: pstableaurest
-date: 2024-01-24
+date: 2024-01-29
 excerpt: "Run Metadata GraphQL query"
 external help file: PSTableauREST-help.xml
 layout: pshelp
 Module Name: PSTableauREST
 online version: https://help.tableau.com/current/api/metadata_api/en-us/index.html
-redirect_from: ["/PowerShell/PSTableauREST/Get-TableauMetadataGraphQL/", "/PowerShell/PSTableauREST/get-tableaumetadatagraphql/", "/PowerShell/get-tableaumetadatagraphql/"]
+redirect_from: ["/PowerShell/PSTableauREST/Get-TableauMetadataObject/", "/PowerShell/PSTableauREST/get-tableaumetadataobject/", "/PowerShell/get-tableaumetadataobject/"]
 schema: 2.0.0
-title: Get-TableauMetadataGraphQL
+title: Get-TableauMetadataObject
 ---
 
-# Get-TableauMetadataGraphQL
+# Get-TableauMetadataObject
 
 ## SYNOPSIS
 Run Metadata GraphQL query
@@ -20,7 +20,7 @@ Run Metadata GraphQL query
 ## SYNTAX
 
 ```
-Get-TableauMetadataGraphQL [-Query] <String> [[-PaginatedEntity] <String>] [[-PageSize] <Int32>]
+Get-TableauMetadataObject [-Query] <String> [[-PaginatedEntity] <String>] [[-PageSize] <Int32>]
  [-ProgressAction <ActionPreference>] [<CommonParameters>]
 ```
 
@@ -31,7 +31,7 @@ Runs the specified GraphQL query through the Tableau Metadata API, including pag
 
 ### EXAMPLE 1
 ```
-$results = Get-TableauMetadataGraphQL -Query (Get-Content "workbooks.graphql" | Out-String)
+$results = Get-TableauMetadataObject -Query (Get-Content "workbooks.graphql" | Out-String)
 ```
 
 ## PARAMETERS

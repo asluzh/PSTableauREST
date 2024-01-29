@@ -1,7 +1,7 @@
 ---
 author: tto
 category: pstableaurest
-date: 2024-01-24
+date: 2024-01-29
 excerpt: "Assert check for Tableau Server REST API version"
 external help file: PSTableauREST-help.xml
 layout: pshelp

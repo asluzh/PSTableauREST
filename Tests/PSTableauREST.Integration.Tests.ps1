@@ -2394,18 +2394,19 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             }
             It "Simple GraphQL queries on <ConfigFile.server>" {
                 $query = Get-Content "Tests/Assets/GraphQL/workbooks.gql" | Out-String
-                $results = Get-TableauMetadataGraphQL -Query $query
+                $results = Get-TableauMetadataObject -Query $query
                 ($results | Measure-Object).Count | Should -BeGreaterThan 0
             }
             It "Paginated GraphQL queries on <ConfigFile.server>" {
                 $query = Get-Content "Tests/Assets/GraphQL/fields-paginated.gql" | Out-String
-                $results = Get-TableauMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection"
+                # Query-TableauMetadata: alias -> Get-TableauMetadataObject
+                $results = Query-TableauMetadata -Query $query -PaginatedEntity "fieldsConnection"
                 ($results | Measure-Object).Count | Should -BeGreaterThan 100
-                $results = Get-TableauMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 500
+                $results = Query-TableauMetadata -Query $query -PaginatedEntity "fieldsConnection" -PageSize 500
                 ($results | Measure-Object).Count | Should -BeGreaterThan 100
-                $results = Get-TableauMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 1000
+                $results = Query-TableauMetadata -Query $query -PaginatedEntity "fieldsConnection" -PageSize 1000
                 ($results | Measure-Object).Count | Should -BeGreaterThan 100
-                $results = Get-TableauMetadataGraphQL -Query $query -PaginatedEntity "fieldsConnection" -PageSize 20000
+                $results = Query-TableauMetadata -Query $query -PaginatedEntity "fieldsConnection" -PageSize 20000
                 ($results | Measure-Object).Count | Should -BeGreaterThan 100
             }
         }

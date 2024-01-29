@@ -6,18 +6,51 @@ $TableauRestChunkSize = 2*1048576 # 2MB (or change for example to 5MB, 10MB, 50M
 function Invoke-TableauRestMethod {
 <#
 .SYNOPSIS
-Proxy function to call Tableau Server REST API with Invoke-RestMethod
+Call Tableau Server REST API method
 
 .DESCRIPTION
-Internal function.
-Calls Tableau Server REST API with Invoke-RestMethod.
+Helper function that implements Tableau Server REST API calls with Invoke-RestMethod.
 See help for Invoke-RestMethod for common parameters description.
+This function should only be used by advanced users for non-implemented API calls.
 
-.PARAMETER NoStandardHeader
-Switch parameter, indicates not to include the standard Tableau Server auth token in the headers
+.PARAMETER Method
+Specifies the method used for the web request. The typical values for this parameter are:
+Get, Post, Put, Delete, Patch, Options, Head
+
+.PARAMETER Uri
+Specifies the Uniform Resource Identifier (URI) of the Internet resource to which the web request is sent.
+
+.PARAMETER Body
+(Optional) Specifies the body of the request. The body is the content of the request that follows the headers.
+
+.PARAMETER InFile
+(Optional) Gets the content of the web request from a file.
+Enter a path and file name. If you omit the path, the default is the current location.
+
+.PARAMETER OutFile
+(Optional) Saves the response body in the specified output file.
+Enter a path and file name. If you omit the path, the default is the current location.
+
+.PARAMETER TimeoutSec
+(Optional) Specifies how long the request can be pending before it times out.
+Enter a value in seconds. The default value, 0, specifies an indefinite time-out.
+
+.PARAMETER ContentType
+(Optional) Specifies the content type of the web request.
+Typical values: application/xml, application/json
+
+.PARAMETER SkipCertificateCheck
+(Optional) Skips certificate validation checks that include all validations such as expiration,
+revocation, trusted root authority, etc.
 
 .PARAMETER AddHeaders
 (Optional) Specifies additional HTTP headers in a hashtable.
+
+.PARAMETER NoStandardHeader
+(Optional) Switch parameter, indicates not to include the standard Tableau Server auth token in the headers
+
+.EXAMPLE
+$serverInfo = Invoke-TableauRestMethod -Uri $ServerUrl/api/$apiVersion/serverinfo -Method Get -NoStandardHeader
 
 .LINK
 Invoke-RestMethod
@@ -373,6 +406,7 @@ With administrator permissions on Tableau Server you can increase this idle time
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_authentication.htm
 #>
+[Alias('Login-TableauServer')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $ServerUrl,
@@ -485,6 +519,7 @@ Disconnect-TableauServer
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_authentication.htm#sign_out
 #>
+[Alias('Logout-TableauServer')]
 [OutputType([PSCustomObject])]
 Param()
     $response = $null
@@ -642,6 +677,7 @@ $domain = Set-TableauActiveDirectoryDomain
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_server.htm#update_server_active_directory_domain
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauActiveDirectoryDomain')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $DomainId,
@@ -826,6 +862,7 @@ No validation is done for SiteParams. If some invalid option is included in the 
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_site.htm#update_site
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauSite')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $SiteId,
@@ -969,6 +1006,7 @@ $result = Set-TableauSiteSettingsEmbedding -Unrestricted false -Allow "mydomain.
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_site.htm#update_embedding_settings_for_site
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauSiteSettingsEmbedding')]
 [OutputType([PSCustomObject[]])]
 Param(
     [Parameter(Mandatory,ParameterSetName='Unrestricted')][switch] $UnrestrictedEmbedding,
@@ -1025,6 +1063,7 @@ $defaultProject = Get-TableauProject -Filter "name:eq:Default","topLevelProject:
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_projects.htm#query_projects
 #>
+[Alias('Query-TableauProject')]
 [OutputType([PSCustomObject[]])]
 Param(
     [Parameter()][string[]] $Filter, # https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm
@@ -1158,6 +1197,7 @@ $project = Set-TableauProject -ProjectId $testProjectId -Name $projectNewName -P
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_projects.htm#update_project
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauProject')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $ProjectId,
@@ -1283,6 +1323,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#get_users_on_site
 #>
+[Alias('Query-TableauUser')]
 [OutputType([PSCustomObject[]])]
 Param(
     [Parameter(Mandatory,ParameterSetName='UserById')][string] $UserId,
@@ -1349,6 +1390,7 @@ $user = New-TableauUser -Name $userName -SiteRole Viewer
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#add_user_to_site
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('Add-TableauUser')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $Name,
@@ -1403,6 +1445,7 @@ $user = Set-TableauUser -UserId $userId -SiteRole Explorer -FullName "John Doe"
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#update_user
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauUser')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $UserId,
@@ -1506,6 +1549,7 @@ $group = Get-TableauGroup -Filter "name:eq:$groupName"
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#query_groups
 #>
+[Alias('Query-TableauGroup')]
 [OutputType([PSCustomObject[]])]
 Param(
     [Parameter()][string[]] $Filter,
@@ -1574,6 +1618,7 @@ $group = New-TableauGroup -Name $groupName -MinimumSiteRole Viewer -GrantLicense
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#create_group
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('Add-TableauGroup')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $Name,
@@ -1658,6 +1703,7 @@ $group = Set-TableauGroup -GroupId $groupId -Name $groupNewName
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#update_group
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauGroup')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $GroupId,
@@ -2030,6 +2076,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_publishing
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_publishing.htm#append_to_file_upload
 #>
+[Alias('Add-TableauFileUpload')]
 [OutputType([string])]
 Param(
     [Parameter(Mandatory)][string] $InFile,
@@ -2168,6 +2215,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#get_workbook_revisions
 #>
+[Alias('Query-TableauWorkbook')]
 [OutputType([PSCustomObject[]])]
 Param(
     [Parameter(Mandatory,ParameterSetName='WorkbookById')]
@@ -2253,6 +2301,7 @@ $workbooks = Get-TableauWorkbooksForUser -UserId (Get-TableauCurrentUserId)
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#query_workbooks_for_user
 #>
+[Alias('Query-TableauWorkbooksForUser')]
 [OutputType([PSCustomObject[]])]
 Param(
     [Parameter(Mandatory)][string] $UserId,
@@ -2331,6 +2380,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_revisions.htm#download_workbook_revision
 #>
+[Alias('Download-TableauWorkbook')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $WorkbookId,
@@ -2427,6 +2477,7 @@ $workbook = Publish-TableauWorkbook -Name $sampleWorkbookName -InFile "Superstor
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#publish_workbook
 #>
+[Alias('Upload-TableauWorkbook')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $InFile,
@@ -2628,6 +2679,7 @@ $workbook = Set-TableauWorkbook -WorkbookId $sampleWorkbookId -ShowTabs:$false
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#update_workbook
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauWorkbook')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $WorkbookId,
@@ -2724,6 +2776,7 @@ $workbookConnection = Set-TableauWorkbookConnection -WorkbookId $sampleWorkbookI
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#update_workbook_connection
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauWorkbookConnection')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $WorkbookId,
@@ -2896,6 +2949,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#query_workbook_preview_image
 #>
+[Alias('Download-TableauWorkbookToFormat')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $WorkbookId,
@@ -3014,6 +3068,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sourc
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_revisions.htm#get_data_source_revisions
 #>
+[Alias('Query-TableauDatasource')]
 [OutputType([PSCustomObject[]])]
 Param(
     [Parameter(Mandatory,ParameterSetName='DatasourceById')]
@@ -3126,6 +3181,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sourc
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_revisions.htm#download_data_source_revision
 #>
+[Alias('Download-TableauDatasource')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $DatasourceId,
@@ -3218,6 +3274,7 @@ $datasource = Publish-TableauDatasource -Name "Datasource" -InFile "data.hyper" 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sources.htm#publish_data_source
 #>
+[Alias('Upload-TableauDatasource')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $InFile,
@@ -3395,6 +3452,7 @@ $datasource = Set-TableauDatasource -DatasourceId $sampleDatasourceId -Certified
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sources.htm#update_data_source
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauDatasource')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $DatasourceId,
@@ -3482,6 +3540,7 @@ $datasourceConnection = Set-TableauDatasourceConnection -DatasourceId $sampleDat
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sources.htm#update_data_source_connection
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauDatasourceConnection')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $DatasourceId,
@@ -3745,6 +3804,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#query_views_for_workbook
 #>
+[Alias('Query-TableauView')]
 [OutputType([PSCustomObject[]])]
 Param(
     [Parameter(Mandatory,ParameterSetName='ViewById')][string] $ViewId,
@@ -3822,6 +3882,7 @@ Export-TableauViewImage -ViewId $view.id -WorkbookId $workbookId -OutFile "previ
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#query_view_with_preview
 #>
+[Alias('Download-TableauViewImage')]
 [OutputType([PSCustomObject[]])]
 Param(
     [Parameter(Mandatory)][string] $ViewId,
@@ -3904,6 +3965,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#query_view_data
 #>
+[Alias('Download-TableauViewToFormat')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $ViewId,
@@ -4035,6 +4097,7 @@ Show-TableauViewRecommendation -ViewId $viewId
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#unhide_view_recommendation
 #>
+[Alias('Unhide-TableauViewRecommendation')]
 [OutputType([string])]
 Param(
     [Parameter(Mandatory)][string] $ViewId
@@ -4087,6 +4150,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#list_custom_views
 #>
+[Alias('Query-TableauCustomView')]
 [OutputType([PSCustomObject[]])]
 Param(
     [Parameter(Mandatory,ParameterSetName='CustomViewById')][string] $CustomViewId,
@@ -4229,6 +4293,7 @@ Export-TableauCustomViewImage -CustomViewId $id -OutFile "export.png" -Resolutio
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#get_custom_view_image
 #>
+[Alias('Download-TableauCustomViewImage')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $CustomViewId,
@@ -4284,6 +4349,7 @@ $result = Set-TableauCustomView -CustomViewId $id -Name "My Custom View"
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#update_custom_view
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauCustomView')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $CustomViewId,
@@ -4424,6 +4490,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#q
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#query_flows_for_site
 #>
+[Alias('Query-TableauFlow')]
 [OutputType([PSCustomObject[]])]
 Param(
     [Parameter(Mandatory,ParameterSetName='FlowById')]
@@ -4506,6 +4573,7 @@ $flows = Get-TableauFlowsForUser -UserId (Get-TableauCurrentUserId)
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#query_flows_for_user
 #>
+[Alias('Query-TableauFlowsForUser')]
 [OutputType([PSCustomObject[]])]
 Param(
     [Parameter(Mandatory)][string] $UserId,
@@ -4578,6 +4646,7 @@ Export-TableauFlow -FlowId $sampleflowId -OutFile "Flow.tflx"
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#download_flow
 #>
+[Alias('Download-TableauFlow')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $FlowId,
@@ -4645,6 +4714,7 @@ $flow = Publish-TableauFlow -Name $sampleFlowName -InFile "Flow.tflx" -ProjectId
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#publish_flow
 #>
+[Alias('Upload-TableauFlow')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $InFile,
@@ -4782,6 +4852,7 @@ $flow = Set-TableauFlow -FlowId $flow.id -NewProjectId $project.id
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#update_flow
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauFlow')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $FlowId,
@@ -4843,6 +4914,7 @@ $flowConnection = Set-TableauFlowConnection -FlowId $flow.id -ConnectionId $conn
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#update_flow_connection
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauFlowConnection')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $FlowId,
@@ -4949,6 +5021,7 @@ $job = Start-TableauFlowNow -FlowId $flow.id
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#run_flow_now
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('Run-TableauFlow')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $FlowId,
@@ -5065,6 +5138,7 @@ Stop-TableauFlowRun -FlowRunId $run.id
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#cancel_flow_run
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('Cancel-TableauFlowRun')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $FlowRunId
@@ -6486,6 +6560,7 @@ $schedule = Set-TableauSchedule -ScheduleId $testScheduleId -Frequency Hourly -S
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_jobs_tasks_and_schedules.htm#update_schedule
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauSchedule')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $ScheduleId,
@@ -6764,6 +6839,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_jobs_tasks
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_jobs_tasks_and_schedules.htm#query_jobs
 #>
+[Alias('Query-TableauJob')]
 [OutputType([PSCustomObject[]])]
 Param(
     [Parameter(Mandatory,ParameterSetName='JobById')][string] $JobId,
@@ -6822,6 +6898,7 @@ Stop-TableauJob -JobId $job.id
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_jobs_tasks_and_schedules.htm#cancel_job
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('Cancel-TableauJob')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $JobId
@@ -7097,6 +7174,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#r
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#run_flow_now1
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('Run-TableauTask')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $TaskId,
@@ -7195,6 +7273,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_extract_an
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_extract_and_encryption.htm#create_extracts_for_workbook
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('Create-TableauContentExtract')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory,ParameterSetName='Workbook')][string] $WorkbookId,
@@ -7322,6 +7401,7 @@ $extractTaskResult = Add-TableauExtractRefreshTask -WorkbookId $workbook.id -Typ
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_extract_and_encryption.htm#create_cloud_extract_refresh_task
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('New-TableauExtractRefreshTask')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory,ParameterSetName='Workbook')][string] $WorkbookId,
@@ -7477,6 +7557,7 @@ $extractTaskResult = Set-TableauExtractRefreshTask -TaskId $taskId -DatasourceId
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_extract_and_encryption.htm#update_cloud_extract_refresh_task
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauExtractRefreshTask')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $TaskId,
@@ -8064,6 +8145,7 @@ $subscription = Add-TableauSubscription -ContentType View -ContentId $view.id -S
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_subscriptions.htm#create_subscription
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('New-TableauSubscription')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $Subject,
@@ -8272,6 +8354,7 @@ $subscription = Set-TableauSubscription -SubscriptionId $subscription.id -Conten
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_subscriptions.htm#update_subscription
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauSubscription')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $SubscriptionId,
@@ -8484,6 +8567,7 @@ $settings = Set-TableauServerSettingsExtension -Enabled true -BlockList 'https:/
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_tableau_extensions_settings.htm#update_tableau_extensions_server_settings
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauServerSettingsExtension')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][ValidateSet('true','false')][string] $Enabled,
@@ -8561,6 +8645,7 @@ $settings = Set-TableauSiteSettingsExtension -Enabled true -SafeList @{url='http
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_tableau_extensions_settings.htm#update_tableau_extensions_site_settings
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauSiteSettingsExtension')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][ValidateSet('true','false')][string] $Enabled,
@@ -8634,6 +8719,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notificati
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#query_data-driven_alerts
 #>
+[Alias('Query-TableauDataAlert')]
 [OutputType([PSCustomObject[]])]
 Param(
     [Parameter(Mandatory,ParameterSetName='DataAlertById')][string] $DataAlertId,
@@ -8722,6 +8808,7 @@ $dataAlert = Add-TableauDataAlert -Subject "Data Driven Alert for Forecast" -Con
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#create_data_driven_alert
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('New-TableauDataAlert')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $Subject,
@@ -8791,6 +8878,7 @@ $dataAlert = Set-TableauDataAlert -DataAlertId $id -Subject "New Alert for Forec
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#update_data-driven_alert
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauDataAlert')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $DataAlertId,
@@ -9066,7 +9154,7 @@ Param(
     }
 }
 
-function Get-TableauMetadataGraphQL {
+function Get-TableauMetadataObject {
 <#
 .SYNOPSIS
 Run Metadata GraphQL query
@@ -9085,11 +9173,13 @@ Pagination in Tableau Metadata API is supported on entities ending with "Connect
 (Optional, Query Columns in a Table) Page size when paging through results.
 
 .EXAMPLE
-$results = Get-TableauMetadataGraphQL -Query (Get-Content "workbooks.graphql" | Out-String)
+$results = Get-TableauMetadataObject -Query (Get-Content "workbooks.graphql" | Out-String)
 
 .LINK
 https://help.tableau.com/current/api/metadata_api/en-us/index.html
 #>
+[Alias('Run-TableauMetadataGraphQL')]
+[Alias('Query-TableauMetadata')]
 [OutputType([PSCustomObject[]])]
 Param(
     [Parameter(Mandatory)][string] $Query,

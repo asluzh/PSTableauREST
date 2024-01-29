@@ -1,7 +1,7 @@
 ---
 author: tto
 category: pstableaurest
-date: 2024-01-24
+date: 2024-01-29
 excerpt: "Create an Extract for a Data Source / Create Extracts for Embedded Data Sources in a Workbook"
 external help file: PSTableauREST-help.xml
 layout: pshelp

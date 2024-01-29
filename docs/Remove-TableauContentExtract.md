@@ -1,7 +1,7 @@
 ---
 author: tto
 category: pstableaurest
-date: 2024-01-24
+date: 2024-01-29
 excerpt: "Delete the Extract from a Data Source / Delete Extracts of Embedded Data Sources from a Workbook"
 external help file: PSTableauREST-help.xml
 layout: pshelp

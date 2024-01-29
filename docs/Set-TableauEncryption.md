@@ -1,7 +1,7 @@
 ---
 author: tto
 category: pstableaurest
-date: 2024-01-24
+date: 2024-01-29
 excerpt: "Encrypt Extracts in a Site / Decrypt Extracts in a Site / Reencrypt Extracts in a Site"
 external help file: PSTableauREST-help.xml
 layout: pshelp

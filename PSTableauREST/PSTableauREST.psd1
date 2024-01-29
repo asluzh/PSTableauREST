@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.5.1'
+ModuleVersion = '0.5.2'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -204,7 +204,7 @@ FunctionsToExport = @(
 # Update Virtual Connection Database Connections
 
 ### Metadata methods - introduced in API API 3.5
-'Get-TableauDatabase', 'Get-TableauTable', 'Get-TableauTableColumn', 'Get-TableauMetadataGraphQL'
+'Get-TableauDatabase', 'Get-TableauTable', 'Get-TableauTableColumn', 'Get-TableauMetadataObject'
 # Query Data Quality Warning by ID
 # Query Data Quality Warning by Content
 # Query Data Quality Certification by ID
@@ -295,7 +295,29 @@ CmdletsToExport = @()
 # VariablesToExport = @()
 
 # Aliases to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no aliases to export.
-AliasesToExport = @()
+AliasesToExport = @('Login-TableauServer','Logout-TableauServer',
+'Update-TableauSiteSettingsEmbedding','Add-TableauFileUpload',
+'Update-TableauActiveDirectoryDomain','Update-TableauSite',
+'Query-TableauProject','Update-TableauProject',
+'Query-TableauUser','Add-TableauUser','Update-TableauUser',
+'Query-TableauGroup','Add-TableauGroup','Update-TableauGroup',
+'Query-TableauWorkbook','Update-TableauWorkbook',
+'Query-TableauWorkbooksForUser','Update-TableauWorkbookConnection',
+'Download-TableauWorkbook','Upload-TableauWorkbook','Download-TableauWorkbookToFormat',
+'Query-TableauDatasource','Update-TableauDatasource',
+'Update-TableauDatasourceConnection','Download-TableauDatasource','Upload-TableauDatasource',
+'Query-TableauView','Download-TableauViewImage','Download-TableauViewToFormat',
+'Unhide-TableauViewRecommendation',
+'Query-TableauCustomView','Update-TableauCustomView','Download-TableauCustomViewImage',
+'Query-TableauFlow','Update-TableauFlow','Query-TableauFlowsForUser',
+'Download-TableauFlow','Upload-TableauFlow','Update-TableauFlowConnection',
+'Run-TableauFlow','Cancel-TableauFlowRun','Update-TableauSchedule',
+'Query-TableauJob','Cancel-TableauJob', 'Run-TableauTask',
+'Create-TableauContentExtract','New-TableauExtractRefreshTask','Update-TableauExtractRefreshTask',
+'New-TableauSubscription','Update-TableauSubscription',
+'Update-TableauServerSettingsExtension','Update-TableauSiteSettingsExtension',
+'Query-TableauDataAlert','New-TableauDataAlert','Update-TableauDataAlert',
+'Run-TableauMetadataGraphQL','Query-TableauMetadata')
 
 # DSC resources to export from this module
 # DscResourcesToExport = @()
