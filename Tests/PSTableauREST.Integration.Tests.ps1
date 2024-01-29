@@ -20,20 +20,20 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
     BeforeAll {
         $script:ConfigFile = Get-Content $_ | ConvertFrom-Json
         if ($ConfigFile.username) {
-            $ConfigFile | Add-Member -MemberType NoteProperty -Name "secure_password" -Value (Test-GetSecurePassword -Namespace $ConfigFile.server -Username $ConfigFile.username)
+            $ConfigFile | Add-Member -MemberType NoteProperty -Name "credential" -Value (New-Object System.Management.Automation.PSCredential($ConfigFile.username, (Test-GetSecurePassword -Namespace $ConfigFile.server -Username $ConfigFile.username)))
         }
         if ($ConfigFile.pat_name) {
-            $ConfigFile | Add-Member -MemberType NoteProperty -Name "pat_secret" -Value (Test-GetSecurePassword -Namespace $ConfigFile.server -Username $ConfigFile.pat_name)
+            $ConfigFile | Add-Member -MemberType NoteProperty -Name "pat_credential" -Value (New-Object System.Management.Automation.PSCredential($ConfigFile.pat_name, (Test-GetSecurePassword -Namespace $ConfigFile.server -Username $ConfigFile.pat_name)))
         }
     }
     Context "Auth operations" -Tag Auth {
         It "Request auth sign-in for <ConfigFile.server>" {
-            $credentials = Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
-            $credentials.user.id | Should -BeOfType String
+            $response = Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -Credential $ConfigFile.credential
+            $response.user.id | Should -BeOfType String
         }
         It "Request switch site to <ConfigFile.switch_site> for <ConfigFile.server>" {
-            $credentials = Switch-TableauSite -Site $ConfigFile.switch_site
-            $credentials.user.id | Should -BeOfType String
+            $response = Switch-TableauSite -Site $ConfigFile.switch_site
+            $response.user.id | Should -BeOfType String
         }
         It "Request sign-out for <ConfigFile.server>" {
             $response = Disconnect-TableauServer
@@ -43,8 +43,8 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             if (-not $ConfigFile.pat_name) {
                 Set-ItResult -Skipped -Because "PAT not provided"
             }
-            $credentials = Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
-            $credentials.user.id | Should -BeOfType String
+            $response = Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -Credential $ConfigFile.pat_credential -PersonalAccessToken
+            $response.user.id | Should -BeOfType String
             $response = Disconnect-TableauServer
             $response | Should -BeOfType "String"
         }
@@ -52,8 +52,8 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             if (-not $ConfigFile.impersonate_user_id) {
                 Set-ItResult -Skipped -Because "impersonate user ID not provided"
             }
-            $credentials = Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password -ImpersonateUserId $ConfigFile.impersonate_user_id
-            $credentials.user.id | Should -Be $ConfigFile.impersonate_user_id
+            $response = Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -Credential $ConfigFile.credential -ImpersonateUserId $ConfigFile.impersonate_user_id
+            $response.user.id | Should -Be $ConfigFile.impersonate_user_id
             $response = Disconnect-TableauServer
             $response | Should -BeOfType "String"
         }
@@ -61,9 +61,9 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
     Context "Content operations" -Tag Content {
         BeforeAll {
             if ($ConfigFile.pat_name) {
-                $null = Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
+                Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -Credential $ConfigFile.pat_credential -PersonalAccessToken | Out-Null
             } else {
-                $null = Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
+                Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -Credential $ConfigFile.credential | Out-Null
             }
         }
         AfterAll {
@@ -205,11 +205,11 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $script:testSite = $null
                     # because we've just deleted the current site, we need to sign-in again
                     if ($ConfigFile.pat_name) {
-                        $credentials = Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
+                        $response = Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -Credential $ConfigFile.pat_credential -PersonalAccessToken
                     } else {
-                        $credentials = Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
+                        $response = Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -Credential $ConfigFile.credential
                     }
-                    $credentials.user.id | Should -BeOfType String
+                    $response.user.id | Should -BeOfType String
                 } else {
                     Set-ItResult -Skipped -Because "Server admin privileges required"
                 }
@@ -225,11 +225,11 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $response | Should -BeOfType String
                     # because we've just deleted the current site, we need to sign-in again
                     if ($ConfigFile.pat_name) {
-                        $credentials = Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -PersonalAccessTokenName $ConfigFile.pat_name -PersonalAccessTokenSecret $ConfigFile.pat_secret
+                        $response = Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -Credential $ConfigFile.pat_credential -PersonalAccessToken
                     } else {
-                        $credentials = Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -Username $ConfigFile.username -SecurePassword $ConfigFile.secure_password
+                        $response = Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -Credential $ConfigFile.credential
                     }
-                    $credentials.user.id | Should -BeOfType String
+                    $response.user.id | Should -BeOfType String
                 } else {
                     Set-ItResult -Skipped -Because "Server admin privileges required"
                 }
@@ -2192,14 +2192,14 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $extractScheduleId = Get-TableauSchedule | Where-Object type -eq "Extract" | Select-Object -First 1 -ExpandProperty id
                     $workbooks = Get-TableauWorkbook -Filter "projectName:eq:$samplesProjectName"
                     $workbooks | ForEach-Object {
-                        $null = Add-TableauContentToSchedule -ScheduleId $extractScheduleId -WorkbookId $_.id
+                        Add-TableauContentToSchedule -ScheduleId $extractScheduleId -WorkbookId $_.id | Out-Null
                     }
                     $datasources = Get-TableauDatasource -Filter "projectName:eq:$samplesProjectName"
                     if (-not $datasources) { # fallback: perform filter in PS
                         $datasources = Get-TableauDatasource | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId} | Select-Object -First 1
                     }
                     $datasources | ForEach-Object {
-                        $null = Add-TableauContentToSchedule -ScheduleId $extractScheduleId -DatasourceId $_.id
+                        Add-TableauContentToSchedule -ScheduleId $extractScheduleId -DatasourceId $_.id | Out-Null
                     }
                 } else {
                     Set-ItResult -Skipped -Because "feature not available for Tableau Cloud"

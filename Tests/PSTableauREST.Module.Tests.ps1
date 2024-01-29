@@ -28,7 +28,7 @@ Describe "Module Structure and Validation Tests" -Tag Module -WarningAction Sile
         It "<ModuleFile> contains valid PowerShell code" {
             $psFile = Get-Content -Path $ModuleFile -ErrorAction Stop
             $errors = $null
-            $null = [System.Management.Automation.PSParser]::Tokenize($psFile, [ref]$errors)
+            [System.Management.Automation.PSParser]::Tokenize($psFile, [ref]$errors) | Out-Null
             if ($errors) {
                 Write-Debug ($errors | ConvertTo-Json -Compress)
             }
@@ -40,7 +40,7 @@ Describe "Module Structure and Validation Tests" -Tag Module -WarningAction Sile
         It "<_> is valid PowerShell code" {
             $fileItem = Get-Item -LiteralPath $_
             $errors = $null
-            $null = [System.Management.Automation.Language.Parser]::ParseFile($fileItem.FullName, [ref]$null, [ref]$errors)
+            [System.Management.Automation.Language.Parser]::ParseFile($fileItem.FullName, [ref]$null, [ref]$errors) | Out-Null
             if ($errors) {
                 Write-Debug ($errors | ConvertTo-Json -Compress)
             }

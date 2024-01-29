@@ -341,18 +341,14 @@ Authentication on Tableau Server (or Tableau Cloud) can be done with either
 The URL of the Tableau Server, including the protocol (usually https://) and the FQDN (not including the URL path).
 For Tableau Cloud, the server address in the URI must contain the pod name, such as 10az, 10ay, or us-east-1.
 
-.PARAMETER Username
-The name of the user when signing in with username and password.
+.PARAMETER Credential
+The credential object for signing in. It contains either:
+- username and password (as SecureString)
+- name and the secret value of the personal access token
 
-.PARAMETER SecurePassword
-SecureString, containing the password when signing in with username and password.
-
-.PARAMETER PersonalAccessTokenName
-The name of the personal access token when signing in with a personal access token.
-The token name is available on a user’s account page on Tableau server or online.
-
-.PARAMETER PersonalAccessTokenSecret
-SecureString, containing the secret value of the personal access token when signing in with a personal access token.
+.PARAMETER PersonalAccessToken
+This switch parameter indicates that the credential contain personal access token.
+The token can be created/viewed on an account page of an individual user (on Tableau Server or Tableau Cloud).
 
 .PARAMETER Site
 The permanent name of the site to sign in to (aka content URL).
@@ -363,13 +359,13 @@ The user ID to impersonate upon sign-in. This can be only used by Server Adminis
 
 .PARAMETER UseServerVersion
 Boolean, if true, sets current REST API version to the latest version supported by the Tableau Server. Default is true.
-If false, the minimum supported version 2.4 is retained.
+If false, the minimum supported version (2.4) is retained.
 
 .EXAMPLE
-$credentials = Connect-TableauServer -Server https://tableau.myserver.com -Username $user -SecurePassword $securePw
+$credentials = Connect-TableauServer -Server https://tableau.myserver.com -Credential (New-Object System.Management.Automation.PSCredential ($user, $securePw))
 
 .EXAMPLE
-$credentials = Connect-TableauServer -Server https://10ay.online.tableau.com -Site sandboxXXXXXXNNNNNN -PersonalAccessTokenName $pat_name -PersonalAccessTokenSecret $pat_secret
+$credentials = Connect-TableauServer -Server https://10ay.online.tableau.com -Site sandboxXXXXXXNNNNNN -Credential $pat_credential -PersonalAccessToken
 
 .NOTES
 This function has to be called prior to other REST API function calls.
@@ -382,10 +378,8 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_authentica
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $ServerUrl,
-    [Parameter()][string] $Username,
-    [Parameter()][securestring] $SecurePassword,
-    [Parameter()][string] $PersonalAccessTokenName,
-    [Parameter()][securestring] $PersonalAccessTokenSecret,
+    [Parameter(Mandatory)][pscredential] $Credential,
+    [Parameter()][switch] $PersonalAccessToken,
     [Parameter()][string] $Site = '',
     [Parameter()][string] $ImpersonateUserId,
     [Parameter()][bool] $UseServerVersion = $true
@@ -410,19 +404,15 @@ Param(
         $el_user = $el_credentials.AppendChild($xml.CreateElement("user"))
         $el_user.SetAttribute("id", $ImpersonateUserId)
     }
-    if ($Username -and $SecurePassword) {
-        $private:PlainPassword = (New-Object System.Net.NetworkCredential("", $SecurePassword)).Password
-        $el_credentials.SetAttribute("name", $Username)
-        $el_credentials.SetAttribute("password", $private:PlainPassword)
-        # if ($ImpersonateUserId) { Assert-TableauRestVersion -AtLeast 2.0 }
-    } elseif ($PersonalAccessTokenName -and $PersonalAccessTokenSecret) {
+    if ($PersonalAccessToken) {
         Assert-TableauRestVersion -AtLeast 3.6
-        $private:PlainSecret = (New-Object System.Net.NetworkCredential("", $PersonalAccessTokenSecret)).Password
-        $el_credentials.SetAttribute("personalAccessTokenName", $PersonalAccessTokenName)
-        $el_credentials.SetAttribute("personalAccessTokenSecret", $private:PlainSecret)
+        $el_credentials.SetAttribute("personalAccessTokenName", $Credential.GetNetworkCredential().UserName)
+        $el_credentials.SetAttribute("personalAccessTokenSecret", $Credential.GetNetworkCredential().Password)
         if ($ImpersonateUserId) { Assert-TableauRestVersion -AtLeast 3.11 }
-    } else {
-        Write-Error "Sign-in parameters not provided (needs either username/password or PAT)" -Category InvalidArgument -ErrorAction Stop
+    } else { # Username and Password
+        $el_credentials.SetAttribute("name", $Credential.GetNetworkCredential().UserName)
+        $el_credentials.SetAttribute("password", $Credential.GetNetworkCredential().Password)
+        # if ($ImpersonateUserId) { Assert-TableauRestVersion -AtLeast 2.0 }
     }
     $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Auth -Param signin) -Body $xml.OuterXml -Method Post -NoStandardHeader
     $script:TableauAuthToken = $response.tsResponse.credentials.token
