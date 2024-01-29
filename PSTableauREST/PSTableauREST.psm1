@@ -1,5 +1,4 @@
 ### Module variables and helper functions
-$TableauRestVersion = [version] 2.4 # selected REST API version, initially the minumum supported version
 $TableauRestMinVersion = [version] 2.4 # supported version for initial sign-in calls
 $TableauRestFileSizeLimit = 64*1048576 # 64MB is the maximum file size for single publishing request
 $TableauRestChunkSize = 2*1048576 # 2MB (or change for example to 5MB, 10MB, 50MB)
@@ -313,7 +312,6 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_server.htm
 Param(
     [Parameter()][string] $ServerUrl
 )
-    # Assert-TableauRestVersion -AtLeast 2.4
     if (-Not $ServerUrl) {
         $ServerUrl = $script:TableauServerUrl
     }
@@ -328,11 +326,11 @@ Param(
 function Connect-TableauServer {
 <#
 .SYNOPSIS
-Sign In (using username and password, or using PAT)
+Connect / Sign-In to Tableau Server or Tableau Cloud service.
 
 .DESCRIPTION
-Signs you in as a user on the specified site on Tableau Server or Tableau Cloud.
-This function initiates the session and stores the auth token that's needed for almost other REST API calls.
+Signs in as a specific user on the specified site of Tableau Server or Tableau Cloud.
+This function initiates the session and stores the auth token that's required for most other REST API calls.
 Authentication on Tableau Server (or Tableau Cloud) can be done with either
 - username and password
 - personal access token (PAT), using PAT name and PAT secret
@@ -384,12 +382,11 @@ Param(
     [Parameter()][string] $ImpersonateUserId,
     [Parameter()][bool] $UseServerVersion = $true
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    $serverInfo = Get-TableauServerInfo -ServerUrl $ServerUrl
     $script:TableauServerUrl = $ServerUrl
-    $serverInfo = Get-TableauServerInfo
-    $script:TSProductVersion = $serverInfo.productVersion.InnerText
-    $script:TSProductVersionBuild = $serverInfo.productVersion.build
-    # $serverInfo.prepConductorVersion
+    # $script:TableauProductVersion = $serverInfo.productVersion.InnerText
+    # $script:TableauProductVersionBuild = $serverInfo.productVersion.build
+    # $script:TableauPrepConductorVersion = $serverInfo.prepConductorVersion
     if ($UseServerVersion) {
         $script:TableauRestVersion = [version]$serverInfo.restApiVersion
     } else {
@@ -412,13 +409,31 @@ Param(
     } else { # Username and Password
         $el_credentials.SetAttribute("name", $Credential.GetNetworkCredential().UserName)
         $el_credentials.SetAttribute("password", $Credential.GetNetworkCredential().Password)
-        # if ($ImpersonateUserId) { Assert-TableauRestVersion -AtLeast 2.0 }
     }
     $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Auth -Param signin) -Body $xml.OuterXml -Method Post -NoStandardHeader
     $script:TableauAuthToken = $response.tsResponse.credentials.token
     $script:TableauSiteId = $response.tsResponse.credentials.site.id
     $script:TableauUserId = $response.tsResponse.credentials.user.id
     return $response.tsResponse.credentials
+}
+
+function Assert-TableauAuthToken {
+<#
+.SYNOPSIS
+Asserts that the authentication token exists
+
+.DESCRIPTION
+Asserts that the authentication token exists.
+The auth token is initialized when a successful sign-in is performed.
+
+.EXAMPLE
+Assert-TableauAuthToken
+#>
+[OutputType()]
+Param()
+    if (-Not $script:TableauAuthToken) {
+        Write-Error "Sign in first with Connect-TableauServer" -Category OperationStopped -ErrorAction Stop
+    }
 }
 
 function Switch-TableauSite {
@@ -443,6 +458,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_authentica
 Param(
     [Parameter()][string] $Site = ''
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 2.6
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -471,7 +487,6 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_authentica
 #>
 [OutputType([PSCustomObject])]
 Param()
-    # Assert-TableauRestVersion -AtLeast 2.0
     $response = $null
     if ($null -ne $script:TableauServerUrl -and $null -ne $script:TableauAuthToken) {
         $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Auth -Param signout) -Method Post
@@ -504,6 +519,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_authentica
 [CmdletBinding(SupportsShouldProcess)]
 [OutputType([PSCustomObject])]
 Param()
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.10
     if ($PSCmdlet.ShouldProcess()) {
         Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Auth -Param serverAdminAccessTokens) -Method Delete
@@ -542,6 +558,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_server.htm
 #>
 [OutputType([PSCustomObject])]
 Param()
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.1
     $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Session -Param current) -Method Get
     return $response.tsResponse.session
@@ -570,6 +587,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_server.htm
 Param(
     [Parameter(Mandatory)][string] $SessionId
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.9
     if ($PSCmdlet.ShouldProcess($SessionId)) {
         Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Session -Param $SessionId) -Method Delete
@@ -593,6 +611,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_server.htm
 #>
 [OutputType([PSCustomObject])]
 Param()
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.11
     $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Domain) -Method Get
     return $response.tsResponse.domainList.domain
@@ -629,6 +648,7 @@ Param(
     [Parameter()][string] $Name,
     [Parameter()][string] $ShortName
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.11
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -688,7 +708,7 @@ Param(
     [Parameter(ParameterSetName='CurrentSite')][switch] $IncludeUsageStatistics,
     [Parameter(ParameterSetName='Sites')][ValidateRange(1,100)][int] $PageSize = 100
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     if ($Current) { # get single (current) site
         $uri = Get-TableauRequestUri -Endpoint Site -Param $script:TableauSiteId
         if ($IncludeUsageStatistics) {
@@ -756,7 +776,7 @@ Param(
     [Parameter(Mandatory)][string] $ContentUrl,
     [Parameter()][hashtable] $SiteParams
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     if ($SiteParams.Keys -contains 'adminMode' -and $SiteParams.Keys -contains 'userQuota' -and $SiteParams["adminMode"] -eq "ContentOnly") {
         Write-Error "You cannot set admin_mode to ContentOnly and also set a user quota" -Category InvalidArgument -ErrorAction Stop
     }
@@ -812,7 +832,7 @@ Param(
     [Parameter()][string] $Name,
     [Parameter()][hashtable] $SiteParams
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     if ($SiteParams.Keys -contains 'adminMode' -and $SiteParams.Keys -contains 'userQuota' -and $SiteParams["adminMode"] -eq "ContentOnly") {
         Write-Error "You cannot set admin_mode to ContentOnly and also set a user quota" -Category InvalidArgument -ErrorAction Stop
     }
@@ -865,7 +885,7 @@ Param(
     [Parameter(Mandatory)][string] $SiteId,
     [Parameter()][switch] $BackgroundTask
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     $uri = Get-TableauRequestUri -Endpoint Site -Param $SiteId
     if ($BackgroundTask) {
         # Assert-TableauRestVersion -AtLeast 3.18
@@ -898,6 +918,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_site.htm#g
 #>
 [OutputType([PSCustomObject[]])]
 Param()
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.5
     $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Site -Param $SiteId/content/recent) -Method Get
     return $response.tsResponse.recents.recent
@@ -919,6 +940,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_site.htm#e
 #>
 [OutputType([PSCustomObject[]])]
 Param()
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.16
     $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Site -Param $SiteId/settings/embedding) -Method Get
     return $response.tsResponse.site.settings
@@ -952,6 +974,8 @@ Param(
     [Parameter(Mandatory,ParameterSetName='Unrestricted')][switch] $UnrestrictedEmbedding,
     [Parameter(Mandatory,ParameterSetName='AllowDomains')][string] $AllowDomains
 )
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.16
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_site = $tsRequest.AppendChild($xml.CreateElement("site"))
@@ -1008,7 +1032,7 @@ Param(
     [Parameter()][string[]] $Fields, # https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_fields.htm#query_projects
     [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     $pageNumber = 0
     do {
         $pageNumber++
@@ -1072,7 +1096,7 @@ Param(
     [Parameter()][string] $OwnerId,
     [Parameter()][string] $ParentProjectId
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_project = $tsRequest.AppendChild($xml.CreateElement("project"))
@@ -1144,7 +1168,7 @@ Param(
     [Parameter()][string] $OwnerId,
     [Parameter()][switch] $PublishSamples
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_project = $tsRequest.AppendChild($xml.CreateElement("project"))
@@ -1198,7 +1222,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_projects.h
 Param(
     [Parameter(Mandatory)][string] $ProjectId
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     if ($PSCmdlet.ShouldProcess($ProjectId)) {
         Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Project -Param $ProjectId) -Method Delete
     }
@@ -1267,7 +1291,7 @@ Param(
     [Parameter(ParameterSetName='Users')][string[]] $Fields,
     [Parameter(ParameterSetName='Users')][ValidateRange(1,100)][int] $PageSize = 100
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     if ($UserId) { # Query User On Site
         $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint User -Param $UserId) -Method Get
         $response.tsResponse.user
@@ -1331,7 +1355,7 @@ Param(
     [Parameter(Mandatory)][ValidateSet('Creator','Explorer','ExplorerCanPublish','SiteAdministratorExplorer','SiteAdministratorCreator','Viewer','Unlicensed')][string] $SiteRole,
     [Parameter()][string] $AuthSetting
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_user = $tsRequest.AppendChild($xml.CreateElement("user"))
@@ -1388,7 +1412,7 @@ Param(
     [Parameter()][ValidateSet('Creator','Explorer','ExplorerCanPublish','SiteAdministratorExplorer','SiteAdministratorCreator','Viewer','Unlicensed')][string] $SiteRole,
     [Parameter()][string] $AuthSetting
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_user = $tsRequest.AppendChild($xml.CreateElement("user"))
@@ -1440,7 +1464,7 @@ Param(
     [Parameter(Mandatory)][string] $UserId,
     [Parameter()][string] $MapAssetsToUserId
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     $uri = Get-TableauRequestUri -Endpoint User -Param $UserId
     if ($MapAssetsToUserId) {
         $uri += "?mapAssetsTo=$MapAssetsToUserId"
@@ -1489,7 +1513,7 @@ Param(
     [Parameter()][string[]] $Fields,
     [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     $pageNumber = 0
     do {
         $pageNumber++
@@ -1559,7 +1583,7 @@ Param(
     [Parameter()][switch] $EphemeralUsersEnabled,
     [Parameter()][switch] $BackgroundTask
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_group = $tsRequest.AppendChild($xml.CreateElement("group"))
@@ -1644,7 +1668,7 @@ Param(
     [Parameter()][switch] $EphemeralUsersEnabled,
     [Parameter()][switch] $BackgroundTask
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_group = $tsRequest.AppendChild($xml.CreateElement("group"))
@@ -1703,7 +1727,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_
 Param(
     [Parameter(Mandatory)][string] $GroupId
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     if ($PSCmdlet.ShouldProcess($GroupId)) {
         Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Group -Param $GroupId) -Method Delete
     }
@@ -1735,7 +1759,7 @@ Param(
     [Parameter(Mandatory)][string] $UserId,
     [Parameter(Mandatory)][string] $GroupId
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_user = $tsRequest.AppendChild($xml.CreateElement("user"))
@@ -1772,7 +1796,7 @@ Param(
     [Parameter(Mandatory)][string] $UserId,
     [Parameter(Mandatory)][string] $GroupId
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     if ($PSCmdlet.ShouldProcess("user:$UserId, group:$GroupId")) {
         Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Group -Param $GroupId/users/$UserId) -Method Delete
     }
@@ -1803,7 +1827,7 @@ Param(
     [Parameter(Mandatory)][string] $GroupId,
     [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     $pageNumber = 0
     do {
         $pageNumber++
@@ -1840,6 +1864,7 @@ Param(
     [Parameter(Mandatory)][string] $UserId,
     [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.7
     $pageNumber = 0
     do {
@@ -1890,6 +1915,7 @@ Param(
     [string] $AuthSetting,
     [Parameter(Mandatory,ParameterSetName='UserAuthSettings')][hashtable] $UserAuthSettings
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.15
     $fileItem = Get-Item -LiteralPath $CsvFile
     $fileName = $fileItem.Name -replace '["`]','' # remove special chars
@@ -1953,6 +1979,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_
 Param(
     [Parameter(Mandatory)][string] $CsvFile
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.15
     $fileItem = Get-Item -LiteralPath $CsvFile
     $fileName = $fileItem.Name -replace '["`]','' # remove special chars
@@ -2008,7 +2035,7 @@ Param(
     [Parameter(Mandatory)][string] $InFile,
     [Parameter()][string] $FileName = "file"
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     if ($FileName -match '[^\x20-\x7e]') { # special non-ASCII characters in the filename cause issues on some API versions
         Write-Verbose "Filename $FileName contains special characters, replacing with tableau_file"
         $FileName = "tableau_file" # fallback to standard filename (doesn't matter for file upload)
@@ -2155,12 +2182,11 @@ Param(
     [Parameter(ParameterSetName='WorkbookRevisions')]
     [ValidateRange(1,100)][int] $PageSize = 100
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     if ($ContentUrl) {
         Assert-TableauRestVersion -AtLeast 3.17
     }
     if ($Revisions) { # Get Workbook Revisions
-        # Assert-TableauRestVersion -AtLeast 2.3
         $pageNumber = 0
         do {
             $pageNumber++
@@ -2233,7 +2259,7 @@ Param(
     [Parameter()][switch] $IsOwner,
     [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     $pageNumber = 0
     do {
         $pageNumber++
@@ -2267,7 +2293,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_
 Param(
     [Parameter(Mandatory)][string] $WorkbookId
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId/connections) -Method Get
     return $response.tsResponse.connections.connection
 }
@@ -2312,14 +2338,13 @@ Param(
     [Parameter()][switch] $ExcludeExtract,
     [Parameter()][int] $Revision
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     $OutFileParam = @{}
     if ($OutFile) {
         $OutFileParam.Add("OutFile", $OutFile)
     }
     $uri = Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId
     if ($Revision) {
-        # Assert-TableauRestVersion -AtLeast 2.3
         $lastRevision = Get-TableauWorkbook -WorkbookId $WorkbookId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
         # Note that the current revision of a workbook cannot be accessed by the /revisions endpoint; in this case we ignore the -Revision parameter
         if ($Revision -lt $lastRevision) {
@@ -2421,7 +2446,7 @@ Param(
     [Parameter()][hashtable[]] $Connections
     # [Parameter()][switch] $EncryptExtracts,
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     $fileItem = Get-Item -LiteralPath $InFile
     if (-Not $FileName) {
         $FileName = $fileItem.Name -replace '["`]','' # remove special chars
@@ -2616,7 +2641,7 @@ Param(
     [Parameter()][switch] $EnableDataAcceleration,
     [Parameter()][switch] $AccelerateNow
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_workbook = $tsRequest.AppendChild($xml.CreateElement("workbook"))
@@ -2710,7 +2735,7 @@ Param(
     [Parameter()][switch] $EmbedPassword,
     [Parameter()][switch] $QueryTagging
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_connection = $tsRequest.AppendChild($xml.CreateElement("connection"))
@@ -2775,9 +2800,8 @@ Param(
     [Parameter(Mandatory)][string] $WorkbookId,
     [Parameter()][int] $Revision
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     if ($Revision) { # Remove Workbook Revision
-        # Assert-TableauRestVersion -AtLeast 2.3
         if ($PSCmdlet.ShouldProcess("$WorkbookId, revision $Revision")) {
             Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId/revisions/$Revision) -Method Delete
         }
@@ -2814,6 +2838,7 @@ Param(
     [Parameter(Mandatory)][string] $WorkbookId,
     [Parameter(Mandatory)][version] $DowngradeVersion
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.5
     $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId/downGradeInfo?productVersion=$DowngradeVersion) -Method Get
     return $response.tsResponse.downgradeInfo
@@ -2880,6 +2905,7 @@ Param(
     [Parameter()][int] $MaxAge, # The maximum number of minutes a workbook preview will be cached before being refreshed
     [Parameter()][string] $OutFile
 )
+    Assert-TableauAuthToken
     $OutFileParam = @{}
     if ($OutFile) {
         $OutFileParam.Add("OutFile", $OutFile)
@@ -2900,7 +2926,6 @@ Param(
         }
         # $fileType = 'pptx'
     } elseif ($Format -eq 'image') {
-        # Assert-TableauRestVersion -AtLeast 2.0
         $uri += "/previewImage"
         # $fileType = 'png'
     }
@@ -2929,6 +2954,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_
 Param(
     [Parameter(Mandatory)][string] $WorkbookId
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 2.8
     $uri = Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId/refresh
     if ($PSCmdlet.ShouldProcess($WorkbookId)) {
@@ -3001,9 +3027,8 @@ Param(
     [Parameter(ParameterSetName='DatasourceRevisions')]
     [ValidateRange(1,100)][int] $PageSize = 100
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     if ($Revisions) { # Get Data Source Revisions
-        # Assert-TableauRestVersion -AtLeast 2.3
         $pageNumber = 0
         do {
             $pageNumber++
@@ -3063,7 +3088,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sourc
 Param(
     [Parameter(Mandatory)][string] $DatasourceId
 )
-    # Assert-TableauRestVersion -AtLeast 2.3
+    Assert-TableauAuthToken
     $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId/connections) -Method Get
     return $response.tsResponse.connections.connection
 }
@@ -3108,14 +3133,13 @@ Param(
     [Parameter()][switch] $ExcludeExtract,
     [Parameter()][int] $Revision
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     $OutFileParam = @{}
     if ($OutFile) {
         $OutFileParam.Add("OutFile", $OutFile)
     }
     $uri = Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId
     if ($Revision) {
-        # Assert-TableauRestVersion -AtLeast 2.3
         $lastRevision = Get-TableauDatasource -DatasourceId $DatasourceId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
         # Note that the current revision of a datasource cannot be accessed by the /revisions endpoint; in this case we ignore the -Revision parameter
         if ($Revision -lt $lastRevision) {
@@ -3210,7 +3234,7 @@ Param(
     [Parameter()][hashtable] $Credentials,
     [Parameter()][hashtable[]] $Connections
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     $fileItem = Get-Item -LiteralPath $InFile
     if (-Not $FileName) {
         $FileName = $fileItem.Name -replace '["`]','' # remove special chars
@@ -3382,7 +3406,7 @@ Param(
     [Parameter()][switch] $EncryptExtracts,
     [Parameter()][switch] $EnableAskData
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_datasource = $tsRequest.AppendChild($xml.CreateElement("datasource"))
@@ -3469,7 +3493,7 @@ Param(
     [Parameter()][switch] $EmbedPassword,
     [Parameter()][switch] $QueryTagging
 )
-    # Assert-TableauRestVersion -AtLeast 2.3
+    Assert-TableauAuthToken
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_connection = $tsRequest.AppendChild($xml.CreateElement("connection"))
@@ -3533,9 +3557,8 @@ Param(
     [Parameter(Mandatory)][string] $DatasourceId,
     [Parameter()][int] $Revision
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     if ($Revision) { # Remove Data Source Revision
-        # Assert-TableauRestVersion -AtLeast 2.3
         if ($PSCmdlet.ShouldProcess("$DatasourceId, revision $Revision")) {
             Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId/revisions/$Revision) -Method Delete
         }
@@ -3568,6 +3591,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sourc
 Param(
     [Parameter(Mandatory)][string] $DatasourceId
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 2.8
     $uri = Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId/refresh
     if ($PSCmdlet.ShouldProcess($DatasourceId)) {
@@ -3634,6 +3658,7 @@ Param(
     [Parameter()][string] $InFile,
     [Parameter()][string] $RequestId
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.12
     if ($ConnectionId) {
         $uri = Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId/connections/$ConnectionId/data
@@ -3730,7 +3755,7 @@ Param(
     [Parameter(ParameterSetName='Views')][string[]] $Fields,
     [Parameter(ParameterSetName='Views')][ValidateRange(1,100)][int] $PageSize = 100
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     if ($ViewId) { # Get View
         Assert-TableauRestVersion -AtLeast 3.0
     }
@@ -3745,7 +3770,6 @@ Param(
         $response = Invoke-TableauRestMethod -Uri $uri -Method Get
         $response.tsResponse.views.view
     } else { # Query Views for Site
-        # Assert-TableauRestVersion -AtLeast 2.2
         $pageNumber = 0
         do {
             $pageNumber++
@@ -3804,7 +3828,7 @@ Param(
     [Parameter(Mandatory)][string] $WorkbookId,
     [Parameter()][string] $OutFile
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     $OutFileParam = @{}
     if ($OutFile) {
         $OutFileParam.Add("OutFile", $OutFile)
@@ -3893,6 +3917,7 @@ Param(
     [Parameter()][string] $OutFile,
     [Parameter()][hashtable] $ViewFilters
 )
+    Assert-TableauAuthToken
     $OutFileParam = @{}
     if ($OutFile) {
         $OutFileParam.Add("OutFile", $OutFile)
@@ -3954,6 +3979,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_
 #>
 [OutputType([PSCustomObject[]])]
 Param()
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.7
     $uri = Get-TableauRequestUri -Endpoint Recommendation -Param "?type=view"
     $response = Invoke-TableauRestMethod -Uri $uri -Method Get
@@ -3981,6 +4007,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_
 Param(
     [Parameter(Mandatory)][string] $ViewId
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.7
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -4012,6 +4039,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_
 Param(
     [Parameter(Mandatory)][string] $ViewId
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.7
     $uri = Get-TableauRequestUri -Endpoint Recommendation -Param "dismissals/?type=view&id=$ViewId"
     Invoke-TableauRestMethod -Uri $uri -Method Delete
@@ -4067,6 +4095,7 @@ Param(
     [Parameter(ParameterSetName='CustomViews')][string[]] $Fields,
     [Parameter(ParameterSetName='CustomViews')][ValidateRange(1,100)][int] $PageSize = 100
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.18
     if ($CustomViewId) { # Get Custom View
         $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint CustomView -Param $CustomViewId) -Method Get
@@ -4118,6 +4147,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_
 Param(
     [Parameter(Mandatory)][string] $CustomViewId
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.21
     $uri = Get-TableauRequestUri -Endpoint CustomView -Param "$CustomViewId/default/users"
     $response = Invoke-TableauRestMethod -Uri $uri -Method Get
@@ -4150,6 +4180,7 @@ Param(
     [Parameter(Mandatory)][string] $CustomViewId,
     [Parameter(Mandatory)][string[]] $UserId
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.21
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -4206,6 +4237,7 @@ Param(
     [Parameter()][string] $OutFile,
     [Parameter()][hashtable] $ViewFilters
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.18
     $OutFileParam = @{}
     if ($OutFile) {
@@ -4258,6 +4290,7 @@ Param(
     [Parameter()][string] $NewName,
     [Parameter()][string] $NewOwnerId
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.18
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -4297,6 +4330,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_
 Param(
     [Parameter(Mandatory)][string] $CustomViewId
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.18
     if ($PSCmdlet.ShouldProcess($CustomViewId)) {
         Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint CustomView -Param $CustomViewId) -Method Delete
@@ -4404,6 +4438,7 @@ Param(
     [Parameter(ParameterSetName='FlowRevisions')]
     [ValidateRange(1,100)][int] $PageSize = 100
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.3
     if ($Revisions) { # Get Flow Revisions
         $pageNumber = 0
@@ -4477,6 +4512,7 @@ Param(
     [Parameter()][switch] $IsOwner,
     [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.3
     $pageNumber = 0
     do {
@@ -4511,6 +4547,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#q
 Param(
     [Parameter(Mandatory)][string] $FlowId
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.3
     $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Flow -Param $FlowId/connections) -Method Get
     return $response.tsResponse.connections.connection
@@ -4547,6 +4584,7 @@ Param(
     [Parameter()][string] $OutFile,
     [Parameter()][int] $Revision
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.3
     $OutFileParam = @{}
     if ($OutFile) {
@@ -4619,6 +4657,7 @@ Param(
     # [Parameter()][hashtable] $Credentials, # connectionCredentials is not supported in this API method
     [Parameter()][hashtable[]] $Connections
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.3
     $fileItem = Get-Item -LiteralPath $InFile
     if (-Not $FileName) {
@@ -4749,6 +4788,7 @@ Param(
     [Parameter()][string] $NewProjectId,
     [Parameter()][string] $NewOwnerId
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.3
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -4813,6 +4853,7 @@ Param(
     [Parameter()][securestring] $SecurePassword,
     [Parameter()][switch] $EmbedPassword
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.3
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -4868,6 +4909,7 @@ Param(
     [Parameter(Mandatory)][string] $FlowId,
     [Parameter()][int] $Revision # Note: flow revisions currently not supported via REST API
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.3
     if ($Revision) { # Remove Flow Revision
         if ($PSCmdlet.ShouldProcess("$FlowId, revision $Revision")) {
@@ -4914,6 +4956,7 @@ Param(
     [Parameter()][string] $OutputStepId,
     [Parameter()][hashtable] $FlowParams
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.3
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -4978,6 +5021,7 @@ Param(
     [Parameter(ParameterSetName='FlowRuns')][string[]] $Filter,
     [Parameter(ParameterSetName='FlowRuns')][ValidateRange(1,100)][int] $PageSize = 100
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.10
     if ($FlowRunId) { # Get Flow Run
         $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Flow -Param runs/$FlowRunId) -Method Get
@@ -5025,6 +5069,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#c
 Param(
     [Parameter(Mandatory)][string] $FlowRunId
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.10
     if ($PSCmdlet.ShouldProcess($FlowRunId)) {
         $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Flow -Param runs/$FlowRunId) -Method Put
@@ -5092,7 +5137,7 @@ Param(
     [Parameter(Mandatory,ParameterSetName='Project')][string] $ProjectId,
     [Parameter(Mandatory,ParameterSetName='Flow')][string] $FlowId
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     if ($WorkbookId) {
         $uri = Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId
     } elseif ($DatasourceId) {
@@ -5178,7 +5223,7 @@ Param(
     [Parameter(Mandatory,ParameterSetName='Flow')][string] $FlowId,
     [Parameter(Mandatory)][hashtable[]] $PermissionTable
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_pm = $tsRequest.AppendChild($xml.CreateElement("permissions"))
@@ -5279,7 +5324,7 @@ Param(
     [Parameter(Mandatory,ParameterSetName='Flow')][string] $FlowId,
     [Parameter(Mandatory)][hashtable[]] $PermissionTable
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     $MainParam = @{}
     if ($WorkbookId) {
         $shouldProcessItem = "workbook:$WorkbookId"
@@ -5540,7 +5585,7 @@ Param(
     [Parameter(Mandatory,ParameterSetName='FlowAll')]
     [switch] $All
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     $MainParam = @{}
     if ($WorkbookId) {
         $uri = Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId
@@ -5697,7 +5742,7 @@ Param(
     [Parameter(Mandatory)][string] $ProjectId,
     [Parameter()][ValidateSet('Workbooks','Datasources','Flows','Dataroles','Lenses','Metrics','Databases','Tables')][string] $ContentType
 )
-    # Assert-TableauRestVersion -AtLeast 2.1
+    Assert-TableauAuthToken
     $permissionTable = @()
     $uri = Get-TableauRequestUri -Endpoint Project -Param "$ProjectId/default-permissions/"
     foreach ($ct in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') { #,'virtualconnections' not supported yet
@@ -5777,6 +5822,7 @@ Param(
     [Parameter(Mandatory)][string] $ProjectId,
     [Parameter(Mandatory)][hashtable[]] $PermissionTable
 )
+    Assert-TableauAuthToken
     $uri = Get-TableauRequestUri -Endpoint Project -Param "$ProjectId/default-permissions/"
     $outputPermissionTable = @()
     foreach ($ct in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
@@ -6014,7 +6060,7 @@ Param(
     [Parameter(Mandatory,ParameterSetName='AllPermissions')]
     [switch] $All
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     $uri = Get-TableauRequestUri -Endpoint Project -Param "$ProjectId/default-permissions/"
     $shouldProcessItem = "project:$ProjectId"
     if ($CapabilityName -and $CapabilityMode) { # Remove one default permission/capability
@@ -6122,7 +6168,7 @@ Param(
     [Parameter(Mandatory,ParameterSetName='Flow')][string] $FlowId,
     [Parameter(Mandatory)][string[]] $Tags
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_tags = $tsRequest.AppendChild($xml.CreateElement("tags"))
@@ -6189,7 +6235,7 @@ Param(
     [Parameter(Mandatory,ParameterSetName='Flow')][string] $FlowId,
     [Parameter(Mandatory)][string] $Tag
 )
-    # Assert-TableauRestVersion -AtLeast 2.0
+    Assert-TableauAuthToken
     if ($WorkbookId -and $PSCmdlet.ShouldProcess("workbook:$WorkbookId, tag:$Tag")) {
         Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId/tags/$Tag) -Method Delete
     } elseif ($DatasourceId -and $PSCmdlet.ShouldProcess("datasource:$DatasourceId, tag:$Tag")) {
@@ -6234,7 +6280,7 @@ Param(
     [Parameter(Mandatory,ParameterSetName='ScheduleById')][string] $ScheduleId,
     [Parameter(ParameterSetName='Schedules')][ValidateRange(1,100)][int] $PageSize = 100
 )
-    # Assert-TableauRestVersion -AtLeast 2.3
+    Assert-TableauAuthToken
     if ($ScheduleId) { # Get Server Schedule
         Assert-TableauRestVersion -AtLeast 3.8
     }
@@ -6331,7 +6377,7 @@ Param(
     [Parameter(Mandatory,ParameterSetName='Weekly')][ValidateSet('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')][string[]] $IntervalWeekdays,
     [Parameter(Mandatory,ParameterSetName='Monthly')][ValidateRange(0,31)][int] $IntervalMonthday
 )
-    # Assert-TableauRestVersion -AtLeast 2.3
+    Assert-TableauAuthToken
     if ($Type -eq 'DataAcceleration') {
         Assert-TableauRestVersion -AtLeast 3.8 -LessThan 3.16
     }
@@ -6467,7 +6513,7 @@ Param(
     [Parameter(Mandatory,ParameterSetName='Weekly')][ValidateSet('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')][string[]] $IntervalWeekdays,
     [Parameter(Mandatory,ParameterSetName='Monthly')][ValidateRange(0,31)][int] $IntervalMonthday # 0 for last day
 )
-    # Assert-TableauRestVersion -AtLeast 2.3
+    Assert-TableauAuthToken
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_sched = $tsRequest.AppendChild($xml.CreateElement("schedule"))
@@ -6554,7 +6600,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_jobs_tasks
 Param(
     [Parameter(Mandatory)][string] $ScheduleId
 )
-    # Assert-TableauRestVersion -AtLeast 2.3
+    Assert-TableauAuthToken
     if ($PSCmdlet.ShouldProcess($ScheduleId)) {
         Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ServerSchedule -Param $ScheduleId) -Method Delete
     }
@@ -6623,6 +6669,7 @@ Param(
     [Parameter(ParameterSetName='Flow')][string] $OutputStepId, # note: this input is ignored by the API, maybe will be supported later
     [Parameter(ParameterSetName='Flow')][hashtable] $FlowParams
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 2.8
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -6725,6 +6772,7 @@ Param(
     [Parameter(ParameterSetName='Jobs')][string[]] $Fields,
     [Parameter(ParameterSetName='Jobs')][ValidateRange(1,100)][int] $PageSize = 100
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.1
     if ($JobId) { # Query Job
         $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Job -Param $JobId) -Method Get
@@ -6778,6 +6826,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_jobs_tasks
 Param(
     [Parameter(Mandatory)][string] $JobId
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.1
     if ($PSCmdlet.ShouldProcess($JobId)) {
         $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Job -Param $JobId) -Method Put
@@ -6820,6 +6869,7 @@ Param(
     [Parameter()][int] $Timeout = 3600,
     [Parameter()][int] $Interval = 1
 )
+    Assert-TableauAuthToken
     do {
         Start-Sleep -s $Interval
         $Timeout--
@@ -6905,6 +6955,7 @@ Param(
     [Parameter(Mandatory,ParameterSetName='TaskById')][string] $TaskId,
     [Parameter(ParameterSetName='Tasks')][ValidateRange(1,100)][int] $PageSize = 100
 )
+    Assert-TableauAuthToken
     if ($TaskId) { # Get Flow Run Task / Get Extract Refresh Task / Get Linked Task / Get Data Acceleration Task
         switch ($Type) {
             'ExtractRefresh' {
@@ -6934,7 +6985,6 @@ Param(
             $pageNumber++
             switch ($Type) {
                 'ExtractRefresh' {
-                    # Assert-TableauRestVersion -AtLeast 2.2
                     $uri = Get-TableauRequestUri -Endpoint Task -Param extractRefreshes
                 }
                 'FlowRun' {
@@ -7001,6 +7051,7 @@ Param(
     [Parameter(Mandatory)][ValidateSet('ExtractRefresh','DataAcceleration')][string] $Type, # 'FlowRun' not supported
     [Parameter(Mandatory)][string] $TaskId
 )
+    Assert-TableauAuthToken
     if ($PSCmdlet.ShouldProcess("$Type $TaskId")) {
         switch ($Type) {
             'ExtractRefresh' {
@@ -7051,6 +7102,7 @@ Param(
     [Parameter(Mandatory)][string] $TaskId,
     [Parameter(Mandatory)][ValidateSet('ExtractRefresh','FlowRun','Linked')][string] $Type
 )
+    Assert-TableauAuthToken
     if ($PSCmdlet.ShouldProcess("$Type $TaskId")) {
         switch ($Type) {
             'ExtractRefresh' { # Run Extract Refresh Task
@@ -7099,7 +7151,7 @@ Param(
     [Parameter(Mandatory)][string] $ScheduleId,
     [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
 )
-    # Assert-TableauRestVersion -AtLeast 2.3
+    Assert-TableauAuthToken
     $pageNumber = 0
     do {
         $pageNumber++
@@ -7149,6 +7201,7 @@ Param(
     [Parameter(Mandatory,ParameterSetName='Datasource')][string] $DatasourceId,
     [Parameter()][switch] $EncryptExtracts
 )
+    Assert-TableauAuthToken
     if ($WorkbookId) {
         Assert-TableauRestVersion -AtLeast 3.5
         $uri = Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId
@@ -7199,6 +7252,7 @@ Param(
     [Parameter(Mandatory,ParameterSetName='Workbook')][string] $WorkbookId,
     [Parameter(Mandatory,ParameterSetName='Datasource')][string] $DatasourceId
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.5
     if ($WorkbookId) {
         $uri = Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId
@@ -7283,6 +7337,7 @@ Param(
     [Parameter()][ValidateSet('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')][string] $IntervalMonthdayWeekday,
     [Parameter()][ValidateRange(1,31)][int[]] $IntervalMonthdays
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.20
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -7438,6 +7493,7 @@ Param(
     [Parameter()][ValidateSet('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')][string] $IntervalMonthdayWeekday,
     [Parameter()][ValidateRange(1,31)][int[]] $IntervalMonthdays # specific month days
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.20
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -7565,6 +7621,8 @@ Param(
     [Parameter(Mandatory,ParameterSetName='Reencrypt')][switch] $ReencryptExtracts,
     [Parameter()][string] $SiteId
 )
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.5
     if (-Not $SiteId) {
         $SiteId = $script:TableauSiteId
     }
@@ -7609,6 +7667,7 @@ Param(
     [Parameter(Mandatory)][string] $UserId,
     [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 2.5
     $pageNumber = 0
     do {
@@ -7684,11 +7743,11 @@ Param(
     [Parameter(Mandatory,ParameterSetName='Project')][string] $ProjectId,
     [Parameter(Mandatory,ParameterSetName='Flow')][string] $FlowId
 )
+    Assert-TableauAuthToken
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_favorite = $tsRequest.AppendChild($xml.CreateElement("favorite"))
     if ($WorkbookId) {
-        # Assert-TableauRestVersion -AtLeast 2.0
         $el_favorite.AppendChild($xml.CreateElement("workbook")).SetAttribute("id", $WorkbookId)
         if ($Label) {
             $el_favorite.SetAttribute("label", $Label)
@@ -7697,7 +7756,6 @@ Param(
         }
         $shouldProcessItem = "user:$UserId, workbook:$WorkbookId"
     } elseif ($DatasourceId) {
-        # Assert-TableauRestVersion -AtLeast 2.3
         $el_favorite.AppendChild($xml.CreateElement("datasource")).SetAttribute("id", $DatasourceId)
         if ($Label) {
             $el_favorite.SetAttribute("label", $Label)
@@ -7706,7 +7764,6 @@ Param(
         }
         $shouldProcessItem = "user:$UserId, datasource:$DatasourceId"
     } elseif ($ViewId) {
-        # Assert-TableauRestVersion -AtLeast 2.0
         $el_favorite.AppendChild($xml.CreateElement("view")).SetAttribute("id", $ViewId)
         if ($Label) {
             $el_favorite.SetAttribute("label", $Label)
@@ -7793,16 +7850,14 @@ Param(
     [Parameter(Mandatory,ParameterSetName='Project')][string] $ProjectId,
     [Parameter(Mandatory,ParameterSetName='Flow')][string] $FlowId
 )
+    Assert-TableauAuthToken
     if ($WorkbookId) {
-        # Assert-TableauRestVersion -AtLeast 2.0
         $uri = Get-TableauRequestUri -Endpoint Favorite -Param $UserId/workbooks/$WorkbookId
         $shouldProcessItem = "user:$UserId, workbook:$WorkbookId"
     } elseif ($DatasourceId) {
-        # Assert-TableauRestVersion -AtLeast 2.3
         $uri = Get-TableauRequestUri -Endpoint Favorite -Param $UserId/datasources/$DatasourceId
         $shouldProcessItem = "user:$UserId, datasource:$DatasourceId"
     } elseif ($ViewId) {
-        # Assert-TableauRestVersion -AtLeast 2.0
         $uri = Get-TableauRequestUri -Endpoint Favorite -Param $UserId/views/$ViewId
         $shouldProcessItem = "user:$UserId, view:$ViewId"
     } elseif ($ProjectId) {
@@ -7859,6 +7914,7 @@ Param(
     [Parameter(Mandatory)][string] $AfterFavoriteId,
     [Parameter(Mandatory)][ValidateSet('Workbook','Datasource','View','Project','Flow')][string] $AfterFavoriteType
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.8
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -7905,7 +7961,7 @@ Param(
     [Parameter(Mandatory,ParameterSetName='SubscriptionById')][string] $SubscriptionId,
     [Parameter(ParameterSetName='Subscriptions')][ValidateRange(1,100)][int] $PageSize = 100
 )
-    # Assert-TableauRestVersion -AtLeast 2.3
+    Assert-TableauAuthToken
     if ($SubscriptionId) { # Get Subscription
         $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Subscription -Param $SubscriptionId) -Method Get
         $response.tsResponse.subscription
@@ -8031,6 +8087,7 @@ Param(
     [Parameter(ParameterSetName='CloudSchedule')][ValidateSet('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')][string] $IntervalMonthdayWeekday,
     [Parameter(ParameterSetName='CloudSchedule')][ValidateRange(1,31)][int[]] $IntervalMonthdays # specific month days
 )
+    Assert-TableauAuthToken
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_subs = $tsRequest.AppendChild($xml.CreateElement("subscription"))
@@ -8051,7 +8108,6 @@ Param(
     $el_user = $el_subs.AppendChild($xml.CreateElement("user"))
     $el_user.SetAttribute("id", $UserId)
     if ($ScheduleId) { # Create Subscription on Tableau Server
-        # Assert-TableauRestVersion -AtLeast 2.3
         $el_sched = $el_subs.AppendChild($xml.CreateElement("schedule"))
         $el_sched.SetAttribute("id", $ScheduleId)
     } elseif ($Frequency) { # Create Subscription on Tableau Cloud
@@ -8241,6 +8297,7 @@ Param(
     [Parameter(ParameterSetName='CloudSchedule')][ValidateSet('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')][string] $IntervalMonthdayWeekday,
     [Parameter(ParameterSetName='CloudSchedule')][ValidateRange(1,31)][int[]] $IntervalMonthdays # specific month days
 )
+    Assert-TableauAuthToken
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
     $el_subs = $tsRequest.AppendChild($xml.CreateElement("subscription"))
@@ -8282,7 +8339,6 @@ Param(
         $el_user.SetAttribute("id", $UserId)
     }
     if ($ScheduleId) { # Update Subscription on Tableau Server
-        # Assert-TableauRestVersion -AtLeast 2.3
         $el_sched = $el_subs.AppendChild($xml.CreateElement("schedule"))
         $el_sched.SetAttribute("id", $ScheduleId)
     } elseif ($Frequency) { # Update Subscription on Tableau Cloud
@@ -8376,7 +8432,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_subscripti
 Param(
     [Parameter(Mandatory)][string] $SubscriptionId
 )
-    # Assert-TableauRestVersion -AtLeast 2.3
+    Assert-TableauAuthToken
     if ($PSCmdlet.ShouldProcess($SubscriptionId)) {
         Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Subscription -Param $SubscriptionId) -Method Delete
     }
@@ -8400,6 +8456,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_tableau_ex
 #>
 [OutputType([PSCustomObject])]
 Param()
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.21
     $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ServerSetting -Param extensions) -Method Get
     return $response.tsResponse.extensionsServerSettings
@@ -8432,6 +8489,7 @@ Param(
     [Parameter(Mandatory)][ValidateSet('true','false')][string] $Enabled,
     [Parameter()][string[]] $BlockList
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.21
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -8467,6 +8525,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_tableau_ex
 #>
 [OutputType([PSCustomObject])]
 Param()
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.21
     $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Setting -Param extensions) -Method Get
     return $response.tsResponse.extensionsSiteSettings
@@ -8508,6 +8567,7 @@ Param(
     [Parameter()][ValidateSet('true','false')][string] $UseDefaultSetting,
     [Parameter()][hashtable[]] $SafeList
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.21
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -8582,6 +8642,7 @@ Param(
     [Parameter(ParameterSetName='DataAlerts')][string[]] $Fields,
     [Parameter(ParameterSetName='DataAlerts')][ValidateRange(1,100)][int] $PageSize = 100
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.2
     if ($DataAlertId) { # Get Data-Driven Alert
         $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint DataAlert -Param $DataAlertId) -Method Get
@@ -8673,6 +8734,7 @@ Param(
     [Parameter(Mandatory,ParameterSetName='View')][string] $ViewId,
     [Parameter(Mandatory,ParameterSetName='CustomView')][string] $CustomViewId
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.20
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -8737,6 +8799,7 @@ Param(
     [Parameter()][ValidateSet('once','freguently','hourly','daily','weekly')][string] $Frequency,
     [Parameter()][ValidateSet('true','false')][string] $Public
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.2
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -8782,6 +8845,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notificati
 Param(
     [Parameter(Mandatory)][string] $DataAlertId
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.2
     if ($PSCmdlet.ShouldProcess($DataAlertId)) {
         Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint DataAlert -Param $DataAlertId) -Method Delete
@@ -8814,6 +8878,7 @@ Param(
     [Parameter(Mandatory)][string] $DataAlertId,
     [Parameter(Mandatory)][string] $UserId
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.2
     $xml = New-Object System.Xml.XmlDocument
     $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
@@ -8851,6 +8916,7 @@ Param(
     [Parameter(Mandatory)][string] $DataAlertId,
     [Parameter(Mandatory)][string] $UserId
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.2
     if ($PSCmdlet.ShouldProcess("user:$UserId, data alert:$DataAlertId")) {
         Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint DataAlert -Param $DataAlertId/users/$UserId) -Method Delete
@@ -8886,6 +8952,7 @@ Param(
     [Parameter(Mandatory,ParameterSetName='DatabaseById')][string] $DatabaseId,
     [Parameter(ParameterSetName='Databases')][ValidateRange(1,100)][int] $PageSize = 100
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.5
     if ($DatabaseId) { # Query Database
         $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Database -Param $DatabaseId) -Method Get
@@ -8931,6 +8998,7 @@ Param(
     [Parameter(Mandatory,ParameterSetName='TableById')][string] $TableId,
     [Parameter(ParameterSetName='Tables')][ValidateRange(1,100)][int] $PageSize = 100
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.5
     if ($TableId) { # Query Table
         $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Table -Param $TableId) -Method Get
@@ -8980,6 +9048,7 @@ Param(
     [Parameter(Mandatory,ParameterSetName='ColumnById')][string] $ColumnId,
     [Parameter(ParameterSetName='Columns')][ValidateRange(1,100)][int] $PageSize = 100
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.5
     if ($ColumnId) { # Query Column in a Table
         $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Table -Param $TableId/columns/$ColumnId) -Method Get
@@ -9027,6 +9096,7 @@ Param(
     [Parameter()][string] $PaginatedEntity,
     [Parameter()][ValidateRange(1,20000)][int] $PageSize = 100
 )
+    Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.5
     $uri = Get-TableauRequestUri -Endpoint GraphQL
     if ($PaginatedEntity) { # run paginated (modified) query

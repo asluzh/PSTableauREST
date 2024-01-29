@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.5.0'
+ModuleVersion = '0.5.1'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -70,76 +70,62 @@ PowerShellVersion = '5.1'
 
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
 FunctionsToExport = @(
+### General methods
+'Invoke-TableauRestMethod',
 ### API version methods
 'Assert-TableauRestVersion', 'Get-TableauRestVersion', 'Set-TableauRestVersion',
-
 ### Authentication / Server methods
 'Get-TableauServerInfo', 'Connect-TableauServer', 'Switch-TableauSite', 'Disconnect-TableauServer', 'Revoke-TableauServerAdminPAT', 'Get-TableauCurrentUserId',
 'Get-TableauSession', 'Remove-TableauSession', 'Get-TableauActiveDirectoryDomain', 'Set-TableauActiveDirectoryDomain',
-
 ### Site methods
 'Get-TableauSite', 'New-TableauSite', 'Set-TableauSite', 'Remove-TableauSite',
 'Get-TableauRecentlyViewedContent', 'Get-TableauSiteSettingsEmbedding', 'Set-TableauSiteSettingsEmbedding',
 # Get Data Acceleration Report for a Site - feature deprecated in API 3.16
-
 ### Projects methods
 'Get-TableauProject', 'New-TableauProject', 'Set-TableauProject', 'Remove-TableauProject', 'Get-TableauDefaultProject',
-
 ### Users and Groups methods
 'Get-TableauUser', 'New-TableauUser', 'Set-TableauUser', 'Remove-TableauUser',
 'Get-TableauGroup', 'New-TableauGroup', 'Set-TableauGroup', 'Remove-TableauGroup',
 'Add-TableauUserToGroup', 'Remove-TableauUserFromGroup', 'Get-TableauUsersInGroup', 'Get-TableauGroupsForUser',
 'Import-TableauUsersCsv', 'Remove-TableauUsersCsv',
-
 ### Publishing methods
 'Send-TableauFileUpload',
-
 ### Workbooks methods
 'Get-TableauWorkbook', 'Get-TableauWorkbooksForUser', 'Export-TableauWorkbook', 'Publish-TableauWorkbook', 'Set-TableauWorkbook', 'Remove-TableauWorkbook',
 'Get-TableauWorkbookDowngradeInfo', 'Export-TableauWorkbookToFormat',
 'Get-TableauWorkbookConnection', 'Set-TableauWorkbookConnection', 'Update-TableauWorkbookNow',
-
 ### Datasources methods
 'Get-TableauDatasource', 'Export-TableauDatasource', 'Publish-TableauDatasource', 'Set-TableauDatasource', 'Remove-TableauDatasource',
 'Get-TableauDatasourceConnection', 'Set-TableauDatasourceConnection', 'Update-TableauDatasourceNow', 'Update-TableauHyperData',
-
 ### Views methods
 'Get-TableauView', 'Export-TableauViewImage', 'Export-TableauViewToFormat', 'Get-TableauViewUrl',
 'Get-TableauViewRecommendation', 'Hide-TableauViewRecommendation', 'Show-TableauViewRecommendation',
 'Get-TableauCustomView', 'Get-TableauCustomViewUserDefault', 'Set-TableauCustomViewUserDefault', 'Set-TableauCustomView', 'Remove-TableauCustomView',
 'Export-TableauCustomViewImage',
-
 ### Flow methods
 'Get-TableauFlow', 'Get-TableauFlowsForUser', 'Get-TableauFlowConnection', 'Export-TableauFlow', 'Publish-TableauFlow', 'Set-TableauFlow', 'Remove-TableauFlow',
 'Set-TableauFlowConnection', 'Start-TableauFlowNow', 'Get-TableauFlowRun', 'Stop-TableauFlowRun',
-
 ### Permissions methods
 'Get-TableauContentPermission', 'Set-TableauContentPermission', 'Add-TableauContentPermission', 'Remove-TableauContentPermission',
 'ConvertTo-TableauPermissionTable',
 'Get-TableauDefaultPermission', 'Set-TableauDefaultPermission', 'Remove-TableauDefaultPermission',
 # List/Add/Delete Ask Data Lens Permissions - retired in API 3.22
-
 ### Tags methods
 'Add-TableauContentTag', 'Remove-TableauContentTag',
-
 ### Jobs, Tasks and Schedules methods
 'Get-TableauSchedule', 'New-TableauSchedule', 'Set-TableauSchedule', 'Remove-TableauSchedule', 'Add-TableauContentToSchedule',
 'Get-TableauJob', 'Stop-TableauJob', 'Wait-TableauJob',
 'Get-TableauTask', 'Remove-TableauTask', 'Start-TableauTaskNow',
-
 ### Extract and Encryption methods
 'Get-TableauExtractRefreshTask',
 'Add-TableauContentExtract', 'Remove-TableauContentExtract',
 'Add-TableauExtractRefreshTask', 'Set-TableauExtractRefreshTask',
 'Set-TableauEncryption',
-
 ### Favorites methods
 'Get-TableauUserFavorite', 'Add-TableauUserFavorite', 'Remove-TableauUserFavorite', 'Move-TableauUserFavorite',
 # Add Metric to Favorites - retired in API 3.22
-
 ### Subscription methods
 'Get-TableauSubscription', 'Add-TableauSubscription', 'Set-TableauSubscription', 'Remove-TableauSubscription',
-
 ### Dashboard Extensions Settings methods - introduced in API 3.8, retired in API 3.21
 ### Tableau Extensions Settings Methods - introduced in API 3.21
 'Get-TableauServerSettingsExtension', 'Set-TableauServerSettingsExtension',
