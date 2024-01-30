@@ -68,23 +68,23 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
         }
         AfterAll {
             if ($script:testProjectId) {
-                Remove-TableauProject -ProjectId $script:testProjectId
+                Remove-TableauProject -ProjectId $script:testProjectId | Out-Null
                 $script:testProjectId = $null
             }
             if ($script:testUserId) {
-                Remove-TableauUser -UserId $script:testUserId
+                Remove-TableauUser -UserId $script:testUserId | Out-Null
                 $script:testUserId = $null
             }
             if ($script:testGroupId) {
-                Remove-TableauGroup -GroupId $script:testGroupId
+                Remove-TableauGroup -GroupId $script:testGroupId | Out-Null
                 $script:testGroupId = $null
             }
             if ($script:testSiteId -and $script:testSite) { # Note: this should be the last cleanup step (session is killed by removing the site)
-                Switch-TableauSite -Site $script:testSite
-                Remove-TableauSite -SiteId $script:testSiteId
+                Switch-TableauSite -Site $script:testSite | Out-Null
+                Remove-TableauSite -SiteId $script:testSiteId | Out-Null
                 $script:testSite = $null
             }
-            Disconnect-TableauServer
+            Disconnect-TableauServer | Out-Null
         }
         Context "Server operations" -Tag Server {
             It "Get server info on <ConfigFile.server>" {
@@ -290,10 +290,10 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                         $project.owner.id | Should -Be (Get-TableauCurrentUserId)
                     } finally {
                         if ($user) {
-                            Remove-TableauUser -UserId $user.id
+                            Remove-TableauUser -UserId $user.id | Out-Null
                         }
                         if ($project) {
-                            Remove-TableauProject -ProjectId $project.id
+                            Remove-TableauProject -ProjectId $project.id | Out-Null
                         }
                     }
                 }
@@ -319,7 +319,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 $permissions.project.id | Should -Be $testProjectId
                 $savedPermissionTable = $permissions | ConvertTo-TableauPermissionTable
                 # remove all permissions for all grantees
-                Remove-TableauContentPermission -ProjectId $testProjectId -All
+                Remove-TableauContentPermission -ProjectId $testProjectId -All | Out-Null
                 $permissions = Get-TableauContentPermission -ProjectId $testProjectId
                 $permissions.granteeCapabilities | Should -BeNullOrEmpty
                 # attempt to set permissions with empty capabilities
@@ -353,7 +353,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
                 ($permissions.granteeCapabilities.capabilities.capability | Measure-Object).Count | Should -Be $possibleCap.Length
                 # remove all permissions for the current user
-                Remove-TableauContentPermission -ProjectId $testProjectId -GranteeType User -GranteeId (Get-TableauCurrentUserId)
+                Remove-TableauContentPermission -ProjectId $testProjectId -GranteeType User -GranteeId (Get-TableauCurrentUserId) | Out-Null
                 $permissions = Get-TableauContentPermission -ProjectId $testProjectId
                 $permissions.granteeCapabilities | Should -BeNullOrEmpty
                 # add back initial permissions configuration
@@ -373,7 +373,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                             $_.capabilities.capability | ForEach-Object {
                                 $capName = $_.name
                                 $capMode = $_.mode
-                                Remove-TableauContentPermission -ProjectId $testProjectId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode
+                                Remove-TableauContentPermission -ProjectId $testProjectId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode | Out-Null
                             }
                         }
                     }
@@ -411,7 +411,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 $wbPermissionTable = Get-TableauDefaultPermission -ProjectId $testProjectId -ContentType workbooks
                 $wbPermissionTable.Length | Should -BeLessOrEqual $savedPermissionTable.Length
                 # remove all default permissions for all grantees
-                Remove-TableauDefaultPermission -ProjectId $testProjectId -All
+                Remove-TableauDefaultPermission -ProjectId $testProjectId -All | Out-Null
                 $permissions = Get-TableauDefaultPermission -ProjectId $testProjectId
                 $permissions.Length | Should -Be 0
                 # add all possible permissions (random Allow/Deny) for the current user
@@ -451,14 +451,14 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     ($permissions | Where-Object contentType -eq $ct).capabilities.Count | Should -Be $possibleCap.Length
                 }
                 # remove all default permissions for one grantee
-                Remove-TableauDefaultPermission -ProjectId $testProjectId -GranteeType User -GranteeId (Get-TableauCurrentUserId)
+                Remove-TableauDefaultPermission -ProjectId $testProjectId -GranteeType User -GranteeId (Get-TableauCurrentUserId) | Out-Null
                 $permissions = Get-TableauDefaultPermission -ProjectId $testProjectId
                 $permissions.Length | Should -Be 0
                 # restore initial permissions configuration
                 if ($savedPermissionTable.Length -gt 0) {
                     $permissions = Set-TableauDefaultPermission -ProjectId $testProjectId -PermissionTable $savedPermissionTable
                     # remove all default permissions for one grantee for the first content type
-                    Remove-TableauDefaultPermission -ProjectId $testProjectId -GranteeType $permissions[0].granteeType -GranteeId $permissions[0].granteeId -ContentType $permissions[0].contentType
+                    Remove-TableauDefaultPermission -ProjectId $testProjectId -GranteeType $permissions[0].granteeType -GranteeId $permissions[0].granteeId -ContentType $permissions[0].contentType | Out-Null
                     $permissions = Get-TableauDefaultPermission -ProjectId $testProjectId
                     $permissions.Length | Should -BeLessThan $savedPermissionTable.Length
                 }
@@ -469,7 +469,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     foreach ($permission in $permissions) {
                         if ($permission.capabilities -and $permission.capabilities.Count -gt 0) {
                             $permission.capabilities.GetEnumerator() | ForEach-Object {
-                                Remove-TableauDefaultPermission -ProjectId $testProjectId -GranteeType $permission.granteeType -GranteeId $permission.granteeId -CapabilityName $_.Key -CapabilityMode $_.Value -ContentType $permission.contentType
+                                Remove-TableauDefaultPermission -ProjectId $testProjectId -GranteeType $permission.granteeType -GranteeId $permission.granteeId -CapabilityName $_.Key -CapabilityMode $_.Value -ContentType $permission.contentType | Out-Null
                             }
                         }
                     }
@@ -478,7 +478,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 }
             }
             It "Set default project permissions with templates on <ConfigFile.server>" {
-                Remove-TableauDefaultPermission -ProjectId $testProjectId -All
+                Remove-TableauDefaultPermission -ProjectId $testProjectId -All | Out-Null
                 # apply all possible permission templates for the current user
                 foreach ($ct in 'workbooks','datasources','flows','dataroles','lenses','metrics','databases','tables') {
                     if ($ct -eq 'dataroles' -and ((Get-TableauRestVersion) -lt [version]3.13 -or (Get-TableauRestVersion) -ge [version]3.22)) {
@@ -698,7 +698,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 }
                 AfterAll {
                     if ($samplesProjectId) {
-                        Remove-TableauProject -ProjectId $samplesProjectId
+                        Remove-TableauProject -ProjectId $samplesProjectId | Out-Null
                         $script:samplesProjectId = $null
                     }
                 }
@@ -739,26 +739,26 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     Test-Path -Path "Tests/Output/$sampleWorkbookName.twbx" | Should -BeTrue
                     Export-TableauWorkbook -WorkbookId $sampleWorkbookId -OutFile "Tests/Output/$sampleWorkbookName.twb" -ExcludeExtract
                     Test-Path -Path "Tests/Output/$sampleWorkbookName.twb" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/$sampleWorkbookName.twb"
+                    Remove-Item -Path "Tests/Output/$sampleWorkbookName.twb" | Out-Null
                 }
                 It "Download sample workbook as PDF from <ConfigFile.server>" {
                     Export-TableauWorkbookToFormat -WorkbookId $sampleWorkbookId -Format pdf -OutFile "Tests/Output/$sampleWorkbookName.pdf"
                     Test-Path -Path "Tests/Output/$sampleWorkbookName.pdf" | Should -BeTrue
                     Export-TableauWorkbookToFormat -WorkbookId $sampleWorkbookId -Format pdf -OutFile "Tests/Output/$sampleWorkbookName.pdf" -PageType 'A3' -PageOrientation 'Landscape' -MaxAge 1
                     Test-Path -Path "Tests/Output/$sampleWorkbookName.pdf" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/$sampleWorkbookName.pdf"
+                    Remove-Item -Path "Tests/Output/$sampleWorkbookName.pdf" | Out-Null
                 }
                 It "Download sample workbook as PowerPoint from <ConfigFile.server>" {
                     Export-TableauWorkbookToFormat -WorkbookId $sampleWorkbookId -Format powerpoint -OutFile "Tests/Output/$sampleWorkbookName.pptx"
                     Test-Path -Path "Tests/Output/$sampleWorkbookName.pptx" | Should -BeTrue
                     # Export-TableauWorkbookToFormat -WorkbookId $sampleWorkbookId -Format powerpoint -OutFile "Tests/Output/$sampleWorkbookName.pptx" -MaxAge 1
                     # Test-Path -Path "Tests/Output/$sampleWorkbookName.pptx" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/$sampleWorkbookName.pptx"
+                    Remove-Item -Path "Tests/Output/$sampleWorkbookName.pptx" | Out-Null
                 }
                 It "Download sample workbook as PNG from <ConfigFile.server>" {
                     Export-TableauWorkbookToFormat -WorkbookId $sampleWorkbookId -Format image -OutFile "Tests/Output/$sampleWorkbookName.png"
                     Test-Path -Path "Tests/Output/$sampleWorkbookName.png" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/$sampleWorkbookName.png"
+                    Remove-Item -Path "Tests/Output/$sampleWorkbookName.png" | Out-Null
                 }
                 It "Publish sample workbook on <ConfigFile.server>" {
                     $workbook = Publish-TableauWorkbook -Name $sampleWorkbookName -InFile "Tests/Output/$sampleWorkbookName.twbx" -ProjectId $samplesProjectId -Overwrite
@@ -813,8 +813,8 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                         $revision = $revisions | Sort-Object revisionNumber -Descending | Select-Object -Skip 1 -First 1 -ExpandProperty revisionNumber
                         Export-TableauWorkbook -WorkbookId $sampleWorkbookId -Revision $revision -OutFile "Tests/Output/download_revision.twbx"
                         Test-Path -Path "Tests/Output/download_revision.twbx" | Should -BeTrue
-                        Remove-Item -Path "Tests/Output/download_revision.twbx"
-                        Remove-TableauWorkbook -WorkbookId $sampleWorkbookId -Revision $revision
+                        Remove-Item -Path "Tests/Output/download_revision.twbx" | Out-Null
+                        Remove-TableauWorkbook -WorkbookId $sampleWorkbookId -Revision $revision | Out-Null
                     } else {
                         Set-ItResult -Skipped -Because "only one revision was found"
                     }
@@ -823,14 +823,14 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $revision = Get-TableauWorkbook -WorkbookId $sampleWorkbookId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
                     Export-TableauWorkbook -WorkbookId $sampleWorkbookId -Revision $revision -OutFile "Tests/Output/download_revision.twbx"
                     Test-Path -Path "Tests/Output/download_revision.twbx" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/download_revision.twbx"
+                    Remove-Item -Path "Tests/Output/download_revision.twbx" | Out-Null
                 }
                 It "Add/remove tags for sample workbook on <ConfigFile.server>" {
-                    Add-TableauContentTag -WorkbookId $sampleWorkbookId -Tags "active","test"
+                    Add-TableauContentTag -WorkbookId $sampleWorkbookId -Tags "active","test" | Out-Null
                     ((Get-TableauWorkbook -WorkbookId $sampleWorkbookId).tags.tag | Measure-Object).Count | Should -Be 2
-                    Remove-TableauContentTag -WorkbookId $sampleWorkbookId -Tag "test"
+                    Remove-TableauContentTag -WorkbookId $sampleWorkbookId -Tag "test" | Out-Null
                     ((Get-TableauWorkbook -WorkbookId $sampleWorkbookId).tags.tag | Measure-Object).Count | Should -Be 1
-                    Remove-TableauContentTag -WorkbookId $sampleWorkbookId -Tag "active"
+                    Remove-TableauContentTag -WorkbookId $sampleWorkbookId -Tag "active" | Out-Null
                     (Get-TableauWorkbook -WorkbookId $sampleWorkbookId).tags | Should -BeNullOrEmpty
                 }
                 It "Query/remove/add/set workbook permissions on <ConfigFile.server>" {
@@ -839,7 +839,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $permissions.workbook.name | Should -Be $sampleWorkbookName
                     $savedPermissionTable = $permissions | ConvertTo-TableauPermissionTable
                     # remove all permissions for all grantees
-                    Remove-TableauContentPermission -WorkbookId $sampleWorkbookId -All
+                    Remove-TableauContentPermission -WorkbookId $sampleWorkbookId -All | Out-Null
                     $permissions = Get-TableauContentPermission -WorkbookId $sampleWorkbookId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # attempt to set permissions with empty capabilities
@@ -871,7 +871,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
                     ($permissions.granteeCapabilities.capabilities.capability | Measure-Object).Count | Should -Be $possibleCap.Length
                     # remove all permissions for the current user
-                    Remove-TableauContentPermission -WorkbookId $sampleWorkbookId -GranteeType User -GranteeId (Get-TableauCurrentUserId)
+                    Remove-TableauContentPermission -WorkbookId $sampleWorkbookId -GranteeType User -GranteeId (Get-TableauCurrentUserId) | Out-Null
                     $permissions = Get-TableauContentPermission -WorkbookId $sampleWorkbookId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # add back initial permissions configuration
@@ -891,7 +891,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                                 $_.capabilities.capability | ForEach-Object {
                                     $capName = $_.name
                                     $capMode = $_.mode
-                                    Remove-TableauContentPermission -WorkbookId $sampleWorkbookId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode
+                                    Remove-TableauContentPermission -WorkbookId $sampleWorkbookId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode | Out-Null
                                 }
                             }
                         }
@@ -951,7 +951,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 It "Publish workbook without embed credentials on <ConfigFile.server>" -Tag WorkbookP {
                     $workbook = Publish-TableauWorkbook -Name "AW Customer Address 1" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId
                     $workbook | Should -Not -BeNullOrEmpty
-                    # Remove-TableauWorkbook -WorkbookId $workbook.id
+                    # Remove-TableauWorkbook -WorkbookId $workbook.id | Out-Null
                 }
                 It "Publish workbook with embed credentials on <ConfigFile.server>" -Tag WorkbookP {
                     $securePw = Test-GetSecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
@@ -974,7 +974,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                         }
                     }
                     $jobFinished.finishCode | Should -Be 0
-                    # Remove-TableauWorkbook -WorkbookId $workbook.id
+                    # Remove-TableauWorkbook -WorkbookId $workbook.id | Out-Null
                 }
                 It "Publish workbook with connections on <ConfigFile.server>" -Tag WorkbookP {
                     $securePw = Test-GetSecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
@@ -997,7 +997,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                         }
                     }
                     $jobFinished.finishCode | Should -Be 0
-                    # Remove-TableauWorkbook -WorkbookId $workbook.id
+                    # Remove-TableauWorkbook -WorkbookId $workbook.id | Out-Null
                 }
                 It "Publish workbook as background job on <ConfigFile.server>" -Tag WorkbookP {
                     $job = Publish-TableauWorkbook -Name "AW Customer Address 4" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -BackgroundTask
@@ -1005,7 +1005,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $jobFinished = Wait-TableauJob -JobId $job.id -Timeout 60
                     Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobFinished.completedAt, $jobFinished.finishCode)
                     $jobFinished.finishCode | Should -Be 0
-                    # Remove-TableauWorkbook -WorkbookId $workbook.id
+                    # Remove-TableauWorkbook -WorkbookId $workbook.id | Out-Null
                 }
                 Context "Publish / download workbooks from test assets on <ConfigFile.server>" -Tag WorkbookSamples -ForEach $WorkbookFiles {
                     BeforeAll {
@@ -1026,7 +1026,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                         if ($sampleWorkbookId) {
                             Export-TableauWorkbook -WorkbookId $sampleWorkbookId -OutFile "Tests/Output/download.twbx"
                             Test-Path -Path "Tests/Output/download.twbx" | Should -BeTrue
-                            Remove-Item -Path "Tests/Output/download.twbx"
+                            Remove-Item -Path "Tests/Output/download.twbx" | Out-Null
                         } else {
                             Set-ItResult -Skipped -Because "previous test(s) failed"
                         }
@@ -1070,7 +1070,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 }
                 AfterAll {
                     if ($samplesProjectId) {
-                        Remove-TableauProject -ProjectId $samplesProjectId
+                        Remove-TableauProject -ProjectId $samplesProjectId | Out-Null
                         $script:samplesProjectId = $null
                     }
                 }
@@ -1091,7 +1091,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 It "Download sample datasource from <ConfigFile.server>" {
                     Export-TableauDatasource -DatasourceId $sampleDatasourceId -OutFile "Tests/Output/$sampleDatasourceName.tdsx"
                     Test-Path -Path "Tests/Output/$sampleDatasourceName.tdsx" | Should -BeTrue
-                    # Remove-Item -Path "Tests/Output/$sampleDatasourceName.tdsx"
+                    # Remove-Item -Path "Tests/Output/$sampleDatasourceName.tdsx" | Out-Null
                 }
                 It "Publish sample datasource on <ConfigFile.server>" {
                     $datasource = Publish-TableauDatasource -Name $sampleDatasourceName -InFile "Tests/Output/$sampleDatasourceName.tdsx" -ProjectId $samplesProjectId -Overwrite
@@ -1108,8 +1108,8 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                         $revision = $revisions | Sort-Object revisionNumber -Descending | Select-Object -Skip 1 -First 1 -ExpandProperty revisionNumber
                         Export-TableauDatasource -DatasourceId $sampleDatasourceId -Revision $revision -OutFile "Tests/Output/download_revision.tdsx"
                         Test-Path -Path "Tests/Output/download_revision.tdsx" | Should -BeTrue
-                        Remove-Item -Path "Tests/Output/download_revision.tdsx"
-                        Remove-TableauDatasource -DatasourceId $sampleDatasourceId -Revision $revision
+                        Remove-Item -Path "Tests/Output/download_revision.tdsx" | Out-Null
+                        Remove-TableauDatasource -DatasourceId $sampleDatasourceId -Revision $revision | Out-Null
                     } else {
                         Set-ItResult -Skipped -Because "only one revision was found"
                     }
@@ -1118,7 +1118,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $revision = Get-TableauDatasource -DatasourceId $sampleDatasourceId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
                     Export-TableauDatasource -DatasourceId $sampleDatasourceId -Revision $revision -OutFile "Tests/Output/download_revision.tdsx"
                     Test-Path -Path "Tests/Output/download_revision.tdsx" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/download_revision.tdsx"
+                    Remove-Item -Path "Tests/Output/download_revision.tdsx" | Out-Null
                 }
                 It "Publish datasource with invalid extension on <ConfigFile.server>" {
                     {Publish-TableauDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/Datasource.txt" -ProjectId $samplesProjectId} | Should -Throw
@@ -1140,11 +1140,11 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $datasource.id | Should -BeOfType String
                 }
                 It "Add/remove tags for sample datasource on <ConfigFile.server>" {
-                    Add-TableauContentTag -DatasourceId $sampleDatasourceId -Tags "active","test"
+                    Add-TableauContentTag -DatasourceId $sampleDatasourceId -Tags "active","test" | Out-Null
                     ((Get-TableauDatasource -DatasourceId $sampleDatasourceId).tags.tag | Measure-Object).Count | Should -Be 2
-                    Remove-TableauContentTag -DatasourceId $sampleDatasourceId -Tag "test"
+                    Remove-TableauContentTag -DatasourceId $sampleDatasourceId -Tag "test" | Out-Null
                     ((Get-TableauDatasource -DatasourceId $sampleDatasourceId).tags.tag | Measure-Object).Count | Should -Be 1
-                    Remove-TableauContentTag -DatasourceId $sampleDatasourceId -Tag "active"
+                    Remove-TableauContentTag -DatasourceId $sampleDatasourceId -Tag "active" | Out-Null
                     (Get-TableauDatasource -DatasourceId $sampleDatasourceId).tags | Should -BeNullOrEmpty
                 }
                 It "Query/remove/add/set datasource permissions on <ConfigFile.server>" {
@@ -1153,7 +1153,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $permissions.datasource.name | Should -Be $sampleDatasourceName
                     $savedPermissionTable = $permissions | ConvertTo-TableauPermissionTable
                     # remove all permissions for all grantees
-                    Remove-TableauContentPermission -DatasourceId $sampleDatasourceId -All
+                    Remove-TableauContentPermission -DatasourceId $sampleDatasourceId -All | Out-Null
                     $permissions = Get-TableauContentPermission -DatasourceId $sampleDatasourceId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # attempt to set permissions with empty capabilities
@@ -1185,7 +1185,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
                     ($permissions.granteeCapabilities.capabilities.capability | Measure-Object).Count | Should -Be $possibleCap.Length
                     # remove all permissions for the current user
-                    Remove-TableauContentPermission -DatasourceId $sampleDatasourceId -GranteeType User -GranteeId (Get-TableauCurrentUserId)
+                    Remove-TableauContentPermission -DatasourceId $sampleDatasourceId -GranteeType User -GranteeId (Get-TableauCurrentUserId) | Out-Null
                     $permissions = Get-TableauContentPermission -DatasourceId $sampleDatasourceId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # add back initial permissions configuration
@@ -1205,7 +1205,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                                 $_.capabilities.capability | ForEach-Object {
                                     $capName = $_.name
                                     $capMode = $_.mode
-                                    Remove-TableauContentPermission -DatasourceId $sampleDatasourceId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode
+                                    Remove-TableauContentPermission -DatasourceId $sampleDatasourceId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode | Out-Null
                                 }
                             }
                         }
@@ -1266,7 +1266,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                         }
                     }
                     $jobFinished.finishCode | Should -Be 0
-                    # Remove-TableauDatasource -DatasourceId $datasource.id
+                    # Remove-TableauDatasource -DatasourceId $datasource.id | Out-Null
                 }
                 It "Publish datasource with connections on <ConfigFile.server>" -Tag DatasourceP -Skip {
                     # note: this option is still not supported by the API as of v2023.3
@@ -1291,7 +1291,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                         }
                     }
                     $jobFinished.finishCode | Should -Be 0
-                    # Remove-TableauDatasource -DatasourceId $datasource.id
+                    # Remove-TableauDatasource -DatasourceId $datasource.id | Out-Null
                 }
                 It "Publish datasource as background job on <ConfigFile.server>" -Tag DatasourceP {
                     $job = Publish-TableauDatasource -Name "AW SalesOrders 3" -InFile "Tests/Assets/Misc/AW_SalesOrders.tdsx" -ProjectId $samplesProjectId -BackgroundTask -Overwrite
@@ -1299,7 +1299,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $jobFinished = Wait-TableauJob -JobId $job.id -Timeout 60
                     Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobFinished.completedAt, $jobFinished.finishCode)
                     $jobFinished.finishCode | Should -Be 0
-                    # Remove-TableauDatasource -DatasourceId $datasource.id
+                    # Remove-TableauDatasource -DatasourceId $datasource.id | Out-Null
                 }
                 Context "Publish / download datasources from test assets on <ConfigFile.server>"  -Tag DatasourceSamples -ForEach $DatasourceFiles {
                     BeforeAll {
@@ -1319,7 +1319,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     It "Download datasource ""<sampleDatasourceName>"" from <ConfigFile.server>" {
                         Export-TableauDatasource -DatasourceId $sampleDatasourceId -OutFile "Tests/Output/download.tdsx"
                         Test-Path -Path "Tests/Output/download.tdsx" | Should -BeTrue
-                        Remove-Item -Path "Tests/Output/download.tdsx"
+                        Remove-Item -Path "Tests/Output/download.tdsx" | Out-Null
                     }
                 }
                 Context "Publish live-to-Hyper assets on <ConfigFile.server>"  -Tag Hyper {
@@ -1427,7 +1427,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 }
                 AfterAll {
                     if ($samplesProjectId) {
-                        Remove-TableauProject -ProjectId $samplesProjectId
+                        Remove-TableauProject -ProjectId $samplesProjectId | Out-Null
                         $script:samplesProjectId = $null
                     }
                 }
@@ -1453,13 +1453,13 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     Test-Path -Path "Tests/Output/$sampleViewName.pdf" | Should -BeTrue
                     Export-TableauViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "Tests/Output/$sampleViewName.pdf" -VizWidth 500 -VizHeight 300
                     Test-Path -Path "Tests/Output/$sampleViewName.pdf" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/$sampleViewName.pdf"
+                    Remove-Item -Path "Tests/Output/$sampleViewName.pdf" | Out-Null
                 }
                 It "Query view preview image from <ConfigFile.server>" {
                     $view = Get-TableauView -ViewId $sampleViewId
                     Export-TableauViewImage -ViewId $sampleViewId -Workbook $view.workbook.id -OutFile "Tests/Output/$sampleViewName.png"
                     Test-Path -Path "Tests/Output/$sampleViewName.png" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/$sampleViewName.png"
+                    Remove-Item -Path "Tests/Output/$sampleViewName.png" | Out-Null
                 }
                 It "Download sample view as PNG from <ConfigFile.server>" {
                     Export-TableauViewToFormat -ViewId $sampleViewId -Format image -OutFile "Tests/Output/$sampleViewName.png"
@@ -1468,38 +1468,38 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     Test-Path -Path "Tests/Output/$sampleViewName.png" | Should -BeTrue
                     Export-TableauViewToFormat -ViewId $sampleViewId -Format image -OutFile "Tests/Output/$sampleViewName.png" -Resolution standard
                     Test-Path -Path "Tests/Output/$sampleViewName.png" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/$sampleViewName.png"
+                    Remove-Item -Path "Tests/Output/$sampleViewName.png" | Out-Null
                 }
                 It "Download sample workbook as CSV from <ConfigFile.server>" {
                     Export-TableauViewToFormat -ViewId $sampleViewId -Format csv -OutFile "Tests/Output/$sampleViewName.csv"
                     Test-Path -Path "Tests/Output/$sampleViewName.csv" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/$sampleViewName.csv"
+                    Remove-Item -Path "Tests/Output/$sampleViewName.csv" | Out-Null
                 }
                 It "Download sample workbook as Excel from <ConfigFile.server>" {
                     Export-TableauViewToFormat -ViewId $sampleViewId -Format excel -OutFile "Tests/Output/$sampleViewName.xlsx"
                     Test-Path -Path "Tests/Output/$sampleViewName.xlsx" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/$sampleViewName.xlsx"
+                    Remove-Item -Path "Tests/Output/$sampleViewName.xlsx" | Out-Null
                 }
                 It "Download sample view with data filters applied from <ConfigFile.server>" {
                     Export-TableauViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "Tests/Output/$sampleViewName.pdf" -ViewFilters @{Region="Europe"}
                     Test-Path -Path "Tests/Output/$sampleViewName.pdf" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/$sampleViewName.pdf"
+                    Remove-Item -Path "Tests/Output/$sampleViewName.pdf" | Out-Null
                     Export-TableauViewToFormat -ViewId $sampleViewId -Format image -OutFile "Tests/Output/$sampleViewName.png" -ViewFilters @{Region="Africa"}
                     Test-Path -Path "Tests/Output/$sampleViewName.png" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/$sampleViewName.png"
+                    Remove-Item -Path "Tests/Output/$sampleViewName.png" | Out-Null
                     Export-TableauViewToFormat -ViewId $sampleViewId -Format csv -OutFile "Tests/Output/$sampleViewName.csv" -ViewFilters @{"Ease of Business (clusters)"="Low"}
                     Test-Path -Path "Tests/Output/$sampleViewName.csv" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/$sampleViewName.csv"
+                    Remove-Item -Path "Tests/Output/$sampleViewName.csv" | Out-Null
                     Export-TableauViewToFormat -ViewId $sampleViewId -Format excel -OutFile "Tests/Output/$sampleViewName.xlsx" -ViewFilters @{"Country/Region"="Kyrgyzstan"}
                     Test-Path -Path "Tests/Output/$sampleViewName.xlsx" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/$sampleViewName.xlsx"
+                    Remove-Item -Path "Tests/Output/$sampleViewName.xlsx" | Out-Null
                 }
                 It "Add/remove tags for sample view on <ConfigFile.server>" {
-                    Add-TableauContentTag -ViewId $sampleViewId -Tags "active","test"
+                    Add-TableauContentTag -ViewId $sampleViewId -Tags "active","test" | Out-Null
                     ((Get-TableauView -ViewId $sampleViewId).tags.tag | Measure-Object).Count | Should -Be 2
-                    Remove-TableauContentTag -ViewId $sampleViewId -Tag "test"
+                    Remove-TableauContentTag -ViewId $sampleViewId -Tag "test" | Out-Null
                     ((Get-TableauView -ViewId $sampleViewId).tags.tag | Measure-Object).Count | Should -Be 1
-                    Remove-TableauContentTag -ViewId $sampleViewId -Tag "active"
+                    Remove-TableauContentTag -ViewId $sampleViewId -Tag "active" | Out-Null
                     (Get-TableauView -ViewId $sampleViewId).tags | Should -BeNullOrEmpty
                 }
                 It "Update sample workbook (showTabs=false) on <ConfigFile.server>" {
@@ -1518,7 +1518,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $permissions.view.name | Should -Be $sampleViewName
                     $savedPermissionTable = $permissions | ConvertTo-TableauPermissionTable
                     # remove all permissions for all grantees
-                    Remove-TableauContentPermission -ViewId $sampleViewId -All
+                    Remove-TableauContentPermission -ViewId $sampleViewId -All | Out-Null
                     $permissions = Get-TableauContentPermission -ViewId $sampleViewId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # attempt to set permissions with empty capabilities
@@ -1550,7 +1550,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
                     ($permissions.granteeCapabilities.capabilities.capability | Measure-Object).Count | Should -Be $possibleCap.Length
                     # remove all permissions for the current user
-                    Remove-TableauContentPermission -ViewId $sampleViewId -GranteeType User -GranteeId (Get-TableauCurrentUserId)
+                    Remove-TableauContentPermission -ViewId $sampleViewId -GranteeType User -GranteeId (Get-TableauCurrentUserId) | Out-Null
                     $permissions = Get-TableauContentPermission -ViewId $sampleViewId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # add back initial permissions configuration
@@ -1570,7 +1570,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                                 $_.capabilities.capability | ForEach-Object {
                                     $capName = $_.name
                                     $capMode = $_.mode
-                                    Remove-TableauContentPermission -ViewId $sampleViewId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode
+                                    Remove-TableauContentPermission -ViewId $sampleViewId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode | Out-Null
                                 }
                             }
                         }
@@ -1625,7 +1625,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 }
                 AfterAll {
                     if ($samplesProjectId) {
-                        Remove-TableauProject -ProjectId $samplesProjectId
+                        Remove-TableauProject -ProjectId $samplesProjectId | Out-Null
                         $script:samplesProjectId = $null
                     }
                 }
@@ -1688,8 +1688,8 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 #         $revision = $revisions | Sort-Object revisionNumber -Descending | Select-Object -Skip 1 -First 1 -ExpandProperty revisionNumber
                 #         Export-TableauFlow -FlowId $sampleFlowId -Revision $revision -OutFile "Tests/Output/download_revision.tflx"
                 #         Test-Path -Path "Tests/Output/download_revision.tflx" | Should -BeTrue
-                #         Remove-Item -Path "Tests/Output/download_revision.tflx"
-                #         Remove-TableauFlow -FlowId $sampleFlowId -Revision $revision
+                #         Remove-Item -Path "Tests/Output/download_revision.tflx" | Out-Null
+                #         Remove-TableauFlow -FlowId $sampleFlowId -Revision $revision | Out-Null
                 #     } else {
                 #         Set-ItResult -Skipped -Because "only one revision was found"
                 #     }
@@ -1698,14 +1698,14 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $revision = Get-TableauFlow -FlowId $sampleFlowId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
                     Export-TableauFlow -FlowId $sampleFlowId -Revision $revision -OutFile "Tests/Output/download_revision.tflx"
                     Test-Path -Path "Tests/Output/download_revision.tflx" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/download_revision.tflx"
+                    Remove-Item -Path "Tests/Output/download_revision.tflx" | Out-Null
                 }
                 It "Add/remove tags for sample flow on <ConfigFile.server>" {
-                    Add-TableauContentTag -FlowId $sampleFlowId -Tags "active","test"
+                    Add-TableauContentTag -FlowId $sampleFlowId -Tags "active","test" | Out-Null
                     ((Get-TableauFlow -FlowId $sampleFlowId).tags.tag | Measure-Object).Count | Should -Be 2
-                    Remove-TableauContentTag -FlowId $sampleFlowId -Tag "test"
+                    Remove-TableauContentTag -FlowId $sampleFlowId -Tag "test" | Out-Null
                     ((Get-TableauFlow -FlowId $sampleFlowId).tags.tag | Measure-Object).Count | Should -Be 1
-                    Remove-TableauContentTag -FlowId $sampleFlowId -Tag "active"
+                    Remove-TableauContentTag -FlowId $sampleFlowId -Tag "active" | Out-Null
                     (Get-TableauFlow -FlowId $sampleFlowId).tags | Should -BeNullOrEmpty
                 }
                 It "Query/remove/add/set flow permissions on <ConfigFile.server>" {
@@ -1714,7 +1714,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $permissions.flow.name | Should -Be $sampleFlowName
                     $savedPermissionTable = $permissions | ConvertTo-TableauPermissionTable
                     # remove all permissions for all grantees
-                    Remove-TableauContentPermission -FlowId $sampleFlowId -All
+                    Remove-TableauContentPermission -FlowId $sampleFlowId -All | Out-Null
                     $permissions = Get-TableauContentPermission -FlowId $sampleFlowId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # attempt to set permissions with empty capabilities
@@ -1746,7 +1746,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $permissions.granteeCapabilities | Should -Not -BeNullOrEmpty
                     ($permissions.granteeCapabilities.capabilities.capability | Measure-Object).Count | Should -Be $possibleCap.Length
                     # remove all permissions for the current user
-                    Remove-TableauContentPermission -FlowId $sampleFlowId -GranteeType User -GranteeId (Get-TableauCurrentUserId)
+                    Remove-TableauContentPermission -FlowId $sampleFlowId -GranteeType User -GranteeId (Get-TableauCurrentUserId) | Out-Null
                     $permissions = Get-TableauContentPermission -FlowId $sampleFlowId
                     $permissions.granteeCapabilities | Should -BeNullOrEmpty
                     # add back initial permissions configuration
@@ -1766,7 +1766,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                                 $_.capabilities.capability | ForEach-Object {
                                     $capName = $_.name
                                     $capMode = $_.mode
-                                    Remove-TableauContentPermission -FlowId $sampleFlowId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode
+                                    Remove-TableauContentPermission -FlowId $sampleFlowId -GranteeType $granteeType -GranteeId $granteeId -CapabilityName $capName -CapabilityMode $capMode | Out-Null
                                 }
                             }
                         }
@@ -1803,7 +1803,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     }
                 }
                 It "Remove sample flow on <ConfigFile.server>" {
-                    Remove-TableauFlow -FlowId $sampleFlowId
+                    Remove-TableauFlow -FlowId $sampleFlowId | Out-Null
                 }
                 It "Publish flow with invalid extension on <ConfigFile.server>" {
                     {Publish-TableauFlow -Name "Flow" -InFile "Tests/Assets/Misc/Flow.txt" -ProjectId $samplesProjectId} | Should -Throw
@@ -1842,7 +1842,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     It "Download flow ""<sampleFlowName>"" from <ConfigFile.server>" {
                         Export-TableauFlow -FlowId $sampleflowId -OutFile "Tests/Output/download.tflx"
                         Test-Path -Path "Tests/Output/download.tflx" | Should -BeTrue
-                        Remove-Item -Path "Tests/Output/download.tflx"
+                        Remove-Item -Path "Tests/Output/download.tflx" | Out-Null
                     }
                 }
             }
@@ -1855,7 +1855,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             }
             AfterAll {
                 if ($samplesProjectId) {
-                    # Remove-TableauProject -ProjectId $samplesProjectId
+                    Remove-TableauProject -ProjectId $samplesProjectId | Out-Null
                     $script:samplesProjectId = $null
                 }
             }
@@ -1943,7 +1943,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             }
             AfterAll {
                 if ($samplesProjectId) {
-                    Remove-TableauProject -ProjectId $samplesProjectId
+                    Remove-TableauProject -ProjectId $samplesProjectId | Out-Null
                     $script:samplesProjectId = $null
                 }
             }
@@ -2027,22 +2027,22 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 }
             }
             It "Remove sample contents from user favorites on <ConfigFile.server>" {
-                Remove-TableauUserFavorite -UserId (Get-TableauCurrentUserId) -ProjectId $samplesProjectId
+                Remove-TableauUserFavorite -UserId (Get-TableauCurrentUserId) -ProjectId $samplesProjectId | Out-Null
                 $datasources = Get-TableauDatasource -Filter "projectName:eq:$samplesProjectName"
                 if (-not $datasources) { # fallback: perform filter in PS
                     $datasources = Get-TableauDatasource | Where-Object -FilterScript {$_.project.id -eq $samplesProjectId}
                 }
                 $datasources | ForEach-Object {
-                    Remove-TableauUserFavorite -UserId (Get-TableauCurrentUserId) -DatasourceId $_.id
+                    Remove-TableauUserFavorite -UserId (Get-TableauCurrentUserId) -DatasourceId $_.id | Out-Null
                 }
                 Get-TableauWorkbook -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
-                    Remove-TableauUserFavorite -UserId (Get-TableauCurrentUserId) -WorkbookId $_.id
+                    Remove-TableauUserFavorite -UserId (Get-TableauCurrentUserId) -WorkbookId $_.id | Out-Null
                 }
                 Get-TableauView -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
-                    Remove-TableauUserFavorite -UserId (Get-TableauCurrentUserId) -ViewId $_.id
+                    Remove-TableauUserFavorite -UserId (Get-TableauCurrentUserId) -ViewId $_.id | Out-Null
                 }
                 Get-TableauFlow -Filter "projectName:eq:$samplesProjectName" | ForEach-Object {
-                    Remove-TableauUserFavorite -UserId (Get-TableauCurrentUserId) -FlowId $_.id
+                    Remove-TableauUserFavorite -UserId (Get-TableauCurrentUserId) -FlowId $_.id | Out-Null
                 }
             }
         }
@@ -2174,7 +2174,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             }
             AfterAll {
                 if ($samplesProjectId) {
-                    Remove-TableauProject -ProjectId $samplesProjectId
+                    Remove-TableauProject -ProjectId $samplesProjectId | Out-Null
                     $script:samplesProjectId = $null
                 }
             }
@@ -2215,7 +2215,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             }
             AfterAll {
                 if ($samplesProjectId) {
-                    Remove-TableauProject -ProjectId $samplesProjectId
+                    Remove-TableauProject -ProjectId $samplesProjectId | Out-Null
                     $script:samplesProjectId = $null
                     $script:workbookForTasks = $null
                     $script:datasourceForTasks = $null
@@ -2246,7 +2246,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $job = Start-TableauTaskNow -Type ExtractRefresh -TaskId $extractTaskId
                     $job | Should -Not -BeNullOrEmpty
                     Stop-TableauJob -JobId $job.id
-                    Remove-TableauTask -Type ExtractRefresh -TaskId $extractTaskId
+                    Remove-TableauTask -Type ExtractRefresh -TaskId $extractTaskId | Out-Null
                     Write-Verbose ("Adding datasource {0}" -f $datasourceForTasks.id)
                     $contentScheduleTask = Add-TableauContentToSchedule -ScheduleId $extractScheduleId -DatasourceId $datasourceForTasks.id
                     $extractTaskId = Get-TableauTask -Type ExtractRefresh | Where-Object -FilterScript {$_.datasource.id -eq $datasourceForTasks.id} | Select-Object -First 1 -ExpandProperty id
@@ -2255,7 +2255,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $job = Start-TableauTaskNow -Type ExtractRefresh -TaskId $extractTaskId
                     $job | Should -Not -BeNullOrEmpty
                     Stop-TableauJob -JobId $job.id
-                    Remove-TableauTask -Type ExtractRefresh -TaskId $extractTaskId
+                    Remove-TableauTask -Type ExtractRefresh -TaskId $extractTaskId | Out-Null
                 } else { # Tableau Cloud methods
                     Write-Verbose ("Adding workbook {0}" -f $workbookForTasks.id)
                     $extractTaskResult = Add-TableauExtractRefreshTask -WorkbookId $workbookForTasks.id -Type FullRefresh -Frequency Daily -StartTime 12:00:00 -IntervalHours 24 -IntervalWeekdays 'Sunday','Monday'
@@ -2268,7 +2268,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $job = Start-TableauTaskNow -Type ExtractRefresh -TaskId $extractTaskId
                     $job | Should -Not -BeNullOrEmpty
                     Stop-TableauJob -JobId $job.id
-                    Remove-TableauTask -Type ExtractRefresh -TaskId $extractTaskId
+                    Remove-TableauTask -Type ExtractRefresh -TaskId $extractTaskId | Out-Null
                     Write-Verbose ("Adding datasource {0}" -f $datasourceForTasks.id)
                     $extractTaskResult = Add-TableauExtractRefreshTask -DatasourceId $datasourceForTasks.id -Type FullRefresh -Frequency Daily -StartTime 12:00:00 -IntervalHours 2 -IntervalWeekdays 'Sunday','Monday'
                     $extractTaskResult | Should -Not -BeNullOrEmpty
@@ -2280,7 +2280,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $job = Start-TableauTaskNow -Type ExtractRefresh -TaskId $extractTaskId
                     $job | Should -Not -BeNullOrEmpty
                     Stop-TableauJob -JobId $job.id
-                    Remove-TableauTask -Type ExtractRefresh -TaskId $extractTaskId
+                    Remove-TableauTask -Type ExtractRefresh -TaskId $extractTaskId | Out-Null
                 }
             }
             It "Schedule and run flow task on <ConfigFile.server>" {
@@ -2307,7 +2307,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             }
             AfterAll {
                 if ($samplesProjectId) {
-                    Remove-TableauProject -ProjectId $samplesProjectId
+                    Remove-TableauProject -ProjectId $samplesProjectId | Out-Null
                     $script:samplesProjectId = $null
                 }
             }
@@ -2364,7 +2364,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             It "Remove subscription on <ConfigFile.server>" {
                 $subscriptionId = Get-TableauSubscription | Select-Object -First 1 -ExpandProperty id
                 $subscriptionId | Should -Not -BeNullOrEmpty
-                Remove-TableauSubscription -SubscriptionId $subscriptionId
+                Remove-TableauSubscription -SubscriptionId $subscriptionId | Out-Null
             }
         }
         Context "Metadata operations" -Tag Metadata {

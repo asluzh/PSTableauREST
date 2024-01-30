@@ -10,10 +10,10 @@ try {
         $Config.username = $env:USERNAME
     }
     if ($Config.username) {
-        $Config | Add-Member -MemberType NoteProperty -Name "secure_password" -Value (Test-GetSecurePassword -Namespace $Config.server -Username $Config.username)
+        $Config | Add-Member -MemberType NoteProperty -Name "credential" -Value (New-Object System.Management.Automation.PSCredential($Config.username, (Test-GetSecurePassword -Namespace $Config.server -Username $Config.username)))
     }
     if ($Config.pat_name) {
-        $Config | Add-Member -MemberType NoteProperty -Name "pat_secret" -Value (Test-GetSecurePassword -Namespace $Config.server -Username $Config.pat_name)
+        $Config | Add-Member -MemberType NoteProperty -Name "pat_credential" -Value (New-Object System.Management.Automation.PSCredential($Config.pat_name, (Test-GetSecurePassword -Namespace $Config.server -Username $Config.pat_name)))
     }
 } catch {
     Write-Error 'Please provide a valid configuration file via $ConfigFile variable' -ErrorAction Stop
@@ -21,17 +21,17 @@ try {
 
 try {
     if ($Config.pat_name) {
-        $credentials = Connect-TableauServer -Server $Config.server -Site $Config.site -PersonalAccessTokenName $Config.pat_name -PersonalAccessTokenSecret $Config.pat_secret
+        $response = Connect-TableauServer -Server $Config.server -Site $Config.site -Credential $Config.pat_credential -PersonalAccessToken
     } else {
-        $credentials = Connect-TableauServer -Server $Config.server -Site $Config.site -Username $Config.username -SecurePassword $Config.secure_password
+        $response = Connect-TableauServer -Server $Config.server -Site $Config.site -Credential $Config.credential
     }
-    $user = Get-TableauUser -UserId $credentials.user.id
+    $user = Get-TableauUser -UserId $response.user.id
     Write-Host ("Successfully logged in as user: {0} ({1})" -f $user.name, $user.fullName)
 
     $project = New-TableauProject -Name (New-Guid)
     $testProjectId = $project.id
     $testProjectName = $project.name
-    $project = Set-TableauProject -ProjectId $testProjectId -PublishSamples
+    $project = Update-TableauProject -ProjectId $testProjectId -PublishSamples
 
     $workbooks = Get-TableauWorkbooksForUser -UserId (Get-TableauCurrentUserId)
     Write-Host ("Workbooks available for user: {0}" -f ($workbooks | Measure-Object).Count)
@@ -50,7 +50,7 @@ try {
         $testWorkbookName = $workbook.name
         Write-Host ("Superstore workbook: {0} {1}" -f $testWorkbookId, $testWorkbookName)
 
-        Write-Host "Testing export functionality (twbx, pdf, pptx, png)"
+        Write-Host "Testing download functionality (twbx, pdf, pptx, png)"
         Export-TableauWorkbook -WorkbookId $testWorkbookId -OutFile "Tests/Output/$testWorkbookName.twbx"
         Export-TableauWorkbookToFormat -WorkbookId $testWorkbookId -Format pdf -OutFile "Tests/Output/$testWorkbookName.pdf" -PageType 'A3' -PageOrientation 'Landscape' -MaxAge 1
         Export-TableauWorkbookToFormat -WorkbookId $testWorkbookId -Format powerpoint -OutFile "Tests/Output/$testWorkbookName.pptx"
@@ -62,10 +62,10 @@ try {
         $workbook = Publish-TableauWorkbook -Name $testWorkbookName -InFile "Tests/Output/$testWorkbookName.twbx" -ProjectId $testProjectId -Overwrite -HideViews @{Shipping="true";Performance="true";Forecast="true"}
 
         Write-Host "Testing update functionality"
-        $workbook = Set-TableauWorkbook -WorkbookId $testWorkbookId -ShowTabs:$false
+        $workbook = Update-TableauWorkbook -WorkbookId $testWorkbookId -ShowTabs:$false
         if ((Get-TableauRestVersion) -ge 3.21) {
             $description = "Testing sample workbook - description 456"
-            $workbook = Set-TableauWorkbook -WorkbookId $testWorkbookId -Description $description
+            $workbook = Update-TableauWorkbook -WorkbookId $testWorkbookId -Description $description
         }
 
         Write-Host "Testing revisions functionality"
@@ -76,9 +76,9 @@ try {
         }
 
         Write-Host "Testing tags functionality"
-        $null = Add-TableauContentTag -WorkbookId $testWorkbookId -Tags "active","test"
-        $null = Remove-TableauContentTag -WorkbookId $testWorkbookId -Tag "test"
-        $null = Remove-TableauContentTag -WorkbookId $testWorkbookId -Tag "active"
+        Add-TableauContentTag -WorkbookId $testWorkbookId -Tags "active","test" | Out-Null
+        Remove-TableauContentTag -WorkbookId $testWorkbookId -Tag "test" | Out-Null
+        Remove-TableauContentTag -WorkbookId $testWorkbookId -Tag "active" | Out-Null
     } else {
         Write-Host "Couldn't find the sample workbook" -ForegroundColor Red
     }
@@ -89,7 +89,7 @@ try {
         $testDatasourceName = $datasource.name
         Write-Host ("Sample datasource: {0} {1}" -f $testDatasourceId, $testDatasourceName)
 
-        Write-Host "Testing export functionality (tdsx)"
+        Write-Host "Testing download functionality (tdsx)"
         Export-TableauDatasource -DatasourceId $testDatasourceId -OutFile "Tests/Output/$testDatasourceName.tdsx"
 
         Write-Host "Testing publish functionality (overwrite, chunked)"
@@ -97,7 +97,7 @@ try {
         $datasource = Publish-TableauDatasource -Name $testDatasourceName -InFile "Tests/Output/$testDatasourceName.tdsx" -ProjectId $testProjectId -Overwrite -Chunked
 
         Write-Host "Testing update functionality"
-        $datasource = Set-TableauDatasource -DatasourceId $testDatasourceId -Certified -CertificationNote "Testing"
+        $datasource = Update-TableauDatasource -DatasourceId $testDatasourceId -Certified -CertificationNote "Testing"
 
         Write-Host "Testing revisions functionality"
         $revisions = Get-TableauDatasource -DatasourceId $testDatasourceId -Revisions
@@ -107,9 +107,9 @@ try {
         }
 
         Write-Host "Testing tags functionality"
-        $null = Add-TableauContentTag -DatasourceId $testDatasourceId -Tags "active","test"
-        $null = Remove-TableauContentTag -DatasourceId $testDatasourceId -Tag "test"
-        $null = Remove-TableauContentTag -DatasourceId $testDatasourceId -Tag "active"
+        Add-TableauContentTag -DatasourceId $testDatasourceId -Tags "active","test" | Out-Null
+        Remove-TableauContentTag -DatasourceId $testDatasourceId -Tag "test" | Out-Null
+        Remove-TableauContentTag -DatasourceId $testDatasourceId -Tag "active" | Out-Null
     } else {
         Write-Host "Couldn't find the sample datasource" -ForegroundColor Red
     }
@@ -118,7 +118,8 @@ try {
 
 } finally {
     if ($testProjectId) {
-        Remove-TableauProject -ProjectId $testProjectId
+        Remove-TableauProject -ProjectId $testProjectId | Out-Null
         $testProjectId = $null
     }
+    Disconnect-TableauServer | Out-Null
 }
