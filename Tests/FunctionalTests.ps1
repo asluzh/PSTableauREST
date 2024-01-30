@@ -121,5 +121,5 @@ try {
         Remove-TableauProject -ProjectId $testProjectId | Out-Null
         $testProjectId = $null
     }
-    Disconnect-TableauServer | Out-Null
+    Disconnect-TableauServer # | Out-Null
 }

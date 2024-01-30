@@ -6688,13 +6688,14 @@ Add Workbook / Data Source / Flow Task to Server Schedule
 
 .DESCRIPTION
 Adds a task to refresh or accelerate a workbook to an existing schedule on Tableau Server.
-Note: this is not supported on Tableau Cloud.
 or
 Adds a task to refresh a data source to an existing server schedule on Tableau Server.
-Note: this is not supported on Tableau Cloud.
 or
 Adds a task to run a flow to an existing schedule.
-Note: Tableau Prep Conductor is required to use this feature.
+Tableau Prep Conductor should be enabled for the site to use this feature.
+Note: this method is not supported on Tableau Cloud.
+For Tableau Cloud - use the following methods:
+
 
 .PARAMETER ScheduleId
 The LUID of the schedule that the task will be added into.
@@ -7346,7 +7347,7 @@ Param(
     }
 }
 
-function Add-TableauExtractRefreshTask {
+function New-TableauCloudExtractRefreshTask {
 <#
 .SYNOPSIS
 Create Cloud Extract Refresh Task
@@ -7395,13 +7396,13 @@ For last day of the month, leave this parameter empty.
 (Optional) For Monthly, describing specific days in a month, e.g. for 3rd and 5th days, the list of values 3 and 5 should be provided.
 
 .EXAMPLE
-$extractTaskResult = Add-TableauExtractRefreshTask -WorkbookId $workbook.id -Type FullRefresh -Frequency Daily -StartTime 12:00:00 -IntervalHours 24 -IntervalWeekdays 'Sunday','Monday'
+$extractTaskResult = New-TableauCloudExtractRefreshTask -WorkbookId $workbook.id -Type FullRefresh -Frequency Daily -StartTime 12:00:00 -IntervalHours 24 -IntervalWeekdays 'Sunday','Monday'
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_extract_and_encryption.htm#create_cloud_extract_refresh_task
 #>
 [CmdletBinding(SupportsShouldProcess)]
-[Alias('New-TableauExtractRefreshTask')]
+[Alias('Add-TableauCloudExtractRefreshTask')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory,ParameterSetName='Workbook')][string] $WorkbookId,
@@ -7498,7 +7499,7 @@ Param(
     }
 }
 
-function Set-TableauExtractRefreshTask {
+function Set-TableauCloudExtractRefreshTask {
 <#
 .SYNOPSIS
 Update Cloud extract refresh task
@@ -7551,13 +7552,13 @@ For last day of the month, leave this parameter empty.
 (Optional) For Monthly, describing specific days in a month, e.g. for 3rd and 5th days, the list of values 3 and 5 should be provided.
 
 .EXAMPLE
-$extractTaskResult = Set-TableauExtractRefreshTask -TaskId $taskId -DatasourceId $datasource.id -Type FullRefresh -Frequency Hourly -StartTime 08:00:00 -EndTime 20:00:00 -IntervalHours 6 -IntervalWeekdays 'Tuesday'
+$extractTaskResult = Set-TableauCloudExtractRefreshTask -TaskId $taskId -DatasourceId $datasource.id -Type FullRefresh -Frequency Hourly -StartTime 08:00:00 -EndTime 20:00:00 -IntervalHours 6 -IntervalWeekdays 'Tuesday'
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_extract_and_encryption.htm#update_cloud_extract_refresh_task
 #>
 [CmdletBinding(SupportsShouldProcess)]
-[Alias('Update-TableauExtractRefreshTask')]
+[Alias('Update-TableauCloudExtractRefreshTask')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $TaskId,
@@ -8057,7 +8058,7 @@ Param(
     }
 }
 
-function Add-TableauSubscription {
+function New-TableauSubscription {
 <#
 .SYNOPSIS
 Create Subscription
@@ -8136,16 +8137,16 @@ For last day of the month, leave this parameter empty.
 (Optional, for Tableau Cloud) For Monthly, describing specific days in a month, e.g. for 3rd and 5th days, the list of values 3 and 5 should be provided.
 
 .EXAMPLE
-$subscription = Add-TableauSubscription -ScheduleId $subscriptionScheduleId -ContentType Workbook -ContentId $workbook.id -Subject "test" -Message "Test subscription" -UserId (Get-TableauCurrentUserId)
+$subscription = New-TableauSubscription -ScheduleId $subscriptionScheduleId -ContentType Workbook -ContentId $workbook.id -Subject "test" -Message "Test subscription" -UserId (Get-TableauCurrentUserId)
 
 .EXAMPLE
-$subscription = Add-TableauSubscription -ContentType View -ContentId $view.id -Subject "test" -Message "Test subscription" -UserId (Get-TableauCurrentUserId) -Frequency Weekly -StartTime 12:00:00 -IntervalWeekdays 'Sunday'
+$subscription = New-TableauSubscription -ContentType View -ContentId $view.id -Subject "test" -Message "Test subscription" -UserId (Get-TableauCurrentUserId) -Frequency Weekly -StartTime 12:00:00 -IntervalWeekdays 'Sunday'
 
 .NOTES
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_subscriptions.htm#create_subscription
 #>
 [CmdletBinding(SupportsShouldProcess)]
-[Alias('New-TableauSubscription')]
+[Alias('Add-TableauSubscription')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $Subject,
@@ -8759,7 +8760,7 @@ Param(
     }
 }
 
-function Add-TableauDataAlert {
+function New-TableauDataAlert {
 <#
 .SYNOPSIS
 Create Data Driven Alert
@@ -8802,13 +8803,13 @@ The LUID of the custom view that contains the data that can trigger an alert.
 Either the ViewId or CustomViewId needs to be provided.
 
 .EXAMPLE
-$dataAlert = Add-TableauDataAlert -Subject "Data Driven Alert for Forecast" -Condition above -Threshold 14000 -WorksheetName "one_measure_no_dimension" -ViewId $view.id
+$dataAlert = New-TableauDataAlert -Subject "Data Driven Alert for Forecast" -Condition above -Threshold 14000 -WorksheetName "one_measure_no_dimension" -ViewId $view.id
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#create_data_driven_alert
 #>
 [CmdletBinding(SupportsShouldProcess)]
-[Alias('New-TableauDataAlert')]
+[Alias('Add-TableauDataAlert')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $Subject,

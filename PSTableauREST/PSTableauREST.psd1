@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.5.2'
+ModuleVersion = '0.5.3'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -119,13 +119,13 @@ FunctionsToExport = @(
 ### Extract and Encryption methods
 'Get-TableauExtractRefreshTask',
 'Add-TableauContentExtract', 'Remove-TableauContentExtract',
-'Add-TableauExtractRefreshTask', 'Set-TableauExtractRefreshTask',
+'New-TableauCloudExtractRefreshTask', 'Set-TableauCloudExtractRefreshTask',
 'Set-TableauEncryption',
 ### Favorites methods
 'Get-TableauUserFavorite', 'Add-TableauUserFavorite', 'Remove-TableauUserFavorite', 'Move-TableauUserFavorite',
 # Add Metric to Favorites - retired in API 3.22
 ### Subscription methods
-'Get-TableauSubscription', 'Add-TableauSubscription', 'Set-TableauSubscription', 'Remove-TableauSubscription',
+'Get-TableauSubscription', 'New-TableauSubscription', 'Set-TableauSubscription', 'Remove-TableauSubscription',
 ### Dashboard Extensions Settings methods - introduced in API 3.8, retired in API 3.21
 ### Tableau Extensions Settings Methods - introduced in API 3.21
 'Get-TableauServerSettingsExtension', 'Set-TableauServerSettingsExtension',
@@ -162,7 +162,7 @@ FunctionsToExport = @(
 # Delete EAS
 
 ### Notifications methods
-'Get-TableauDataAlert', 'Add-TableauDataAlert', 'Set-TableauDataAlert', 'Remove-TableauDataAlert',
+'Get-TableauDataAlert', 'New-TableauDataAlert', 'Set-TableauDataAlert', 'Remove-TableauDataAlert',
 'Add-TableauDataAlertUser', 'Remove-TableauDataAlertUser',
 # List Webhooks - introduced in API 3.6
 # Get a Webhook
@@ -313,10 +313,10 @@ AliasesToExport = @('Login-TableauServer','Logout-TableauServer',
 'Download-TableauFlow','Upload-TableauFlow','Update-TableauFlowConnection',
 'Run-TableauFlow','Cancel-TableauFlowRun','Update-TableauSchedule',
 'Query-TableauJob','Cancel-TableauJob', 'Run-TableauTask',
-'Create-TableauContentExtract','New-TableauExtractRefreshTask','Update-TableauExtractRefreshTask',
-'New-TableauSubscription','Update-TableauSubscription',
+'Create-TableauContentExtract','Add-TableauCloudExtractRefreshTask','Update-TableauCloudExtractRefreshTask',
+'Add-TableauSubscription','Update-TableauSubscription',
 'Update-TableauServerSettingsExtension','Update-TableauSiteSettingsExtension',
-'Query-TableauDataAlert','New-TableauDataAlert','Update-TableauDataAlert',
+'Query-TableauDataAlert','Add-TableauDataAlert','Update-TableauDataAlert',
 'Run-TableauMetadataGraphQL','Query-TableauMetadata')
 
 # DSC resources to export from this module
