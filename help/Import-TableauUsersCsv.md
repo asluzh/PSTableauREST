@@ -1,11 +1,3 @@
----
-external help file: PSTableauREST-help.xml
-Module Name: PSTableauREST
-online version: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#import_users_to_site_from_csv
-schema: 2.0.0
-title: Import-TableauUsersCsv
----
-
 # Import-TableauUsersCsv
 
 ## SYNOPSIS

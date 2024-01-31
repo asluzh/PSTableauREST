@@ -1,11 +1,3 @@
----
-external help file: PSTableauREST-help.xml
-Module Name: PSTableauREST
-online version: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#cancel_flow_run
-schema: 2.0.0
-title: Stop-TableauFlowRun
----
-
 # Stop-TableauFlowRun
 
 ## SYNOPSIS

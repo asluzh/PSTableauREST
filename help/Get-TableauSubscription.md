@@ -1,11 +1,3 @@
----
-external help file: PSTableauREST-help.xml
-Module Name: PSTableauREST
-online version: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_subscriptions.htm#get_subscription
-schema: 2.0.0
-title: Get-TableauSubscription
----
-
 # Get-TableauSubscription
 
 ## SYNOPSIS

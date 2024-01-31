@@ -31,19 +31,18 @@ if ($Item) {
     $CommandList += $Module.ExportedCmdlets.Keys
 }
 
-# https://onprem.wtf/post/converting-powershell-help-to-a-website/
 foreach ($Command in $CommandList) {
     $Help = Get-Help -Name $Command -Full
-    $Metadata = @{
+    # $Metadata = @{
     #     'layout' = 'pshelp';
     #     'author' = 'asluzh';
-        'title' = $($Command);
+    #     'title' = $($Command);
     #     'category' = $($ModuleName.ToLower());
     #     'excerpt' = "`"$($Help.Synopsis)`"";
     #     'date' = $(Get-Date -Format yyyy-MM-dd);
     #     'redirect_from' = "[`"/PowerShell/$($ModuleName)/$($Command)/`", `"/PowerShell/$($ModuleName)/$($Command.ToLower())/`", `"/PowerShell/$($Command.ToLower())/`"]"
-    }
+    # }
     if ($Help.Synopsis -notmatch "\[|\]") {
-        New-MarkdownHelp -Command $Command -OutputFolder ./help -Force -Metadata $Metadata
+        New-MarkdownHelp -Command $Command -OutputFolder ./help -Force -NoMetadata
     }
 }

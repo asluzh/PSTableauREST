@@ -1,11 +1,3 @@
----
-external help file: PSTableauREST-help.xml
-Module Name: PSTableauREST
-online version: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#get_custom_view_image
-schema: 2.0.0
-title: Export-TableauCustomViewImage
----
-
 # Export-TableauCustomViewImage
 
 ## SYNOPSIS

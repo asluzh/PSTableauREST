@@ -1,11 +1,3 @@
----
-external help file: PSTableauREST-help.xml
-Module Name: PSTableauREST
-online version: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sources.htm#delete_data_source
-schema: 2.0.0
-title: Remove-TableauDatasource
----
-
 # Remove-TableauDatasource
 
 ## SYNOPSIS

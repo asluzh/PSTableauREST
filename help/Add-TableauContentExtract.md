@@ -1,11 +1,3 @@
----
-external help file: PSTableauREST-help.xml
-Module Name: PSTableauREST
-online version: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_extract_and_encryption.htm#create_extract_for_datasource
-schema: 2.0.0
-title: Add-TableauContentExtract
----
-
 # Add-TableauContentExtract
 
 ## SYNOPSIS

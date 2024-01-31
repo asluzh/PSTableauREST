@@ -1,11 +1,3 @@
----
-external help file: PSTableauREST-help.xml
-Module Name: PSTableauREST
-online version: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#delete_tag_from_workbook
-schema: 2.0.0
-title: Remove-TableauContentTag
----
-
 # Remove-TableauContentTag
 
 ## SYNOPSIS

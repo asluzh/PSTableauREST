@@ -1,11 +1,3 @@
----
-external help file: PSTableauREST-help.xml
-Module Name: PSTableauREST
-online version: https://help.tableau.com/current/api/metadata_api/en-us/index.html
-schema: 2.0.0
-title: Get-TableauMetadataObject
----
-
 # Get-TableauMetadataObject
 
 ## SYNOPSIS

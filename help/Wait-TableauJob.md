@@ -1,11 +1,3 @@
----
-external help file: PSTableauREST-help.xml
-Module Name: PSTableauREST
-online version:
-schema: 2.0.0
-title: Wait-TableauJob
----
-
 # Wait-TableauJob
 
 ## SYNOPSIS

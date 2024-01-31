@@ -1,11 +1,3 @@
----
-external help file: PSTableauREST-help.xml
-Module Name: PSTableauREST
-online version: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_jobs_tasks_and_schedules.htm#get-schedule
-schema: 2.0.0
-title: Get-TableauSchedule
----
-
 # Get-TableauSchedule
 
 ## SYNOPSIS

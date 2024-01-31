@@ -1,11 +1,3 @@
----
-external help file: PSTableauREST-help.xml
-Module Name: PSTableauREST
-online version: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#set_custom_view_as_default_for_users
-schema: 2.0.0
-title: Set-TableauCustomViewUserDefault
----
-
 # Set-TableauCustomViewUserDefault
 
 ## SYNOPSIS
