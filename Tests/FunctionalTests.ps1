@@ -1,5 +1,5 @@
 Import-Module ./PSTableauREST -Force
-. ./Tests/Test.Functions.ps1
+. ./scripts/SecretStore.Functions.ps1
 
 # $script:VerbosePreference = 'Continue' # display verbose output of the module functions
 Write-Host "This script runs a suite of tests with various REST API calls. The temporary content objects are then removed."
@@ -10,10 +10,10 @@ try {
         $Config.username = $env:USERNAME
     }
     if ($Config.username) {
-        $Config | Add-Member -MemberType NoteProperty -Name "credential" -Value (New-Object System.Management.Automation.PSCredential($Config.username, (Test-GetSecurePassword -Namespace $Config.server -Username $Config.username)))
+        $Config | Add-Member -MemberType NoteProperty -Name "credential" -Value (New-Object System.Management.Automation.PSCredential($Config.username, (Get-SecurePassword -Namespace $Config.server -Username $Config.username)))
     }
     if ($Config.pat_name) {
-        $Config | Add-Member -MemberType NoteProperty -Name "pat_credential" -Value (New-Object System.Management.Automation.PSCredential($Config.pat_name, (Test-GetSecurePassword -Namespace $Config.server -Username $Config.pat_name)))
+        $Config | Add-Member -MemberType NoteProperty -Name "pat_credential" -Value (New-Object System.Management.Automation.PSCredential($Config.pat_name, (Get-SecurePassword -Namespace $Config.server -Username $Config.pat_name)))
     }
 } catch {
     Write-Error 'Please provide a valid configuration file via $ConfigFile variable' -ErrorAction Stop
@@ -51,15 +51,15 @@ try {
         Write-Host ("Superstore workbook: {0} {1}" -f $testWorkbookId, $testWorkbookName)
 
         Write-Host "Testing download functionality (twbx, pdf, pptx, png)"
-        Export-TableauWorkbook -WorkbookId $testWorkbookId -OutFile "Tests/Output/$testWorkbookName.twbx"
-        Export-TableauWorkbookToFormat -WorkbookId $testWorkbookId -Format pdf -OutFile "Tests/Output/$testWorkbookName.pdf" -PageType 'A3' -PageOrientation 'Landscape' -MaxAge 1
-        Export-TableauWorkbookToFormat -WorkbookId $testWorkbookId -Format powerpoint -OutFile "Tests/Output/$testWorkbookName.pptx"
-        Export-TableauWorkbookToFormat -WorkbookId $testWorkbookId -Format image -OutFile "Tests/Output/$testWorkbookName.png"
+        Export-TableauWorkbook -WorkbookId $testWorkbookId -OutFile "tests/output/$testWorkbookName.twbx"
+        Export-TableauWorkbookToFormat -WorkbookId $testWorkbookId -Format pdf -OutFile "tests/output/$testWorkbookName.pdf" -PageType 'A3' -PageOrientation 'Landscape' -MaxAge 1
+        Export-TableauWorkbookToFormat -WorkbookId $testWorkbookId -Format powerpoint -OutFile "tests/output/$testWorkbookName.pptx"
+        Export-TableauWorkbookToFormat -WorkbookId $testWorkbookId -Format image -OutFile "tests/output/$testWorkbookName.png"
 
         Write-Host "Testing publish functionality (overwrite, chunked, hideviews)"
-        $workbook = Publish-TableauWorkbook -Name $testWorkbookName -InFile "Tests/Output/$testWorkbookName.twbx" -ProjectId $testProjectId -Overwrite
-        $workbook = Publish-TableauWorkbook -Name $testWorkbookName -InFile "Tests/Output/$testWorkbookName.twbx" -ProjectId $testProjectId -Overwrite -Chunked
-        $workbook = Publish-TableauWorkbook -Name $testWorkbookName -InFile "Tests/Output/$testWorkbookName.twbx" -ProjectId $testProjectId -Overwrite -HideViews @{Shipping="true";Performance="true";Forecast="true"}
+        $workbook = Publish-TableauWorkbook -Name $testWorkbookName -InFile "tests/output/$testWorkbookName.twbx" -ProjectId $testProjectId -Overwrite
+        $workbook = Publish-TableauWorkbook -Name $testWorkbookName -InFile "tests/output/$testWorkbookName.twbx" -ProjectId $testProjectId -Overwrite -Chunked
+        $workbook = Publish-TableauWorkbook -Name $testWorkbookName -InFile "tests/output/$testWorkbookName.twbx" -ProjectId $testProjectId -Overwrite -HideViews @{Shipping="true";Performance="true";Forecast="true"}
 
         Write-Host "Testing update functionality"
         $workbook = Update-TableauWorkbook -WorkbookId $testWorkbookId -ShowTabs:$false
@@ -72,7 +72,7 @@ try {
         $revisions = Get-TableauWorkbook -WorkbookId $testWorkbookId -Revisions
         if (($revisions | Measure-Object).Count -gt 1) {
             $revision = $revisions | Sort-Object revisionNumber -Descending | Select-Object -Skip 1 -First 1 -ExpandProperty revisionNumber
-            Export-TableauWorkbook -WorkbookId $testWorkbookId -Revision $revision -OutFile "Tests/Output/download_revision.twbx"
+            Export-TableauWorkbook -WorkbookId $testWorkbookId -Revision $revision -OutFile "tests/output/download_revision.twbx"
         }
 
         Write-Host "Testing tags functionality"
@@ -90,11 +90,11 @@ try {
         Write-Host ("Sample datasource: {0} {1}" -f $testDatasourceId, $testDatasourceName)
 
         Write-Host "Testing download functionality (tdsx)"
-        Export-TableauDatasource -DatasourceId $testDatasourceId -OutFile "Tests/Output/$testDatasourceName.tdsx"
+        Export-TableauDatasource -DatasourceId $testDatasourceId -OutFile "tests/output/$testDatasourceName.tdsx"
 
         Write-Host "Testing publish functionality (overwrite, chunked)"
-        $datasource = Publish-TableauDatasource -Name $testDatasourceName -InFile "Tests/Output/$testDatasourceName.tdsx" -ProjectId $testProjectId -Overwrite
-        $datasource = Publish-TableauDatasource -Name $testDatasourceName -InFile "Tests/Output/$testDatasourceName.tdsx" -ProjectId $testProjectId -Overwrite -Chunked
+        $datasource = Publish-TableauDatasource -Name $testDatasourceName -InFile "tests/output/$testDatasourceName.tdsx" -ProjectId $testProjectId -Overwrite
+        $datasource = Publish-TableauDatasource -Name $testDatasourceName -InFile "tests/output/$testDatasourceName.tdsx" -ProjectId $testProjectId -Overwrite -Chunked
 
         Write-Host "Testing update functionality"
         $datasource = Update-TableauDatasource -DatasourceId $testDatasourceId -Certified -CertificationNote "Testing"
@@ -103,7 +103,7 @@ try {
         $revisions = Get-TableauDatasource -DatasourceId $testDatasourceId -Revisions
         if (($revisions | Measure-Object).Count -gt 1) {
             $revision = $revisions | Sort-Object revisionNumber -Descending | Select-Object -Skip 1 -First 1 -ExpandProperty revisionNumber
-            Export-TableauDatasource -DatasourceId $testDatasourceId -Revision $revision -OutFile "Tests/Output/download_revision.tdsx"
+            Export-TableauDatasource -DatasourceId $testDatasourceId -Revision $revision -OutFile "tests/output/download_revision.tdsx"
         }
 
         Write-Host "Testing tags functionality"

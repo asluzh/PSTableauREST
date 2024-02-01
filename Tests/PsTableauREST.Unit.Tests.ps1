@@ -1,9 +1,9 @@
 BeforeAll {
     Import-Module ./PSTableauREST -Force
-    . ./Tests/Test.Functions.ps1
+    . ./scripts/SecretStore.Functions.ps1
 }
 BeforeDiscovery {
-    $script:ConfigFiles = Get-ChildItem -Path "Tests/Config" -Filter "test_*.json" -Recurse
+    $script:ConfigFiles = Get-ChildItem -Path "tests/config" -Filter "test_*.json" -Recurse
 }
 
 Describe "Unit Tests for PSTableauREST" -Tag Unit {
@@ -17,7 +17,7 @@ Describe "Unit Tests for PSTableauREST" -Tag Unit {
             $ConfigFile.username | Should -Not -BeNullOrEmpty
         }
         It "Password for <ConfigFile.server> should be available" {
-            $ConfigFile | Add-Member -MemberType NoteProperty -Name "securePw" -Value (Test-GetSecurePassword -Namespace $ConfigFile.server -Username $ConfigFile.username)
+            $ConfigFile | Add-Member -MemberType NoteProperty -Name "securePw" -Value (Get-SecurePassword -Namespace $ConfigFile.server -Username $ConfigFile.username)
             $ConfigFile.securePw | Should -Not -BeNullOrEmpty
         }
         It "REST API version methods" {

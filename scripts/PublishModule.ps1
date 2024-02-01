@@ -14,9 +14,9 @@ Param()
 
 $ModuleName = (Split-Path -Leaf (Get-Item $PSCommandPath).Directory.Parent.FullName)
 # Import-Module ./$ModuleName -Force
-. ./Tests/Test.Functions.ps1
+. ./scripts/SecretStore.Functions.ps1
 
-$secureKey = Test-GetSecurePassword -Namespace 'https://www.powershellgallery.com' -Username NuGetApiKey
+$secureKey = Get-SecurePassword -Namespace 'https://www.powershellgallery.com' -Username NuGetApiKey
 $NuGetApiKey = (New-Object System.Net.NetworkCredential("", $secureKey)).Password
 
 Publish-Module -Path ./$ModuleName -NuGetApiKey $NuGetApiKey # -Verbose -Repository PSGallery

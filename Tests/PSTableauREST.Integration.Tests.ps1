@@ -2,7 +2,7 @@ BeforeAll {
     # Requires -Modules Assert
     # Import-Module Assert
     Import-Module ./PSTableauREST -Force
-    . ./Tests/Test.Functions.ps1
+    . ./scripts/SecretStore.Functions.ps1
     # InModuleScope 'PSTableauREST' { $script:VerbosePreference = 'Continue' } # display verbose output of module functions
     $script:VerbosePreference = 'Continue' # display verbose output of the tests
     # InModuleScope 'PSTableauREST' { $script:DebugPreference = 'Continue' } # display debug output of the module
@@ -10,20 +10,20 @@ BeforeAll {
     # see also: https://stackoverflow.com/questions/18770723/hide-progress-of-invoke-webrequest
 }
 BeforeDiscovery {
-    $script:ConfigFiles = Get-ChildItem -Path "./Tests/Config" -Filter "test_*.json" | Resolve-Path -Relative
-    $script:DatasourceFiles = Get-ChildItem -Path "./Tests/Assets/Datasources" -Recurse | Resolve-Path -Relative
-    $script:WorkbookFiles = Get-ChildItem -Path "./Tests/Assets/Workbooks" -Recurse | Resolve-Path -Relative
-    $script:FlowFiles = Get-ChildItem -Path "./Tests/Assets/Flows" -Recurse | Resolve-Path -Relative
+    $script:ConfigFiles = Get-ChildItem -Path "./tests/config" -Filter "test_*.json" | Resolve-Path -Relative
+    $script:DatasourceFiles = Get-ChildItem -Path "./tests/assets/Datasources" -Recurse | Resolve-Path -Relative
+    $script:WorkbookFiles = Get-ChildItem -Path "./tests/assets/Workbooks" -Recurse | Resolve-Path -Relative
+    $script:FlowFiles = Get-ChildItem -Path "./tests/assets/Flows" -Recurse | Resolve-Path -Relative
 }
 
 Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $ConfigFiles {
     BeforeAll {
         $script:ConfigFile = Get-Content $_ | ConvertFrom-Json
         if ($ConfigFile.username) {
-            $ConfigFile | Add-Member -MemberType NoteProperty -Name "credential" -Value (New-Object System.Management.Automation.PSCredential($ConfigFile.username, (Test-GetSecurePassword -Namespace $ConfigFile.server -Username $ConfigFile.username)))
+            $ConfigFile | Add-Member -MemberType NoteProperty -Name "credential" -Value (New-Object System.Management.Automation.PSCredential($ConfigFile.username, (Get-SecurePassword -Namespace $ConfigFile.server -Username $ConfigFile.username)))
         }
         if ($ConfigFile.pat_name) {
-            $ConfigFile | Add-Member -MemberType NoteProperty -Name "pat_credential" -Value (New-Object System.Management.Automation.PSCredential($ConfigFile.pat_name, (Test-GetSecurePassword -Namespace $ConfigFile.server -Username $ConfigFile.pat_name)))
+            $ConfigFile | Add-Member -MemberType NoteProperty -Name "pat_credential" -Value (New-Object System.Management.Automation.PSCredential($ConfigFile.pat_name, (Get-SecurePassword -Namespace $ConfigFile.server -Username $ConfigFile.pat_name)))
         }
     }
     Context "Auth operations" -Tag Auth {
@@ -560,9 +560,9 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             }
             It "Import users via CSV file on <ConfigFile.server>" {
                 if ($ConfigFile.tableau_cloud) {
-                    $job = Import-TableauUsersCsv -CsvFile './Tests/Assets/Misc/users_to_add_cloud.csv' -AuthSetting ServerDefault
+                    $job = Import-TableauUsersCsv -CsvFile './tests/assets/Misc/users_to_add_cloud.csv' -AuthSetting ServerDefault
                 } else {
-                    $job = Import-TableauUsersCsv -CsvFile './Tests/Assets/Misc/users_to_add.csv'
+                    $job = Import-TableauUsersCsv -CsvFile './tests/assets/Misc/users_to_add.csv'
                 }
                 $job | Should -Not -BeNullOrEmpty
                 $job.type | Should -Be "UserImport"
@@ -581,7 +581,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             }
             It "Remove users via CSV file on <ConfigFile.server>" {
                 if ($ConfigFile.tableau_cloud) {
-                    # $job = Remove-TableauUsersCsv -CsvFile './Tests/Assets/Misc/users_to_remove_cloud.csv'
+                    # $job = Remove-TableauUsersCsv -CsvFile './tests/assets/Misc/users_to_remove_cloud.csv'
                     $user = Get-TableauUser -Filter "name:eq:user1@domain.com"
                     $response = Remove-TableauUser -UserId $user.id
                     $response | Should -BeOfType String
@@ -590,7 +590,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $response | Should -BeOfType String
                 } else {
                     # TODO test this method on Tableau Server, on Tableau Cloud this doesn't work for some reason
-                    $job = Remove-TableauUsersCsv -CsvFile './Tests/Assets/Misc/users_to_remove.csv'
+                    $job = Remove-TableauUsersCsv -CsvFile './tests/assets/Misc/users_to_remove.csv'
                     $job | Should -Not -BeNullOrEmpty
                 }
                 if ($job) {
@@ -752,43 +752,43 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     }
                 }
                 It "Download sample workbook from <ConfigFile.server>" {
-                    Export-TableauWorkbook -WorkbookId $sampleWorkbookId -OutFile "Tests/Output/$sampleWorkbookName.twbx"
-                    Test-Path -Path "Tests/Output/$sampleWorkbookName.twbx" | Should -BeTrue
-                    Export-TableauWorkbook -WorkbookId $sampleWorkbookId -OutFile "Tests/Output/$sampleWorkbookName.twb" -ExcludeExtract
-                    Test-Path -Path "Tests/Output/$sampleWorkbookName.twb" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/$sampleWorkbookName.twb" | Out-Null
+                    Export-TableauWorkbook -WorkbookId $sampleWorkbookId -OutFile "tests/output/$sampleWorkbookName.twbx"
+                    Test-Path -Path "tests/output/$sampleWorkbookName.twbx" | Should -BeTrue
+                    Export-TableauWorkbook -WorkbookId $sampleWorkbookId -OutFile "tests/output/$sampleWorkbookName.twb" -ExcludeExtract
+                    Test-Path -Path "tests/output/$sampleWorkbookName.twb" | Should -BeTrue
+                    Remove-Item -Path "tests/output/$sampleWorkbookName.twb" | Out-Null
                 }
                 It "Download sample workbook as PDF from <ConfigFile.server>" {
-                    Export-TableauWorkbookToFormat -WorkbookId $sampleWorkbookId -Format pdf -OutFile "Tests/Output/$sampleWorkbookName.pdf"
-                    Test-Path -Path "Tests/Output/$sampleWorkbookName.pdf" | Should -BeTrue
-                    Export-TableauWorkbookToFormat -WorkbookId $sampleWorkbookId -Format pdf -OutFile "Tests/Output/$sampleWorkbookName.pdf" -PageType 'A3' -PageOrientation 'Landscape' -MaxAge 1
-                    Test-Path -Path "Tests/Output/$sampleWorkbookName.pdf" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/$sampleWorkbookName.pdf" | Out-Null
+                    Export-TableauWorkbookToFormat -WorkbookId $sampleWorkbookId -Format pdf -OutFile "tests/output/$sampleWorkbookName.pdf"
+                    Test-Path -Path "tests/output/$sampleWorkbookName.pdf" | Should -BeTrue
+                    Export-TableauWorkbookToFormat -WorkbookId $sampleWorkbookId -Format pdf -OutFile "tests/output/$sampleWorkbookName.pdf" -PageType 'A3' -PageOrientation 'Landscape' -MaxAge 1
+                    Test-Path -Path "tests/output/$sampleWorkbookName.pdf" | Should -BeTrue
+                    Remove-Item -Path "tests/output/$sampleWorkbookName.pdf" | Out-Null
                 }
                 It "Download sample workbook as PowerPoint from <ConfigFile.server>" {
-                    Export-TableauWorkbookToFormat -WorkbookId $sampleWorkbookId -Format powerpoint -OutFile "Tests/Output/$sampleWorkbookName.pptx"
-                    Test-Path -Path "Tests/Output/$sampleWorkbookName.pptx" | Should -BeTrue
-                    # Export-TableauWorkbookToFormat -WorkbookId $sampleWorkbookId -Format powerpoint -OutFile "Tests/Output/$sampleWorkbookName.pptx" -MaxAge 1
-                    # Test-Path -Path "Tests/Output/$sampleWorkbookName.pptx" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/$sampleWorkbookName.pptx" | Out-Null
+                    Export-TableauWorkbookToFormat -WorkbookId $sampleWorkbookId -Format powerpoint -OutFile "tests/output/$sampleWorkbookName.pptx"
+                    Test-Path -Path "tests/output/$sampleWorkbookName.pptx" | Should -BeTrue
+                    # Export-TableauWorkbookToFormat -WorkbookId $sampleWorkbookId -Format powerpoint -OutFile "tests/output/$sampleWorkbookName.pptx" -MaxAge 1
+                    # Test-Path -Path "tests/output/$sampleWorkbookName.pptx" | Should -BeTrue
+                    Remove-Item -Path "tests/output/$sampleWorkbookName.pptx" | Out-Null
                 }
                 It "Download sample workbook as PNG from <ConfigFile.server>" {
-                    Export-TableauWorkbookToFormat -WorkbookId $sampleWorkbookId -Format image -OutFile "Tests/Output/$sampleWorkbookName.png"
-                    Test-Path -Path "Tests/Output/$sampleWorkbookName.png" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/$sampleWorkbookName.png" | Out-Null
+                    Export-TableauWorkbookToFormat -WorkbookId $sampleWorkbookId -Format image -OutFile "tests/output/$sampleWorkbookName.png"
+                    Test-Path -Path "tests/output/$sampleWorkbookName.png" | Should -BeTrue
+                    Remove-Item -Path "tests/output/$sampleWorkbookName.png" | Out-Null
                 }
                 It "Publish sample workbook on <ConfigFile.server>" {
-                    $workbook = Publish-TableauWorkbook -Name $sampleWorkbookName -InFile "Tests/Output/$sampleWorkbookName.twbx" -ProjectId $samplesProjectId -Overwrite
+                    $workbook = Publish-TableauWorkbook -Name $sampleWorkbookName -InFile "tests/output/$sampleWorkbookName.twbx" -ProjectId $samplesProjectId -Overwrite
                     $workbook.id | Should -BeOfType String
                     $script:sampleWorkbookId = $workbook.id
                 }
                 It "Publish sample workbook (chunks) on <ConfigFile.server>" {
-                    $workbook = Publish-TableauWorkbook -Name $sampleWorkbookName -InFile "Tests/Output/$sampleWorkbookName.twbx" -ProjectId $samplesProjectId -Overwrite -Chunked
+                    $workbook = Publish-TableauWorkbook -Name $sampleWorkbookName -InFile "tests/output/$sampleWorkbookName.twbx" -ProjectId $samplesProjectId -Overwrite -Chunked
                     $workbook.id | Should -BeOfType String
                     $script:sampleWorkbookId = $workbook.id
                 }
                 It "Publish sample workbook (hidden views) on <ConfigFile.server>" {
-                    $workbook = Publish-TableauWorkbook -Name $sampleWorkbookName -InFile "Tests/Output/$sampleWorkbookName.twbx" -ProjectId $samplesProjectId -Overwrite -HideViews @{Shipping="true";Performance="true";Forecast="true"}
+                    $workbook = Publish-TableauWorkbook -Name $sampleWorkbookName -InFile "tests/output/$sampleWorkbookName.twbx" -ProjectId $samplesProjectId -Overwrite -HideViews @{Shipping="true";Performance="true";Forecast="true"}
                     $workbook.id | Should -BeOfType String
                     $workbook.showTabs | Should -Be false
                     $script:sampleWorkbookId = $workbook.id
@@ -796,7 +796,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 It "Publish sample workbook (with options) on <ConfigFile.server>" {
                     if ((Get-TableauRestVersion) -ge [version]3.21) {
                         $description = "Testing sample workbook - description 123"
-                        $workbook = Publish-TableauWorkbook -Name $sampleWorkbookName -InFile "Tests/Output/$sampleWorkbookName.twbx" -ProjectId $samplesProjectId -Overwrite -ShowTabs -ThumbnailsUserId (Get-TableauCurrentUserId) -Description $description
+                        $workbook = Publish-TableauWorkbook -Name $sampleWorkbookName -InFile "tests/output/$sampleWorkbookName.twbx" -ProjectId $samplesProjectId -Overwrite -ShowTabs -ThumbnailsUserId (Get-TableauCurrentUserId) -Description $description
                         $workbook.id | Should -BeOfType String
                         $workbook.showTabs | Should -Be true
                         $workbook.description | Should -Be $description
@@ -828,9 +828,9 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $revisions = Get-TableauWorkbook -WorkbookId $sampleWorkbookId -Revisions
                     if (($revisions | Measure-Object).Count -gt 1) {
                         $revision = $revisions | Sort-Object revisionNumber -Descending | Select-Object -Skip 1 -First 1 -ExpandProperty revisionNumber
-                        Export-TableauWorkbook -WorkbookId $sampleWorkbookId -Revision $revision -OutFile "Tests/Output/download_revision.twbx"
-                        Test-Path -Path "Tests/Output/download_revision.twbx" | Should -BeTrue
-                        Remove-Item -Path "Tests/Output/download_revision.twbx" | Out-Null
+                        Export-TableauWorkbook -WorkbookId $sampleWorkbookId -Revision $revision -OutFile "tests/output/download_revision.twbx"
+                        Test-Path -Path "tests/output/download_revision.twbx" | Should -BeTrue
+                        Remove-Item -Path "tests/output/download_revision.twbx" | Out-Null
                         Remove-TableauWorkbook -WorkbookId $sampleWorkbookId -Revision $revision | Out-Null
                     } else {
                         Set-ItResult -Skipped -Because "only one revision was found"
@@ -838,9 +838,9 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 }
                 It "Download latest workbook revision on <ConfigFile.server>" {
                     $revision = Get-TableauWorkbook -WorkbookId $sampleWorkbookId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
-                    Export-TableauWorkbook -WorkbookId $sampleWorkbookId -Revision $revision -OutFile "Tests/Output/download_revision.twbx"
-                    Test-Path -Path "Tests/Output/download_revision.twbx" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/download_revision.twbx" | Out-Null
+                    Export-TableauWorkbook -WorkbookId $sampleWorkbookId -Revision $revision -OutFile "tests/output/download_revision.twbx"
+                    Test-Path -Path "tests/output/download_revision.twbx" | Should -BeTrue
+                    Remove-Item -Path "tests/output/download_revision.twbx" | Out-Null
                 }
                 It "Add/remove tags for sample workbook on <ConfigFile.server>" {
                     Add-TableauContentTag -WorkbookId $sampleWorkbookId -Tags "active","test" | Out-Null
@@ -945,35 +945,35 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     }
                 }
                 It "Publish workbook with invalid extension on <ConfigFile.server>" {
-                    {Publish-TableauWorkbook -Name "Workbook" -InFile "Tests/Assets/Misc/Workbook.txt" -ProjectId $samplesProjectId} | Should -Throw
+                    {Publish-TableauWorkbook -Name "Workbook" -InFile "tests/assets/Misc/Workbook.txt" -ProjectId $samplesProjectId} | Should -Throw
                 }
                 It "Publish workbook with invalid contents on <ConfigFile.server>" {
-                    {Publish-TableauWorkbook -Name "invalid" -InFile "Tests/Assets/Misc/invalid.twbx" -ProjectId $samplesProjectId} | Should -Throw
+                    {Publish-TableauWorkbook -Name "invalid" -InFile "tests/assets/Misc/invalid.twbx" -ProjectId $samplesProjectId} | Should -Throw
                 }
                 It "Publish TWB workbook with embed credentials on <ConfigFile.server>" -Tag WorkbookP {
                     # this request/test is done first to unsuspend the database (free SQL tier, suspended after 1h of inactivity)
-                    $securePw = Test-GetSecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
+                    $securePw = Get-SecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
                     $credentials = @{username="sqladmin"; password=$securePw; embed="true" }
                     try {
-                        $workbook = Publish-TableauWorkbook -Name "AW Customer Address" -InFile "Tests/Assets/Misc/AW_Customer_Address.twb" -ProjectId $samplesProjectId -Credentials $credentials
+                        $workbook = Publish-TableauWorkbook -Name "AW Customer Address" -InFile "tests/assets/Misc/AW_Customer_Address.twb" -ProjectId $samplesProjectId -Credentials $credentials
                         $workbook | Should -Not -BeNullOrEmpty
                         $view = Get-TableauView -Filter "workbookName:eq:AW Customer Address","projectName:eq:$samplesProjectName" | Select-Object -First 1
                         $view | Should -Not -BeNullOrEmpty
-                        Export-TableauViewToFormat -ViewId $view.id -Format image -OutFile "Tests/Output/Sheet1.png"
+                        Export-TableauViewToFormat -ViewId $view.id -Format image -OutFile "tests/output/Sheet1.png"
                     } catch [Microsoft.PowerShell.Commands.WriteErrorException] {
                         # Write-Verbose $_.Exception.Message
                         Write-Verbose "The workbook couldn't be published, but the SQL database is now starting for other tests."
                     }
                 }
                 It "Publish workbook without embed credentials on <ConfigFile.server>" -Tag WorkbookP {
-                    $workbook = Publish-TableauWorkbook -Name "AW Customer Address 1" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId
+                    $workbook = Publish-TableauWorkbook -Name "AW Customer Address 1" -InFile "tests/assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId
                     $workbook | Should -Not -BeNullOrEmpty
                     # Remove-TableauWorkbook -WorkbookId $workbook.id | Out-Null
                 }
                 It "Publish workbook with embed credentials on <ConfigFile.server>" -Tag WorkbookP {
-                    $securePw = Test-GetSecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
+                    $securePw = Get-SecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
                     $credentials = @{username="sqladmin"; password=$securePw; embed="true" }
-                    $workbook = Publish-TableauWorkbook -Name "AW Customer Address 2" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -Credentials $credentials
+                    $workbook = Publish-TableauWorkbook -Name "AW Customer Address 2" -InFile "tests/assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -Credentials $credentials
                     $workbook | Should -Not -BeNullOrEmpty
                     Write-Verbose "Queueing extract refresh job"
                     $job = Update-TableauWorkbookNow -WorkbookId $workbook.id
@@ -994,9 +994,9 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     # Remove-TableauWorkbook -WorkbookId $workbook.id | Out-Null
                 }
                 It "Publish workbook with connections on <ConfigFile.server>" -Tag WorkbookP {
-                    $securePw = Test-GetSecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
+                    $securePw = Get-SecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
                     $connections = @( @{serverAddress="asl-tableau-testsql.database.windows.net"; serverPort="3389"; credentials=@{username="sqladmin"; password=$securePw; embed="true" }} )
-                    $workbook = Publish-TableauWorkbook -Name "AW Customer Address 3" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -Connections $connections
+                    $workbook = Publish-TableauWorkbook -Name "AW Customer Address 3" -InFile "tests/assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -Connections $connections
                     $workbook | Should -Not -BeNullOrEmpty
                     Write-Verbose "Queueing extract refresh job"
                     $job = Update-TableauWorkbookNow -WorkbookId $workbook.id
@@ -1017,7 +1017,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     # Remove-TableauWorkbook -WorkbookId $workbook.id | Out-Null
                 }
                 It "Publish workbook as background job on <ConfigFile.server>" -Tag WorkbookP {
-                    $job = Publish-TableauWorkbook -Name "AW Customer Address 4" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -BackgroundTask
+                    $job = Publish-TableauWorkbook -Name "AW Customer Address 4" -InFile "tests/assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -BackgroundTask
                     $job | Should -Not -BeNullOrEmpty
                     $jobFinished = Wait-TableauJob -JobId $job.id -Timeout 60
                     Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobFinished.completedAt, $jobFinished.finishCode)
@@ -1041,9 +1041,9 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     }
                     It "Download workbook ""<sampleWorkbookName>"" from <ConfigFile.server>" {
                         if ($sampleWorkbookId) {
-                            Export-TableauWorkbook -WorkbookId $sampleWorkbookId -OutFile "Tests/Output/download.twbx"
-                            Test-Path -Path "Tests/Output/download.twbx" | Should -BeTrue
-                            Remove-Item -Path "Tests/Output/download.twbx" | Out-Null
+                            Export-TableauWorkbook -WorkbookId $sampleWorkbookId -OutFile "tests/output/download.twbx"
+                            Test-Path -Path "tests/output/download.twbx" | Should -BeTrue
+                            Remove-Item -Path "tests/output/download.twbx" | Out-Null
                         } else {
                             Set-ItResult -Skipped -Because "previous test(s) failed"
                         }
@@ -1106,16 +1106,16 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $sampleDatasourceId | Should -BeOfType String
                 }
                 It "Download sample datasource from <ConfigFile.server>" {
-                    Export-TableauDatasource -DatasourceId $sampleDatasourceId -OutFile "Tests/Output/$sampleDatasourceName.tdsx"
-                    Test-Path -Path "Tests/Output/$sampleDatasourceName.tdsx" | Should -BeTrue
-                    # Remove-Item -Path "Tests/Output/$sampleDatasourceName.tdsx" | Out-Null
+                    Export-TableauDatasource -DatasourceId $sampleDatasourceId -OutFile "tests/output/$sampleDatasourceName.tdsx"
+                    Test-Path -Path "tests/output/$sampleDatasourceName.tdsx" | Should -BeTrue
+                    # Remove-Item -Path "tests/output/$sampleDatasourceName.tdsx" | Out-Null
                 }
                 It "Publish sample datasource on <ConfigFile.server>" {
-                    $datasource = Publish-TableauDatasource -Name $sampleDatasourceName -InFile "Tests/Output/$sampleDatasourceName.tdsx" -ProjectId $samplesProjectId -Overwrite
+                    $datasource = Publish-TableauDatasource -Name $sampleDatasourceName -InFile "tests/output/$sampleDatasourceName.tdsx" -ProjectId $samplesProjectId -Overwrite
                     $datasource.id | Should -BeOfType String
                 }
                 It "Publish sample datasource (chunks) on <ConfigFile.server>" {
-                    $datasource = Publish-TableauDatasource -Name $sampleDatasourceName -InFile "Tests/Output/$sampleDatasourceName.tdsx" -ProjectId $samplesProjectId -Overwrite -Chunked
+                    $datasource = Publish-TableauDatasource -Name $sampleDatasourceName -InFile "tests/output/$sampleDatasourceName.tdsx" -ProjectId $samplesProjectId -Overwrite -Chunked
                     $datasource.id | Should -BeOfType String
                     $script:sampleDatasourceId = $datasource.id
                 }
@@ -1123,9 +1123,9 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $revisions = Get-TableauDatasource -DatasourceId $sampleDatasourceId -Revisions
                     if (($revisions | Measure-Object).Count -gt 1) {
                         $revision = $revisions | Sort-Object revisionNumber -Descending | Select-Object -Skip 1 -First 1 -ExpandProperty revisionNumber
-                        Export-TableauDatasource -DatasourceId $sampleDatasourceId -Revision $revision -OutFile "Tests/Output/download_revision.tdsx"
-                        Test-Path -Path "Tests/Output/download_revision.tdsx" | Should -BeTrue
-                        Remove-Item -Path "Tests/Output/download_revision.tdsx" | Out-Null
+                        Export-TableauDatasource -DatasourceId $sampleDatasourceId -Revision $revision -OutFile "tests/output/download_revision.tdsx"
+                        Test-Path -Path "tests/output/download_revision.tdsx" | Should -BeTrue
+                        Remove-Item -Path "tests/output/download_revision.tdsx" | Out-Null
                         Remove-TableauDatasource -DatasourceId $sampleDatasourceId -Revision $revision | Out-Null
                     } else {
                         Set-ItResult -Skipped -Because "only one revision was found"
@@ -1133,27 +1133,27 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 }
                 It "Download latest datasource revision on <ConfigFile.server>" {
                     $revision = Get-TableauDatasource -DatasourceId $sampleDatasourceId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
-                    Export-TableauDatasource -DatasourceId $sampleDatasourceId -Revision $revision -OutFile "Tests/Output/download_revision.tdsx"
-                    Test-Path -Path "Tests/Output/download_revision.tdsx" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/download_revision.tdsx" | Out-Null
+                    Export-TableauDatasource -DatasourceId $sampleDatasourceId -Revision $revision -OutFile "tests/output/download_revision.tdsx"
+                    Test-Path -Path "tests/output/download_revision.tdsx" | Should -BeTrue
+                    Remove-Item -Path "tests/output/download_revision.tdsx" | Out-Null
                 }
                 It "Publish datasource with invalid extension on <ConfigFile.server>" {
-                    {Publish-TableauDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/Datasource.txt" -ProjectId $samplesProjectId} | Should -Throw
+                    {Publish-TableauDatasource -Name "Datasource" -InFile "tests/assets/Misc/Datasource.txt" -ProjectId $samplesProjectId} | Should -Throw
                 }
                 It "Publish datasource with invalid contents on <ConfigFile.server>" {
-                    {Publish-TableauDatasource -Name "invalid" -InFile "Tests/Assets/Misc/invalid.tdsx" -ProjectId $samplesProjectId} | Should -Throw
+                    {Publish-TableauDatasource -Name "invalid" -InFile "tests/assets/Misc/invalid.tdsx" -ProjectId $samplesProjectId} | Should -Throw
                 }
                 It "Publish datasource with append option on <ConfigFile.server>" {
-                    $datasource = Publish-TableauDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/append.hyper" -ProjectId $samplesProjectId -Overwrite
+                    $datasource = Publish-TableauDatasource -Name "Datasource" -InFile "tests/assets/Misc/append.hyper" -ProjectId $samplesProjectId -Overwrite
                     $datasource.id | Should -BeOfType String
-                    {Publish-TableauDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/append.hyper" -ProjectId $samplesProjectId -Overwrite -Append} | Should -Throw
-                    $datasource = Publish-TableauDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/append.hyper" -ProjectId $samplesProjectId -Append
+                    {Publish-TableauDatasource -Name "Datasource" -InFile "tests/assets/Misc/append.hyper" -ProjectId $samplesProjectId -Overwrite -Append} | Should -Throw
+                    $datasource = Publish-TableauDatasource -Name "Datasource" -InFile "tests/assets/Misc/append.hyper" -ProjectId $samplesProjectId -Append
                     $datasource.id | Should -BeOfType String
-                    $datasource = Publish-TableauDatasource -Name "Datasource" -InFile "Tests/Assets/Misc/append.hyper" -ProjectId $samplesProjectId -Append -Chunked
+                    $datasource = Publish-TableauDatasource -Name "Datasource" -InFile "tests/assets/Misc/append.hyper" -ProjectId $samplesProjectId -Append -Chunked
                     $datasource.id | Should -BeOfType String
                 }
                 It "Publish a Parquet file on <ConfigFile.server>" {
-                    $datasource = Publish-TableauDatasource -Name "Titanic" -InFile './Tests/Assets/Misc/Titanic.parquet' -ProjectId $samplesProjectId -Overwrite
+                    $datasource = Publish-TableauDatasource -Name "Titanic" -InFile './tests/assets/Misc/Titanic.parquet' -ProjectId $samplesProjectId -Overwrite
                     $datasource.id | Should -BeOfType String
                 }
                 It "Add/remove tags for sample datasource on <ConfigFile.server>" {
@@ -1259,13 +1259,13 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     }
                 }
                 It "Publish datasource without embed credentials on <ConfigFile.server>" -Tag DatasourceP {
-                    $datasource = Publish-TableauDatasource -Name "AW SalesOrders 0" -InFile "Tests/Assets/Misc/AW_SalesOrders.tdsx" -ProjectId $samplesProjectId
+                    $datasource = Publish-TableauDatasource -Name "AW SalesOrders 0" -InFile "tests/assets/Misc/AW_SalesOrders.tdsx" -ProjectId $samplesProjectId
                     $datasource | Should -Not -BeNullOrEmpty
                 }
                 It "Publish datasource with embed credentials on <ConfigFile.server>" -Tag DatasourceP {
-                    $securePw = Test-GetSecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
+                    $securePw = Get-SecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
                     $credentials = @{username="sqladmin"; password=$securePw; embed="true" }
-                    $datasource = Publish-TableauDatasource -Name "AW SalesOrders 1" -InFile "Tests/Assets/Misc/AW_SalesOrders.tdsx" -ProjectId $samplesProjectId -Credentials $credentials
+                    $datasource = Publish-TableauDatasource -Name "AW SalesOrders 1" -InFile "tests/assets/Misc/AW_SalesOrders.tdsx" -ProjectId $samplesProjectId -Credentials $credentials
                     $datasource | Should -Not -BeNullOrEmpty
                     Write-Verbose "Queueing extract refresh job"
                     $job = Update-TableauDatasourceNow -DatasourceId $datasource.id
@@ -1288,9 +1288,9 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 It "Publish datasource with connections on <ConfigFile.server>" -Tag DatasourceP -Skip {
                     # note: this option is still not supported by the API as of v2023.3
                     # although it's coded the same way in the tsc python module
-                    $securePw = Test-GetSecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
+                    $securePw = Get-SecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
                     $connections = @( @{serverAddress="asl-tableau-testsql.database.windows.net"; serverPort="3389"; credentials=@{username="sqladmin"; password=$securePw; embed="true" }} )
-                    $datasource = Publish-TableauDatasource -Name "AW SalesOrders 2" -InFile "Tests/Assets/Misc/AW_SalesOrders.tdsx" -ProjectId $samplesProjectId -Connections $connections
+                    $datasource = Publish-TableauDatasource -Name "AW SalesOrders 2" -InFile "tests/assets/Misc/AW_SalesOrders.tdsx" -ProjectId $samplesProjectId -Connections $connections
                     $datasource | Should -Not -BeNullOrEmpty
                     Write-Verbose "Queueing extract refresh job"
                     $job = Update-TableauDatasourceNow -DatasourceId $datasource.id
@@ -1311,7 +1311,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     # Remove-TableauDatasource -DatasourceId $datasource.id | Out-Null
                 }
                 It "Publish datasource as background job on <ConfigFile.server>" -Tag DatasourceP {
-                    $job = Publish-TableauDatasource -Name "AW SalesOrders 3" -InFile "Tests/Assets/Misc/AW_SalesOrders.tdsx" -ProjectId $samplesProjectId -BackgroundTask -Overwrite
+                    $job = Publish-TableauDatasource -Name "AW SalesOrders 3" -InFile "tests/assets/Misc/AW_SalesOrders.tdsx" -ProjectId $samplesProjectId -BackgroundTask -Overwrite
                     $job | Should -Not -BeNullOrEmpty
                     $jobFinished = Wait-TableauJob -JobId $job.id -Timeout 60
                     Write-Verbose ("Job completed at {0}, finish code: {1}" -f $jobFinished.completedAt, $jobFinished.finishCode)
@@ -1334,14 +1334,14 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                         $script:sampleDatasourceId = $datasource.id
                     }
                     It "Download datasource ""<sampleDatasourceName>"" from <ConfigFile.server>" {
-                        Export-TableauDatasource -DatasourceId $sampleDatasourceId -OutFile "Tests/Output/download.tdsx"
-                        Test-Path -Path "Tests/Output/download.tdsx" | Should -BeTrue
-                        Remove-Item -Path "Tests/Output/download.tdsx" | Out-Null
+                        Export-TableauDatasource -DatasourceId $sampleDatasourceId -OutFile "tests/output/download.tdsx"
+                        Test-Path -Path "tests/output/download.tdsx" | Should -BeTrue
+                        Remove-Item -Path "tests/output/download.tdsx" | Out-Null
                     }
                 }
                 Context "Publish live-to-Hyper assets on <ConfigFile.server>"  -Tag Hyper {
                     It "Publish initial Hyper file" {
-                        $datasource = Publish-TableauDatasource -Name "World Indicators Data" -InFile './Tests/Assets/Misc/World Indicators.hyper' -ProjectId $samplesProjectId -Overwrite
+                        $datasource = Publish-TableauDatasource -Name "World Indicators Data" -InFile './tests/assets/Misc/World Indicators.hyper' -ProjectId $samplesProjectId -Overwrite
                         $datasource.id | Should -BeOfType String
                         $script:hyperDatasourceId = $datasource.id
                     }
@@ -1350,7 +1350,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                             'target-table'='Extract'; 'target-schema'='Extract';
                             'condition'=@{op='eq'; 'target-col'='Region'; const=@{type='string'; v='Europe'}}
                         }
-                        $job = Update-TableauHyperData -InFile './Tests/Assets/Misc/World Indicators.hyper' -Action $action -DatasourceId $hyperDatasourceId
+                        $job = Update-TableauHyperData -InFile './tests/assets/Misc/World Indicators.hyper' -Action $action -DatasourceId $hyperDatasourceId
                         $job | Should -Not -BeNullOrEmpty
                         $job.type | Should -Be "updateUploadedFile"
                         $job.mode | Should -Be "Asynchronous"
@@ -1371,7 +1371,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                             'source-table'='Extract'; 'source-schema'='Extract';
                             'target-table'='Extract'; 'target-schema'='Extract'
                         }
-                        $job = Update-TableauHyperData -InFile './Tests/Assets/Misc/World Indicators.hyper' -Action $action -DatasourceId $hyperDatasourceId
+                        $job = Update-TableauHyperData -InFile './tests/assets/Misc/World Indicators.hyper' -Action $action -DatasourceId $hyperDatasourceId
                         $job | Should -Not -BeNullOrEmpty
                         $job.type | Should -Be "updateUploadedFile"
                         $job.mode | Should -Be "Asynchronous"
@@ -1393,7 +1393,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                             'source-table'='Extract'; 'source-schema'='Extract';
                             'target-table'='Extract'; 'target-schema'='Extract'
                         }
-                        $job = Update-TableauHyperData -InFile './Tests/Assets/Misc/World Indicators.hyper' -Action $action -DatasourceId $hyperDatasourceId -ConnectionId $connection.id
+                        $job = Update-TableauHyperData -InFile './tests/assets/Misc/World Indicators.hyper' -Action $action -DatasourceId $hyperDatasourceId -ConnectionId $connection.id
                         $job | Should -Not -BeNullOrEmpty
                         $job.type | Should -Be "updateUploadedFile"
                         $job.mode | Should -Be "Asynchronous"
@@ -1464,52 +1464,52 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $script:sampleViewName = (Get-TableauView -ViewId $sampleViewId).name
                 }
                 It "Download sample view as PDF from <ConfigFile.server>" {
-                    Export-TableauViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "Tests/Output/$sampleViewName.pdf"
-                    Test-Path -Path "Tests/Output/$sampleViewName.pdf" | Should -BeTrue
-                    Export-TableauViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "Tests/Output/$sampleViewName.pdf" -PageType 'A5' -PageOrientation 'Landscape' -MaxAge 1
-                    Test-Path -Path "Tests/Output/$sampleViewName.pdf" | Should -BeTrue
-                    Export-TableauViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "Tests/Output/$sampleViewName.pdf" -VizWidth 500 -VizHeight 300
-                    Test-Path -Path "Tests/Output/$sampleViewName.pdf" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/$sampleViewName.pdf" | Out-Null
+                    Export-TableauViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "tests/output/$sampleViewName.pdf"
+                    Test-Path -Path "tests/output/$sampleViewName.pdf" | Should -BeTrue
+                    Export-TableauViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "tests/output/$sampleViewName.pdf" -PageType 'A5' -PageOrientation 'Landscape' -MaxAge 1
+                    Test-Path -Path "tests/output/$sampleViewName.pdf" | Should -BeTrue
+                    Export-TableauViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "tests/output/$sampleViewName.pdf" -VizWidth 500 -VizHeight 300
+                    Test-Path -Path "tests/output/$sampleViewName.pdf" | Should -BeTrue
+                    Remove-Item -Path "tests/output/$sampleViewName.pdf" | Out-Null
                 }
                 It "Query view preview image from <ConfigFile.server>" {
                     $view = Get-TableauView -ViewId $sampleViewId
-                    Export-TableauViewImage -ViewId $sampleViewId -Workbook $view.workbook.id -OutFile "Tests/Output/$sampleViewName.png"
-                    Test-Path -Path "Tests/Output/$sampleViewName.png" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/$sampleViewName.png" | Out-Null
+                    Export-TableauViewImage -ViewId $sampleViewId -Workbook $view.workbook.id -OutFile "tests/output/$sampleViewName.png"
+                    Test-Path -Path "tests/output/$sampleViewName.png" | Should -BeTrue
+                    Remove-Item -Path "tests/output/$sampleViewName.png" | Out-Null
                 }
                 It "Download sample view as PNG from <ConfigFile.server>" {
-                    Export-TableauViewToFormat -ViewId $sampleViewId -Format image -OutFile "Tests/Output/$sampleViewName.png"
-                    Test-Path -Path "Tests/Output/$sampleViewName.png" | Should -BeTrue
-                    Export-TableauViewToFormat -ViewId $sampleViewId -Format image -OutFile "Tests/Output/$sampleViewName.png" -Resolution high
-                    Test-Path -Path "Tests/Output/$sampleViewName.png" | Should -BeTrue
-                    Export-TableauViewToFormat -ViewId $sampleViewId -Format image -OutFile "Tests/Output/$sampleViewName.png" -Resolution standard
-                    Test-Path -Path "Tests/Output/$sampleViewName.png" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/$sampleViewName.png" | Out-Null
+                    Export-TableauViewToFormat -ViewId $sampleViewId -Format image -OutFile "tests/output/$sampleViewName.png"
+                    Test-Path -Path "tests/output/$sampleViewName.png" | Should -BeTrue
+                    Export-TableauViewToFormat -ViewId $sampleViewId -Format image -OutFile "tests/output/$sampleViewName.png" -Resolution high
+                    Test-Path -Path "tests/output/$sampleViewName.png" | Should -BeTrue
+                    Export-TableauViewToFormat -ViewId $sampleViewId -Format image -OutFile "tests/output/$sampleViewName.png" -Resolution standard
+                    Test-Path -Path "tests/output/$sampleViewName.png" | Should -BeTrue
+                    Remove-Item -Path "tests/output/$sampleViewName.png" | Out-Null
                 }
                 It "Download sample workbook as CSV from <ConfigFile.server>" {
-                    Export-TableauViewToFormat -ViewId $sampleViewId -Format csv -OutFile "Tests/Output/$sampleViewName.csv"
-                    Test-Path -Path "Tests/Output/$sampleViewName.csv" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/$sampleViewName.csv" | Out-Null
+                    Export-TableauViewToFormat -ViewId $sampleViewId -Format csv -OutFile "tests/output/$sampleViewName.csv"
+                    Test-Path -Path "tests/output/$sampleViewName.csv" | Should -BeTrue
+                    Remove-Item -Path "tests/output/$sampleViewName.csv" | Out-Null
                 }
                 It "Download sample workbook as Excel from <ConfigFile.server>" {
-                    Export-TableauViewToFormat -ViewId $sampleViewId -Format excel -OutFile "Tests/Output/$sampleViewName.xlsx"
-                    Test-Path -Path "Tests/Output/$sampleViewName.xlsx" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/$sampleViewName.xlsx" | Out-Null
+                    Export-TableauViewToFormat -ViewId $sampleViewId -Format excel -OutFile "tests/output/$sampleViewName.xlsx"
+                    Test-Path -Path "tests/output/$sampleViewName.xlsx" | Should -BeTrue
+                    Remove-Item -Path "tests/output/$sampleViewName.xlsx" | Out-Null
                 }
                 It "Download sample view with data filters applied from <ConfigFile.server>" {
-                    Export-TableauViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "Tests/Output/$sampleViewName.pdf" -ViewFilters @{Region="Europe"}
-                    Test-Path -Path "Tests/Output/$sampleViewName.pdf" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/$sampleViewName.pdf" | Out-Null
-                    Export-TableauViewToFormat -ViewId $sampleViewId -Format image -OutFile "Tests/Output/$sampleViewName.png" -ViewFilters @{Region="Africa"}
-                    Test-Path -Path "Tests/Output/$sampleViewName.png" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/$sampleViewName.png" | Out-Null
-                    Export-TableauViewToFormat -ViewId $sampleViewId -Format csv -OutFile "Tests/Output/$sampleViewName.csv" -ViewFilters @{"Ease of Business (clusters)"="Low"}
-                    Test-Path -Path "Tests/Output/$sampleViewName.csv" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/$sampleViewName.csv" | Out-Null
-                    Export-TableauViewToFormat -ViewId $sampleViewId -Format excel -OutFile "Tests/Output/$sampleViewName.xlsx" -ViewFilters @{"Country/Region"="Kyrgyzstan"}
-                    Test-Path -Path "Tests/Output/$sampleViewName.xlsx" | Should -BeTrue
-                    Remove-Item -Path "Tests/Output/$sampleViewName.xlsx" | Out-Null
+                    Export-TableauViewToFormat -ViewId $sampleViewId -Format pdf -OutFile "tests/output/$sampleViewName.pdf" -ViewFilters @{Region="Europe"}
+                    Test-Path -Path "tests/output/$sampleViewName.pdf" | Should -BeTrue
+                    Remove-Item -Path "tests/output/$sampleViewName.pdf" | Out-Null
+                    Export-TableauViewToFormat -ViewId $sampleViewId -Format image -OutFile "tests/output/$sampleViewName.png" -ViewFilters @{Region="Africa"}
+                    Test-Path -Path "tests/output/$sampleViewName.png" | Should -BeTrue
+                    Remove-Item -Path "tests/output/$sampleViewName.png" | Out-Null
+                    Export-TableauViewToFormat -ViewId $sampleViewId -Format csv -OutFile "tests/output/$sampleViewName.csv" -ViewFilters @{"Ease of Business (clusters)"="Low"}
+                    Test-Path -Path "tests/output/$sampleViewName.csv" | Should -BeTrue
+                    Remove-Item -Path "tests/output/$sampleViewName.csv" | Out-Null
+                    Export-TableauViewToFormat -ViewId $sampleViewId -Format excel -OutFile "tests/output/$sampleViewName.xlsx" -ViewFilters @{"Country/Region"="Kyrgyzstan"}
+                    Test-Path -Path "tests/output/$sampleViewName.xlsx" | Should -BeTrue
+                    Remove-Item -Path "tests/output/$sampleViewName.xlsx" | Out-Null
                 }
                 It "Add/remove tags for sample view on <ConfigFile.server>" {
                     Add-TableauContentTag -ViewId $sampleViewId -Tags "active","test" | Out-Null
@@ -1685,16 +1685,16 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $flows | Select-Object -First 1 -ExpandProperty id | Should -BeOfType String
                 }
                 It "Download sample flow from <ConfigFile.server>" {
-                    Export-TableauFlow -FlowId $sampleflowId -OutFile "Tests/Output/$sampleFlowName.tflx"
-                    Test-Path -Path "Tests/Output/$sampleFlowName.tflx" | Should -BeTrue
+                    Export-TableauFlow -FlowId $sampleflowId -OutFile "tests/output/$sampleFlowName.tflx"
+                    Test-Path -Path "tests/output/$sampleFlowName.tflx" | Should -BeTrue
                 }
                 It "Publish sample flow on <ConfigFile.server>" {
-                    $flow = Publish-TableauFlow -Name $sampleFlowName -InFile "Tests/Output/$sampleFlowName.tflx" -ProjectId $samplesProjectId -Overwrite
+                    $flow = Publish-TableauFlow -Name $sampleFlowName -InFile "tests/output/$sampleFlowName.tflx" -ProjectId $samplesProjectId -Overwrite
                     $flow.id | Should -BeOfType String
                     $script:sampleFlowId = $flow.id
                 }
                 It "Publish sample flow (chunks) on <ConfigFile.server>" {
-                    $flow = Publish-TableauFlow -Name $sampleFlowName -InFile "Tests/Output/$sampleFlowName.tflx" -ProjectId $samplesProjectId -Overwrite -Chunked
+                    $flow = Publish-TableauFlow -Name $sampleFlowName -InFile "tests/output/$sampleFlowName.tflx" -ProjectId $samplesProjectId -Overwrite -Chunked
                     $flow.id | Should -BeOfType String
                     $script:sampleFlowId = $flow.id
                 }
@@ -1703,9 +1703,9 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 #     $revisions = Get-TableauFlow -FlowId $sampleFlowId -Revisions
                 #     if (($revisions | Measure-Object).Count -gt 1) {
                 #         $revision = $revisions | Sort-Object revisionNumber -Descending | Select-Object -Skip 1 -First 1 -ExpandProperty revisionNumber
-                #         Export-TableauFlow -FlowId $sampleFlowId -Revision $revision -OutFile "Tests/Output/download_revision.tflx"
-                #         Test-Path -Path "Tests/Output/download_revision.tflx" | Should -BeTrue
-                #         Remove-Item -Path "Tests/Output/download_revision.tflx" | Out-Null
+                #         Export-TableauFlow -FlowId $sampleFlowId -Revision $revision -OutFile "tests/output/download_revision.tflx"
+                #         Test-Path -Path "tests/output/download_revision.tflx" | Should -BeTrue
+                #         Remove-Item -Path "tests/output/download_revision.tflx" | Out-Null
                 #         Remove-TableauFlow -FlowId $sampleFlowId -Revision $revision | Out-Null
                 #     } else {
                 #         Set-ItResult -Skipped -Because "only one revision was found"
@@ -1713,9 +1713,9 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 # }
                 # It "Download latest flow revision on <ConfigFile.server>" -Skip {
                 #     $revision = Get-TableauFlow -FlowId $sampleFlowId -Revisions | Sort-Object revisionNumber -Descending | Select-Object -First 1 -ExpandProperty revisionNumber
-                #     Export-TableauFlow -FlowId $sampleFlowId -Revision $revision -OutFile "Tests/Output/download_revision.tflx"
-                #     Test-Path -Path "Tests/Output/download_revision.tflx" | Should -BeTrue
-                #     Remove-Item -Path "Tests/Output/download_revision.tflx" | Out-Null
+                #     Export-TableauFlow -FlowId $sampleFlowId -Revision $revision -OutFile "tests/output/download_revision.tflx"
+                #     Test-Path -Path "tests/output/download_revision.tflx" | Should -BeTrue
+                #     Remove-Item -Path "tests/output/download_revision.tflx" | Out-Null
                 # }
                 It "Add/remove tags for sample flow on <ConfigFile.server>" {
                     Add-TableauContentTag -FlowId $sampleFlowId -Tags "active","test" | Out-Null
@@ -1823,23 +1823,23 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     Remove-TableauFlow -FlowId $sampleFlowId | Out-Null
                 }
                 It "Publish flow with invalid extension on <ConfigFile.server>" {
-                    {Publish-TableauFlow -Name "Flow" -InFile "Tests/Assets/Misc/Flow.txt" -ProjectId $samplesProjectId} | Should -Throw
+                    {Publish-TableauFlow -Name "Flow" -InFile "tests/assets/Misc/Flow.txt" -ProjectId $samplesProjectId} | Should -Throw
                 }
                 It "Publish flow with invalid contents on <ConfigFile.server>" {
-                    {Publish-TableauFlow -Name "invalid" -InFile "Tests/Assets/Misc/invalid.tflx" -ProjectId $samplesProjectId} | Should -Throw
+                    {Publish-TableauFlow -Name "invalid" -InFile "tests/assets/Misc/invalid.tflx" -ProjectId $samplesProjectId} | Should -Throw
                 }
                 It "Publish and check flow with output steps on <ConfigFile.server>" -Skip {
-                    $flow = Publish-TableauFlow -Name $sampleFlowName -InFile "Tests/Output/$sampleFlowName.tflx" -ProjectId $samplesProjectId -Overwrite
+                    $flow = Publish-TableauFlow -Name $sampleFlowName -InFile "tests/output/$sampleFlowName.tflx" -ProjectId $samplesProjectId -Overwrite
                     $flow.id | Should -BeOfType String
                     $outputSteps = Get-TableauFlow -FlowId $flow.id -OutputSteps
                     ($outputSteps | Measure-Object).Count | Should -BeGreaterThan 0
                     $outputSteps.id | Select-Object -First 1 -ExpandProperty id | Should -BeOfType String
                 }
                 It "Publish flow with connections on <ConfigFile.server>" -Skip {
-                    Publish-TableauFlow -Name "Flow" -InFile "Tests/Assets/Misc/Flow.txt" -ProjectId $samplesProjectId
+                    Publish-TableauFlow -Name "Flow" -InFile "tests/assets/Misc/Flow.txt" -ProjectId $samplesProjectId
                 }
                 It "Publish flow with credentials on <ConfigFile.server>" -Skip {
-                    Publish-TableauFlow -Name "Flow" -InFile "Tests/Assets/Misc/Flow.txt" -ProjectId $samplesProjectId
+                    Publish-TableauFlow -Name "Flow" -InFile "tests/assets/Misc/Flow.txt" -ProjectId $samplesProjectId
                 }
                 Context "Publish / download flows from test assets on <ConfigFile.server>" -Tag FlowSamples -ForEach $FlowFiles {
                     BeforeAll {
@@ -1857,9 +1857,9 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                         $script:sampleflowId = $flow.id
                     }
                     It "Download flow ""<sampleFlowName>"" from <ConfigFile.server>" {
-                        Export-TableauFlow -FlowId $sampleflowId -OutFile "Tests/Output/download.tflx"
-                        Test-Path -Path "Tests/Output/download.tflx" | Should -BeTrue
-                        Remove-Item -Path "Tests/Output/download.tflx" | Out-Null
+                        Export-TableauFlow -FlowId $sampleflowId -OutFile "tests/output/download.tflx"
+                        Test-Path -Path "tests/output/download.tflx" | Should -BeTrue
+                        Remove-Item -Path "tests/output/download.tflx" | Out-Null
                     }
                 }
             }
@@ -2240,14 +2240,14 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 }
             }
             It "Publish test content into project <samplesProjectName> on <ConfigFile.server>" {
-                $securePw = Test-GetSecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
+                $securePw = Get-SecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
                 $credentials = @{username="sqladmin"; password=$securePw; embed="true" }
-                $script:workbookForTasks = Publish-TableauWorkbook -Name "AW Customer Address" -InFile "Tests/Assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -Credentials $credentials
+                $script:workbookForTasks = Publish-TableauWorkbook -Name "AW Customer Address" -InFile "tests/assets/Misc/AW_Customer_Address.twbx" -ProjectId $samplesProjectId -Credentials $credentials
                 $script:workbookForTasks | Should -Not -BeNullOrEmpty
-                $script:datasourceForTasks = Publish-TableauDatasource -Name "AW SalesOrders" -InFile "Tests/Assets/Misc/AW_SalesOrders.tdsx" -ProjectId $samplesProjectId -Credentials $credentials
+                $script:datasourceForTasks = Publish-TableauDatasource -Name "AW SalesOrders" -InFile "tests/assets/Misc/AW_SalesOrders.tdsx" -ProjectId $samplesProjectId -Credentials $credentials
                 $script:datasourceForTasks | Should -Not -BeNullOrEmpty
                 $connections = @( @{serverAddress="asl-tableau-testsql.database.windows.net"; serverPort="3389"; credentials=@{username="sqladmin"; password=$securePw; embed="true" }} )
-                $script:flowForTasks = Publish-TableauFlow -Name "AW ProductDescription Flow" -InFile "Tests/Assets/Misc/AW_ProductDescription.tfl" -ProjectId $samplesProjectId -Connections $connections
+                $script:flowForTasks = Publish-TableauFlow -Name "AW ProductDescription Flow" -InFile "tests/assets/Misc/AW_ProductDescription.tfl" -ProjectId $samplesProjectId -Connections $connections
                 $script:flowForTasks | Should -Not -BeNullOrEmpty
                 # Start-Sleep -s 3
             }
@@ -2417,12 +2417,12 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 $column.id | Should -Be $columnId
             }
             It "Simple GraphQL queries on <ConfigFile.server>" {
-                $query = Get-Content "Tests/Assets/GraphQL/workbooks.gql" | Out-String
+                $query = Get-Content "tests/assets/GraphQL/workbooks.gql" | Out-String
                 $results = Get-TableauMetadataObject -Query $query
                 ($results | Measure-Object).Count | Should -BeGreaterThan 0
             }
             It "Paginated GraphQL queries on <ConfigFile.server>" {
-                $query = Get-Content "Tests/Assets/GraphQL/fields-paginated.gql" | Out-String
+                $query = Get-Content "tests/assets/GraphQL/fields-paginated.gql" | Out-String
                 # Query-TableauMetadata: alias -> Get-TableauMetadataObject
                 $results = Query-TableauMetadata -Query $query -PaginatedEntity "fieldsConnection"
                 ($results | Measure-Object).Count | Should -BeGreaterThan 100
