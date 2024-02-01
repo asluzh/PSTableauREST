@@ -54,15 +54,21 @@ This example uses Sign-in via Personal Access Token
     $results = Query-TableauMetadata -Query $query -PaginatedEntity "fieldsConnection" -PageSize 500
 
 ## Help Files
-The help files for each cmdlet are located in the *docs* folder.
+The help files for each cmdlet are located in the *help* folder.
 
 # Testing
-This repository also contains a suite of module tests for PSTableauREST:
-- Module integrity tests (PSTableauREST.Module.Tests.ps1)
-- Basic unit tests for module functions (PSTableauREST.Unit.Tests.ps1)
-- Comprehensive functional tests, based on pre-configured environment(s) (PSTableauREST.Functional.Tests.ps1)
+This repository also contains a suite of Pester tests:
+- Module validation tests (tests/PSTableauREST.Module.Tests.ps1)
+- Basic unit tests for module functions (tests/PSTableauREST.Unit.Tests.ps1)
+- Comprehensive integration tests, with functionality testing on real Tableau environments (tests/PSTableauREST.Integration.Tests.ps1)
 
 The tests can be executed using Pester, e.g.
 
     Invoke-Pester -Tag Module
     Invoke-Pester -Tag Unit -Output Diagnostic
+    Invoke-Pester -Tag Auth -Output Diagnostic
+    Invoke-Pester -Tag Workbook -Output Diagnostic
+
+The other standalone functionality testing script is tests/FunctionalTests.ps1
+It runs with a configuration file provided in the variable $ConfigFile and executes a sample of test routines for REST API calls.
+The temporaty content objects are then removed from the test system.
