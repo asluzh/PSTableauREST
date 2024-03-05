@@ -1,7 +1,7 @@
 ### Module variables and helper functions
 $TableauRestMinVersion = [version] 2.4 # supported version for initial sign-in calls
-$TableauRestFileSizeLimit = 64*1048576 # 64MB is the maximum file size for single publishing request
-$TableauRestChunkSize = 2*1048576 # 2MB (or change for example to 5MB, 10MB, 50MB)
+$TableauRestFileSizeLimit = 64MB # 64MB is the maximum file size for single publishing request
+$TableauRestChunkSize = 2MB # multipart chunk size for file uploads
 
 function Invoke-TableauRestMethod {
 <#

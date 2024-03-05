@@ -9,12 +9,31 @@ if ($env:windir) { # running on Windows platform (PS 5.1)
 }
 
 function Get-SecurePassword {
-    [OutputType([securestring])]
-    Param
-    (
-        [Parameter(Mandatory)][string]$Namespace,
-        [Parameter(Mandatory)][string]$Username
-    )
+<#
+.SYNOPSIS
+Get secure password for specific system
+
+.DESCRIPTION
+Returns secure password for a specific system/username from the secure storage
+
+.PARAMETER Namespace
+Generic namespace / system name that is used as a prefix for username
+
+.PARAMETER Username
+Username for the requested password
+
+.EXAMPLE
+$secureKey = Get-SecurePassword -Namespace 'https://www.powershellgallery.com' -Username NuGetApiKey
+
+.EXAMPLE
+$securePw = Get-SecurePassword -Namespace $ConfigFile.server -Username $ConfigFile.username
+#>
+[OutputType([securestring])]
+Param
+(
+    [Parameter(Mandatory)][string]$Namespace,
+    [Parameter(Mandatory)][string]$Username
+)
     if ($env:windir) { # secure store on Windows platform
         $securePw = Get-Secret -Name "$Namespace|$Username" -Vault SecretStore -ErrorAction Ignore
         if (!$securePw) {
