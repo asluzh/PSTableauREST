@@ -43,6 +43,6 @@ foreach ($Command in $CommandList) {
     #     'redirect_from' = "[`"/PowerShell/$($ModuleName)/$($Command)/`", `"/PowerShell/$($ModuleName)/$($Command.ToLower())/`", `"/PowerShell/$($Command.ToLower())/`"]"
     # }
     if ($Help.Synopsis -notmatch "\[|\]") {
-        New-MarkdownHelp -Command $Command -OutputFolder ./help -Force -NoMetadata
+        New-MarkdownHelp -Command $Command -OutputFolder ./docs -Force -NoMetadata
     }
 }

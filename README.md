@@ -11,9 +11,9 @@ To try out the functionality, obtaining a free Developer access to Tableau Cloud
 
 ## Install and Importing Module
 
-### Install PSTableauREST from the Powershell Gallery
+### Install PSTableauREST from the PowerShell Gallery
 
-    Find-Module PSTableauREST | Install-Module
+    Find-Module PSTableauREST | Install-Module -Scope CurrentUser
 
 ### Import Module
 
@@ -60,7 +60,7 @@ The help files for each cmdlet are located in the *help* folder.
 This repository also contains a suite of Pester tests:
 - Module validation tests (tests/PSTableauREST.Module.Tests.ps1)
 - Basic unit tests for module functions (tests/PSTableauREST.Unit.Tests.ps1)
-- Comprehensive integration tests, with functionality testing on real Tableau environments (tests/PSTableauREST.Integration.Tests.ps1)
+- Integration tests, with functionality testing on real Tableau environments (tests/PSTableauREST.Integration.Tests.ps1)
 
 The tests can be executed using Pester, e.g.
 
@@ -71,4 +71,4 @@ The tests can be executed using Pester, e.g.
 
 The other standalone functionality testing script is tests/FunctionalTests.ps1
 It runs with a configuration file provided in the variable $ConfigFile and executes a sample of test routines for REST API calls.
-The temporaty content objects are then removed from the test system.
+The temporary content objects are then removed from the test system.
