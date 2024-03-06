@@ -128,7 +128,8 @@ Expand ValidateSet to add support for more Endpoints.
 #>
 [OutputType([string])]
 Param(
-    [Parameter(Mandatory)][ValidateSet('Auth','Site','Session','Domain','Setting','ServerSetting',
+    [Parameter(Mandatory)][ValidateSet('Auth','Site','Session','Domain',
+        'Setting','ServerSetting','AnalyticsSetting',
         'Project','User','Group','Workbook','Datasource','View','Flow','FileUpload',
         'Recommendation','CustomView','Favorite','OrderFavorite',
         'Schedule','ServerSchedule','Job','Task','Subscription','DataAlert',
@@ -158,6 +159,10 @@ Param(
         }
         'ServerSetting' {
             $uri += "settings"
+            if ($Param) { $uri += "/$Param" }
+        }
+        'AnalyticsSetting' {
+            $uri = "$script:TableauServerUrl/api/-/settings"
             if ($Param) { $uri += "/$Param" }
         }
         'GraphQL' {
@@ -8678,6 +8683,297 @@ Param(
     if ($PSCmdlet.ShouldProcess("Site Extensions: $Enabled")) {
         $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Setting -Param extensions) -Method Put -Body $xml.OuterXml
         return $response.tsResponse.extensionsSiteSettings
+    }
+}
+
+### Analytics Extensions Settings methods
+function Get-TableauAnalyticsExtension {
+<#
+.SYNOPSIS
+List analytics extension connections on site
+or
+List analytics extension connections of workbook
+or
+Get analytics extension connection details
+or
+Get current analytics extension for workbook
+
+.DESCRIPTION
+Long description
+
+.EXAMPLE
+An example
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_analytics_extensions_settings.htm#AnalyticsExtensionsService_getAnalyticsExtensionsConnections
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_analytics_extensions_settings.htm#AnalyticsExtensionsService_getConnectionOptionsForWorkbook
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_analytics_extensions_settings.htm#AnalyticsExtensionsService_getAnalyticsExtensionsConnection
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_analytics_extensions_settings.htm#AnalyticsExtensionsService_getSelectedConnectionForWorkbook
+#>
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(ParameterSetName='Connection')][string] $ConnectionId,
+    [Parameter(Mandatory,ParameterSetName='Workbook')]
+    [Parameter(Mandatory,ParameterSetName='WorkbookCurrent')]
+    [string] $WorkbookId,
+    [Parameter(Mandatory,ParameterSetName='WorkbookCurrent')][switch] $Current
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.11
+    if ($Current.IsPresent) {
+        # Get current analytics extension for workbook
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint AnalyticsSetting -Param site/extensions/analytics/workbooks/$WorkbookId/selected_connection) -Method Get
+        Write-Debug $response
+        return $response.connectionList
+    } elseif ($WorkbookId) {
+        # List analytics extension connections of workbook
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint AnalyticsSetting -Param site/extensions/analytics/workbooks/$WorkbookId/connections) -Method Get
+        Write-Debug $response
+        return $response.connectionList
+    } elseif ($ConnectionId) {
+        # Get analytics extension connection details
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint AnalyticsSetting -Param site/extensions/analytics/connections/$ConnectionId) -Method Get
+        # Write-Debug $response
+        return $response
+    } else {
+        # List analytics extension connections on site
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint AnalyticsSetting -Param site/extensions/analytics/connections) -Method Get
+        # Write-Debug $response
+        return $response.connectionList
+    }
+}
+
+function Set-TableauAnalyticsExtension {
+<#
+.SYNOPSIS
+Update analytics extension connection of site
+or
+Update analytics extension for workbook
+
+.DESCRIPTION
+Long description
+
+.EXAMPLE
+An example
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_analytics_extensions_settings.htm#AnalyticsExtensionsService_updateAnalyticsExtensionsSiteSettings
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_analytics_extensions_settings.htm#AnalyticsExtensionsService_updateWorkbookWithConnection
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauAnalyticsExtension')]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $ConnectionId,
+    [Parameter(Mandatory,ParameterSetName='Workbook')][string] $WorkbookId,
+    [Parameter(Mandatory,ParameterSetName='Site')][string] $Name,
+    [Parameter(Mandatory,ParameterSetName='Site')][ValidateSet('UNDEFINED','TABPY','RSERVE','EINSTEIN_DISCOVERY','GENERIC_API')][string] $Type,
+    [Parameter(Mandatory,ParameterSetName='Site')][string] $Hostname,
+    [Parameter(Mandatory,ParameterSetName='Site')][ValidateRange(1,65535)][int] $Port,
+    [Parameter(ParameterSetName='Site')][switch] $AuthRequired,
+    [Parameter(ParameterSetName='Site')][string] $Username,
+    [Parameter(ParameterSetName='Site')][securestring] $SecurePassword,
+    [Parameter(ParameterSetName='Site')][switch] $SslEnabled
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.11
+
+    if ($Name -and $PSCmdlet.ShouldProcess("Update Analytics Extension (site)")) {
+        $options = @{
+            connection_luid=$ConnectionId;
+            host=$Hostname; port=$Port;
+            is_auth_enabled=$AuthRequired.ToBool();
+            is_ssl_enabled=$SslEnabled.ToBool();
+            connection_brief=@{ connection_name=$Name; connection_type=$Type }
+        }
+        if ($Username) {
+            $options.username = $Username
+        }
+        if ($SecurePassword) {
+            $options.password = (New-Object System.Net.NetworkCredential("", $SecurePassword)).Password
+        }
+        $jsonBody = $options | ConvertTo-Json -Compress -Depth 2
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint AnalyticsSetting -Param site/extensions/analytics/connections/$ConnectionId) -Body $jsonBody -Method Put -ContentType "application/json"
+        # Write-Debug $response
+        return $response
+    } elseif ($WorkbookId -and $PSCmdlet.ShouldProcess("Update Analytics Extension (workbook)")) {
+        $jsonBody = @{
+            workbook_luid=$WorkbookId;
+            connection_luid=$ConnectionId
+        } | ConvertTo-Json -Compress
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint AnalyticsSetting -Param site/extensions/analytics/workbooks/$WorkbookId/selected_connection) -Body $jsonBody -Method Put -ContentType "application/json"
+        # Write-Debug $response
+        return $response
+    }
+}
+
+function New-TableauAnalyticsExtension {
+<#
+.SYNOPSIS
+Add analytics extension connection to site
+
+.DESCRIPTION
+Long description
+
+.EXAMPLE
+An example
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_analytics_extensions_settings.htm#AnalyticsExtensionsService_addAnalyticsExtensionsConnection
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[Alias('Add-TableauAnalyticsExtension')]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $Name,
+    [Parameter(Mandatory)][ValidateSet('UNDEFINED','TABPY','RSERVE','EINSTEIN_DISCOVERY','GENERIC_API')][string] $Type,
+    [Parameter(Mandatory)][string] $Hostname,
+    [Parameter(Mandatory)][ValidateRange(1,65535)][int] $Port,
+    [Parameter()][switch] $AuthRequired,
+    [Parameter()][string] $Username,
+    [Parameter()][securestring] $SecurePassword,
+    [Parameter()][switch] $SslEnabled
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.11
+    $options = @{
+        host=$Hostname; port=$Port;
+        is_auth_enabled=$AuthRequired.ToString().ToLower();
+        is_ssl_enabled=$SslEnabled.ToString().ToLower();
+        connection_brief=@{ connection_name=$Name; connection_type=$Type }
+    }
+    if ($Username) {
+        $options.username = $Username
+    }
+    if ($SecurePassword) {
+        $options.password = (New-Object System.Net.NetworkCredential("", $SecurePassword)).Password
+    }
+    $jsonBody = $options | ConvertTo-Json -Compress
+    Write-Debug $jsonBody
+    if ($PSCmdlet.ShouldProcess("Add Analytics Extension (site)")) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint AnalyticsSetting -Param site/extensions/analytics/connections) -Body $jsonBody -Method Post -ContentType "application/json"
+        # Write-Debug $response
+        return $response
+    }
+}
+
+function Remove-TableauAnalyticsExtension {
+<#
+.SYNOPSIS
+Delete analytics extension connection from site
+or
+Remove current analytics extension connection for workbook
+
+.DESCRIPTION
+Long description
+
+.PARAMETER WorkbookId
+Parameter description
+
+.PARAMETER ConnectionId
+Parameter description
+
+.EXAMPLE
+An example
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_analytics_extensions_settings.htm#AnalyticsExtensionsService_deleteAnalyticsExtensionsConnection
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_analytics_extensions_settings.htm#AnalyticsExtensionsService_deleteConnectionFromWorkbook
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory,ParameterSetName='Connection')][string] $ConnectionId,
+    [Parameter(Mandatory,ParameterSetName='Workbook')][string] $WorkbookId
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.11
+    if ($WorkbookId -and $PSCmdlet.ShouldProcess("Remove Analytics Extension (workbook)")) {
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint AnalyticsSetting -Param site/extensions/analytics/workbooks/$WorkbookId/selected_connection) -Method Delete
+    } elseif ($ConnectionId -and $PSCmdlet.ShouldProcess("Remove Analytics Extension (site)")) {
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint AnalyticsSetting -Param site/extensions/analytics/connections/$ConnectionId) -Method Delete
+    }
+}
+
+function Get-TableauAnalyticsExtensionState {
+<#
+.SYNOPSIS
+Get enabled state of analytics extensions on site
+or
+Get enabled state of analytics extensions on server
+
+.DESCRIPTION
+Long description
+
+.PARAMETER Scope
+Parameter description
+
+.EXAMPLE
+An example
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_analytics_extensions_settings.htm#AnalyticsExtensionsService_getAnalyticsExtensionsSiteSettings
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_analytics_extensions_settings.htm#AnalyticsExtensionsService_getAnalyticsExtensionsServerSettings
+#>
+[OutputType([string])]
+Param(
+    [Parameter(Mandatory)][ValidateSet('Site','Server')][string] $Scope
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.11
+    $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint AnalyticsSetting -Param "$($Scope.ToLower())/extensions/analytics") -Method Get
+    return $response.enabled.ToString().ToLower()
+}
+
+function Set-TableauAnalyticsExtensionState {
+<#
+.SYNOPSIS
+Update enabled state of analytics extensions on site
+or
+Enable or disable analytics extensions on server
+
+.DESCRIPTION
+Long description
+
+.PARAMETER Scope
+Parameter description
+
+.PARAMETER Enabled
+Parameter description
+
+.EXAMPLE
+An example
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_analytics_extensions_settings.htm#AnalyticsExtensionsService_updateAnalyticsExtensionsSiteSettings
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_analytics_extensions_settings.htm#AnalyticsExtensionsService_updateAnalyticsExtensionsServerSettings
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauAnalyticsExtensionState')]
+[OutputType([string])]
+Param(
+    [Parameter(Mandatory)][ValidateSet('Site','Server')][string] $Scope,
+    [Parameter(Mandatory)][ValidateSet('true','false')][string] $Enabled
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.11
+    $jsonBody = @{enabled=$Enabled} | ConvertTo-Json -Compress
+    if ($PSCmdlet.ShouldProcess("Change Analytics Extensions ($Scope) to $Enabled")) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint AnalyticsSetting -Param "$($Scope.ToLower())/extensions/analytics") -Body $jsonBody -Method Put -ContentType "application/json"
+        return $response.enabled.ToString().ToLower()
     }
 }
 

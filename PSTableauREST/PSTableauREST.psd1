@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.5.4'
+ModuleVersion = '0.5.5'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -131,20 +131,10 @@ FunctionsToExport = @(
 'Get-TableauServerSettingsExtension', 'Set-TableauServerSettingsExtension',
 'Get-TableauSiteSettingsExtension', 'Set-TableauSiteSettingsExtension',
 
-### Analytics Extensions Settings methods - introduced in API 3.8
-# List analytics extension connections on site
-# Add analytics extension connection to site
-# Update analytics extension connection of site
-# Delete analytics extension connection from site
-# Get enabled state of analytics extensions on site
-# Update enabled state of analytics extensions on site
-# Get enabled state of analytics extensions on server
-# Enable or disable analytics extensions on server
-# Get analytics extension details
-# List analytics extension connections of workbook
-# Get current analytics extension for workbook
-# Update analytics extension for workbook
-# Remove current analytics extension connection for workbook
+### Analytics Extensions Settings methods - introduced in API 3.11
+'Get-TableauAnalyticsExtension', 'Set-TableauAnalyticsExtension',
+'New-TableauAnalyticsExtension', 'Remove-TableauAnalyticsExtension',
+'Get-TableauAnalyticsExtensionState', 'Set-TableauAnalyticsExtensionState',
 
 ### Connected App methods
 # List Connected Apps
@@ -316,6 +306,7 @@ AliasesToExport = @('Login-TableauServer','Logout-TableauServer',
 'Create-TableauContentExtract','Add-TableauCloudExtractRefreshTask','Update-TableauCloudExtractRefreshTask',
 'Add-TableauSubscription','Update-TableauSubscription',
 'Update-TableauServerSettingsExtension','Update-TableauSiteSettingsExtension',
+'Update-TableauAnalyticsExtension','Add-TableauAnalyticsExtension','Update-TableauAnalyticsExtensionState',
 'Query-TableauDataAlert','Add-TableauDataAlert','Update-TableauDataAlert',
 'Run-TableauMetadataGraphQL','Query-TableauMetadata')
 

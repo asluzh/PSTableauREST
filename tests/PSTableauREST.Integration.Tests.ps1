@@ -5,7 +5,7 @@ BeforeAll {
     . ./scripts/SecretStore.Functions.ps1
     # InModuleScope 'PSTableauREST' { $script:VerbosePreference = 'Continue' } # display verbose output of module functions
     $script:VerbosePreference = 'Continue' # display verbose output of the tests
-    # InModuleScope 'PSTableauREST' { $script:DebugPreference = 'Continue' } # display debug output of the module
+    InModuleScope 'PSTableauREST' { $script:DebugPreference = 'Continue' } # display debug output of the module
     # InModuleScope 'PSTableauREST' { $script:ProgressPreference = 'SilentlyContinue' } # suppress progress for upload/download operations
     # see also: https://stackoverflow.com/questions/18770723/hide-progress-of-invoke-webrequest
 }
@@ -146,6 +146,85 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $settings = Set-TableauSiteSettingsExtension -Enabled $script:SiteExtensionsEnabled -UseDefaultSetting $script:SiteUseDefaultSetting -SafeList $script:SiteSafeList
                 } else {
                     Set-ItResult -Skipped -Because "Site extension settings were not saved in the previous test"
+                }
+            }
+        }
+        Context "Tableau analytics extensions operations" -Tag Analytics {
+            It "Get Tableau analytics extensions state (server) on <ConfigFile.server>" {
+                if ($ConfigFile.server_admin) {
+                    $enabled = Get-TableauAnalyticsExtensionState -Scope Server
+                    $enabled | Should -BeOfType String
+                    $script:ServerAnalyticsExtensionsState = $enabled
+                } else {
+                    Set-ItResult -Skipped -Because "Server admin privileges required"
+                }
+            }
+            It "Get Tableau analytics extensions state (site) on <ConfigFile.server>" {
+                $enabled = Get-TableauAnalyticsExtensionState -Scope Site
+                $enabled | Should -BeOfType String
+                $script:SiteAnalyticsExtensionsState = $enabled
+            }
+            It "Enable Tableau extensions setting (server) on <ConfigFile.server>" {
+                if ($ConfigFile.server_admin -and $script:ServerAnalyticsExtensionsState) {
+                    $enabled = Set-TableauAnalyticsExtensionState -Scope Server -Enabled true
+                    $enabled | Should -Be true
+                } else {
+                    Set-ItResult -Skipped -Because "Server admin privileges required"
+                }
+            }
+            It "Enable Tableau extensions setting (site) on <ConfigFile.server>" {
+                if ($script:SiteAnalyticsExtensionsState) {
+                    $enabled = Set-TableauAnalyticsExtensionState -Scope Site -Enabled true
+                    $enabled | Should -Be true
+                } else {
+                    Set-ItResult -Skipped -Because "Site analytics extension settings were not saved in the previous test"
+                }
+            }
+            It "Add dummy Tableau analytics extension on <ConfigFile.server>" {
+                $response = New-TableauAnalyticsExtension -Name "Analytics Extension Test" -Type GENERIC_API -Hostname "google.com" -Port 443 -AuthRequired -SslEnabled -Username test -SecurePassword (ConvertTo-SecureString "test" -AsPlainText -Force)
+                $response | Should -Not -BeNullOrEmpty
+                $response.connection_luid | Should -Not -BeNullOrEmpty
+                $script:SiteAnalyticsExtensionDummy = $response.connection_luid
+            }
+            It "List/Get Tableau extensions setting (site) on <ConfigFile.server>" {
+                $settings = Get-TableauAnalyticsExtension
+                $settings | Should -Not -BeNullOrEmpty
+                $conn = $settings | Select-Object -First 1
+                $conn.connection_luid | Should -Not -BeNullOrEmpty
+                $details = Get-TableauAnalyticsExtension -ConnectionId $conn.connection_luid
+                $details | Should -Not -BeNullOrEmpty
+            }
+            It "Update dummy Tableau analytics extension on <ConfigFile.server>" {
+                if ($script:SiteAnalyticsExtensionDummy) {
+                    $response = Set-TableauAnalyticsExtension -ConnectionId $script:SiteAnalyticsExtensionDummy -Name "Test 2" -Type TABPY -Hostname "python.org" -Port 443 -AuthRequired -SslEnabled -Username test2 -SecurePassword (ConvertTo-SecureString "test2" -AsPlainText -Force)
+                    $response | Should -Not -BeNullOrEmpty
+                    $response.connection_luid | Should -Not -BeNullOrEmpty
+                } else {
+                    Set-ItResult -Skipped -Because "Site analytics extension dummy was not added in the previous test"
+                }
+            }
+            It "Remove dummy Tableau analytics extensions on <ConfigFile.server>" {
+                if ($script:SiteAnalyticsExtensionDummy) {
+                    $details = Get-TableauAnalyticsExtension -ConnectionId $script:SiteAnalyticsExtensionDummy
+                    $details | Should -Not -BeNullOrEmpty
+                    {Remove-TableauAnalyticsExtension -ConnectionId $script:SiteAnalyticsExtensionDummy} | Should -Not -Throw
+                } else {
+                    Set-ItResult -Skipped -Because "Site analytics extension dummy was not added in the previous test"
+                }
+                $script:SiteAnalyticsExtensionConn = $null
+            }
+            It "Restore Tableau extensions setting (server) on <ConfigFile.server>" {
+                if ($ConfigFile.server_admin -and $script:ServerAnalyticsExtensionsState) {
+                    Set-TableauAnalyticsExtensionState -Scope Server -Enabled $script:ServerAnalyticsExtensionsState | Should -BeOfType String
+                } else {
+                    Set-ItResult -Skipped -Because "Server admin privileges required"
+                }
+            }
+            It "Restore Tableau extensions setting (site) on <ConfigFile.server>" {
+                if ($script:SiteAnalyticsExtensionsState) {
+                    Set-TableauAnalyticsExtensionState -Scope Site -Enabled $script:SiteAnalyticsExtensionsState | Should -BeOfType String
+                } else {
+                    Set-ItResult -Skipped -Because "Site analytics extension settings were not saved in the previous test"
                 }
             }
         }
