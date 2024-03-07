@@ -8699,10 +8699,24 @@ or
 Get current analytics extension for workbook
 
 .DESCRIPTION
-Long description
+Retrieves a list of configured analytics extensions for a site or workbook
+or
+Retrieves the details of the configured analytics extension for a site or workbook
+
+.PARAMETER ConnectionId
+The LUID of the connection to get the details for.
+
+.PARAMETER WorkbookId
+The LUID of the workbook to get the list of connections, or connection details for.
+
+.PARAMETER Current
+(Switch) Specifies if the current analytics extension for workbook should be retrieved.
 
 .EXAMPLE
-An example
+$list = Get-TableauAnalyticsExtension
+
+.EXAMPLE
+$ext = Get-TableauAnalyticsExtension -ConnectionId $conn
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_analytics_extensions_settings.htm#AnalyticsExtensionsService_getAnalyticsExtensionsConnections
@@ -8757,10 +8771,44 @@ or
 Update analytics extension for workbook
 
 .DESCRIPTION
-Long description
+Update analytics extension settings for the site or specific workbook.
+
+.PARAMETER ConnectionId
+The LUID of the connection to update.
+
+.PARAMETER Name
+The name for the analytics extension connection.
+
+.PARAMETER Type
+The type for the analytics extension connection, which should be one of the following:
+UNDEFINED,TABPY,RSERVE,EINSTEIN_DISCOVERY,GENERIC_API
+
+.PARAMETER Hostname
+The hostname for the analytics extension service.
+
+.PARAMETER Port
+The port number for the analytics extension service.
+
+.PARAMETER AuthRequired
+Specifies if authentication should be required.
+
+.PARAMETER Username
+Username for authentication for the analytics extension service.
+
+.PARAMETER SecurePassword
+Password as SecureString for authentication for the analytics extension service.
+
+.PARAMETER SslEnabled
+Specifies SSL for the analytics extension connection should be enabled.
+
+.PARAMETER WorkbookId
+If updating a connection in a specific workbook, the LUID of the workbook.
 
 .EXAMPLE
-An example
+$response = Set-TableauAnalyticsExtension -ConnectionId $conn -Name $name -Type TABPY -Hostname $host -Port 443 -AuthRequired -SslEnabled -Username $user -SecurePassword $pw
+
+.EXAMPLE
+$response = Set-TableauAnalyticsExtension -ConnectionId $conn -WorkbookId $wb
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_analytics_extensions_settings.htm#AnalyticsExtensionsService_updateAnalyticsExtensionsSiteSettings
@@ -8773,7 +8821,6 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_analytics_
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $ConnectionId,
-    [Parameter(Mandatory,ParameterSetName='Workbook')][string] $WorkbookId,
     [Parameter(Mandatory,ParameterSetName='Site')][string] $Name,
     [Parameter(Mandatory,ParameterSetName='Site')][ValidateSet('UNDEFINED','TABPY','RSERVE','EINSTEIN_DISCOVERY','GENERIC_API')][string] $Type,
     [Parameter(Mandatory,ParameterSetName='Site')][string] $Hostname,
@@ -8781,7 +8828,8 @@ Param(
     [Parameter(ParameterSetName='Site')][switch] $AuthRequired,
     [Parameter(ParameterSetName='Site')][string] $Username,
     [Parameter(ParameterSetName='Site')][securestring] $SecurePassword,
-    [Parameter(ParameterSetName='Site')][switch] $SslEnabled
+    [Parameter(ParameterSetName='Site')][switch] $SslEnabled,
+    [Parameter(Mandatory,ParameterSetName='Workbook')][string] $WorkbookId
 )
     Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.11
@@ -8821,10 +8869,35 @@ function New-TableauAnalyticsExtension {
 Add analytics extension connection to site
 
 .DESCRIPTION
-Long description
+Adds a new analytics extension connection for the current site.
+
+.PARAMETER Name
+The name for the analytics extension connection.
+
+.PARAMETER Type
+The type for the analytics extension connection, which should be one of the following:
+UNDEFINED,TABPY,RSERVE,EINSTEIN_DISCOVERY,GENERIC_API
+
+.PARAMETER Hostname
+The hostname for the analytics extension service.
+
+.PARAMETER Port
+The port number for the analytics extension service.
+
+.PARAMETER AuthRequired
+Specifies if authentication should be required.
+
+.PARAMETER Username
+Username for authentication for the analytics extension service.
+
+.PARAMETER SecurePassword
+Password as SecureString for authentication for the analytics extension service.
+
+.PARAMETER SslEnabled
+Specifies SSL for the analytics extension connection should be enabled.
 
 .EXAMPLE
-An example
+$ext = New-TableauAnalyticsExtension -Name $name -Type TABPY -Hostname $host -Port 443 -AuthRequired -SslEnabled -Username $user -SecurePassword $pw
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_analytics_extensions_settings.htm#AnalyticsExtensionsService_addAnalyticsExtensionsConnection
@@ -8873,16 +8946,16 @@ or
 Remove current analytics extension connection for workbook
 
 .DESCRIPTION
-Long description
-
-.PARAMETER WorkbookId
-Parameter description
+Removes the specific analytics extension connection from a site or workbook.
 
 .PARAMETER ConnectionId
-Parameter description
+The LUID of the connection to remove.
+
+.PARAMETER WorkbookId
+(Optional) If the connection should be removed for a workbook, this is the LUID of the workbook.
 
 .EXAMPLE
-An example
+Remove-TableauAnalyticsExtension -ConnectionId $conn
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_analytics_extensions_settings.htm#AnalyticsExtensionsService_deleteAnalyticsExtensionsConnection
@@ -8913,13 +8986,14 @@ or
 Get enabled state of analytics extensions on server
 
 .DESCRIPTION
-Long description
+Retrieves the current state (enabled/disabled) for analytics extensions on the site or server.
 
 .PARAMETER Scope
-Parameter description
+Specifies the scope for analytcs extension settings (Server or Site).
+If requested for the scope of Server, the server admin privileges are required.
 
 .EXAMPLE
-An example
+$enabled = Get-TableauAnalyticsExtensionState -Scope Site
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_analytics_extensions_settings.htm#AnalyticsExtensionsService_getAnalyticsExtensionsSiteSettings
@@ -8945,16 +9019,17 @@ or
 Enable or disable analytics extensions on server
 
 .DESCRIPTION
-Long description
+Updates the current state (enabled/disabled) for analytics extensions on the site or server.
 
 .PARAMETER Scope
-Parameter description
+Specifies the scope for analytcs extension settings (Server or Site).
+If requested for the scope of Server, the server admin privileges are required.
 
 .PARAMETER Enabled
-Parameter description
+Boolean, specifies if the state should be enabled or disabled.
 
 .EXAMPLE
-An example
+$result = Set-TableauAnalyticsExtensionState -Scope Site -Enabled true
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_analytics_extensions_settings.htm#AnalyticsExtensionsService_updateAnalyticsExtensionsSiteSettings
