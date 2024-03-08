@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.5.6'
+ModuleVersion = '0.5.7'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -130,18 +130,16 @@ FunctionsToExport = @(
 ### Tableau Extensions Settings Methods - introduced in API 3.21
 'Get-TableauServerSettingsExtension', 'Set-TableauServerSettingsExtension',
 'Get-TableauSiteSettingsExtension', 'Set-TableauSiteSettingsExtension',
-
 ### Analytics Extensions Settings methods - introduced in API 3.11
 'Get-TableauAnalyticsExtension', 'Set-TableauAnalyticsExtension',
 'New-TableauAnalyticsExtension', 'Remove-TableauAnalyticsExtension',
 'Get-TableauAnalyticsExtensionState', 'Set-TableauAnalyticsExtensionState',
-
 ### Connected App methods
-# List Connected Apps
-# Get Connected App
-# Create Connected App
-# Delete Connected App
-# Update Connected App
+'Get-TableauConnectedApp', 'Set-TableauConnectedApp',
+'New-TableauConnectedApp', 'Remove-TableauConnectedApp',
+# 'Get-TableauConnectedAppSecret', 'New-TableauConnectedAppSecret', 'Remove-TableauConnectedAppSecret',
+# 'Get-TableauConnectedAppEAS', 'Set-TableauConnectedAppEAS',
+# 'New-TableauConnectedAppEAS', 'Remove-TableauConnectedAppEAS',
 # Get Connected App Secret
 # Create Connected App Secret
 # Delete Connected App Secret
@@ -307,6 +305,7 @@ AliasesToExport = @('Login-TableauServer','Logout-TableauServer',
 'Add-TableauSubscription','Update-TableauSubscription',
 'Update-TableauServerSettingsExtension','Update-TableauSiteSettingsExtension',
 'Update-TableauAnalyticsExtension','Add-TableauAnalyticsExtension','Update-TableauAnalyticsExtensionState',
+'Update-TableauConnectedApp','Add-TableauConnectedApp',
 'Query-TableauDataAlert','Add-TableauDataAlert','Update-TableauDataAlert',
 'Run-TableauMetadataGraphQL','Query-TableauMetadata')
 

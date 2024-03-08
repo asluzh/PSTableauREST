@@ -129,7 +129,7 @@ Expand ValidateSet to add support for more Endpoints.
 [OutputType([string])]
 Param(
     [Parameter(Mandatory)][ValidateSet('Auth','Site','Session','Domain',
-        'Setting','ServerSetting','AnalyticsSetting',
+        'Setting','ServerSetting','AnalyticsSetting','ConnectedApp',
         'Project','User','Group','Workbook','Datasource','View','Flow','FileUpload',
         'Recommendation','CustomView','Favorite','OrderFavorite',
         'Schedule','ServerSchedule','Job','Task','Subscription','DataAlert',
@@ -163,6 +163,14 @@ Param(
         }
         'AnalyticsSetting' {
             $uri = "$script:TableauServerUrl/api/-/settings"
+            if ($Param) { $uri += "/$Param" }
+        }
+        'ConnectedApp' {
+            if ($script:TableauRestVersion -ge 3.17) {
+                $uri += "sites/$script:TableauSiteId/connected-apps/direct-trust"
+            } else {
+                $uri += "sites/$script:TableauSiteId/connected-applications"
+            }
             if ($Param) { $uri += "/$Param" }
         }
         'GraphQL' {
@@ -8056,7 +8064,9 @@ Param(
         $pageNumber = 0
         do {
             $pageNumber++
-            $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Subscription) -Method Get
+            $uri = Get-TableauRequestUri -Endpoint Subscription
+            $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+            $response = Invoke-TableauRestMethod -Uri $uri -Method Get
             $totalAvailable = $response.tsResponse.pagination.totalAvailable
             $response.tsResponse.subscriptions.subscription
         } until ($PageSize*$pageNumber -ge $totalAvailable)
@@ -9049,6 +9059,255 @@ Param(
     if ($PSCmdlet.ShouldProcess("Change Analytics Extensions ($Scope) to $Enabled")) {
         $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint AnalyticsSetting -Param "$($Scope.ToLower())/extensions/analytics") -Body $jsonBody -Method Put -ContentType "application/json"
         return $response.enabled.ToString().ToLower()
+    }
+}
+
+### Connected App methods
+function Get-TableauConnectedApp {
+<#
+.SYNOPSIS
+List Connected Apps
+or
+Get Connected App
+
+.DESCRIPTION
+Query all connected apps configured on a site, or details of the connected app by its ID.
+
+.PARAMETER ClientId
+Get Connected App: The client ID of the connected app.
+
+.PARAMETER PageSize
+(Optional, List Connected Apps) Page size when paging through results.
+
+.EXAMPLE
+$apps = Get-TableauConnectedApp
+
+.EXAMPLE
+$app = Get-TableauConnectedApp -ClientId $cid
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_connected_app.htm#get_connectedapps
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_connected_app.htm#get_connectedapp
+#>
+[OutputType([PSCustomObject[]])]
+Param(
+    [Parameter(Mandatory,ParameterSetName='ConnectedAppById')][string] $ClientId,
+    [Parameter(ParameterSetName='ConnectedApps')][ValidateRange(1,100)][int] $PageSize = 100
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.14
+    if ($ClientId) { # Get Connected App by Client ID
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ConnectedApp -Param $ClientId) -Method Get
+        $response.tsResponse.connectedApplication
+    } else { # List Connected Apps
+        $pageNumber = 0
+        do {
+            $pageNumber++
+            $uri = Get-TableauRequestUri -Endpoint ConnectedApp
+            $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+            $response = Invoke-TableauRestMethod -Uri $uri -Method Get
+            $totalAvailable = $response.tsResponse.pagination.totalAvailable
+            $response.tsResponse.connectedApplications.connectedApplication
+        } until ($PageSize*$pageNumber -ge $totalAvailable)
+    }
+}
+
+function Set-TableauConnectedApp {
+<#
+.SYNOPSIS
+Update Connected App
+
+.DESCRIPTION
+Update a connected app settings.
+
+.PARAMETER ClientId
+The client ID of the connected app to be updated.
+
+.PARAMETER Name
+(Optional) The new name of the connected app.
+
+.PARAMETER Enabled
+(Optional) Controls whether the connected app is enabled or not.
+
+.PARAMETER ProjectId
+(Optional) The list of project LUID that the connected app's access level is scoped to.
+Multiple projects can be specified for API version 3.22 and later.
+For scoping to all projects: specify the empty string value.
+
+.PARAMETER DomainSafeList
+(Optional) A list of domains the connected app is allowed to be hosted.
+Please check Domain allowlist rules in online help for format specification.
+
+.PARAMETER UnrestrictedEmbedding
+(Optional) Controls whether the connected app can be hosted on all domains.
+
+.EXAMPLE
+$app = Set-TableauConnectedApp -Name "Connected App Example" -ProjectId "" -UnrestrictedEmbedding true
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_connected_app.htm#update_connectedapp
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauConnectedApp')]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $ClientId,
+    [Parameter(Mandatory)][string] $Name,
+    [Parameter()][ValidateSet('true','false')][string] $Enabled,
+    [Parameter()][string[]] $ProjectId,
+    [Parameter()][string[]] $DomainSafeList,
+    [Parameter()][ValidateSet('true','false')][string] $UnrestrictedEmbedding
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.14
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_conn = $tsRequest.AppendChild($xml.CreateElement("connectedApplication"))
+    if ($Name) {
+        $el_conn.SetAttribute("name", $Name)
+    }
+    if ($Enabled) {
+        $el_conn.SetAttribute("enabled", $Enabled)
+    }
+    if ($DomainSafeList) {
+        $domain_list_str = $DomainSafeList -join ' '
+        $el_conn.SetAttribute("domainSafelist", $domain_list_str)
+        if ($UnrestrictedEmbedding) {
+            $UnrestrictedEmbedding = $false
+        }
+    }
+    if ($UnrestrictedEmbedding) {
+        $el_conn.SetAttribute("unrestrictedEmbedding", $UnrestrictedEmbedding)
+    }
+    if ($ProjectId) {
+        if ($script:TableauRestVersion -ge 3.22) {
+            $el_projs = $el_conn.AppendChild($xml.CreateElement("projectIds"))
+            foreach ($proj in $ProjectId) {
+                $el_proj = $el_projs.AppendChild($xml.CreateElement("projectId"))
+                $el_proj.InnerText = $proj
+            }
+        } else {
+            if ($ProjectId.Length -gt 1) {
+                Write-Warning "Multiple project are not supported in this API version. Using the first project ID from the list."
+            }
+            $el_conn.SetAttribute("projectId", $ProjectId[0])
+        }
+    }
+    if ($PSCmdlet.ShouldProcess($ClientId)) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ConnectedApp -Param $ClientId) -Body $xml.OuterXml -Method Put
+        return $response.tsResponse.connectedApplication
+    }
+}
+
+function New-TableauConnectedApp {
+<#
+.SYNOPSIS
+Create Connected App
+
+.DESCRIPTION
+Create a connected app for the current site.
+
+.PARAMETER Name
+Name of the connected app.
+
+.PARAMETER Enabled
+(Optional) Controls whether the connected app is enabled or not.
+
+.PARAMETER ProjectId
+(Optional) The list of project LUID that the connected app's access level is scoped to.
+Multiple projects can be specified for API version 3.22 and later.
+For scoping to all projects, omit this parameter.
+
+.PARAMETER DomainSafeList
+(Optional) A list of domains the connected app is allowed to be hosted.
+Please check Domain allowlist rules in online help for format specification.
+
+.PARAMETER UnrestrictedEmbedding
+(Optional) Controls whether the connected app can be hosted on all domains.
+
+.EXAMPLE
+$app = New-TableauConnectedApp -Name "Connected App Example"
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_connected_app.htm#create_connectedapp
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[Alias('Add-TableauConnectedApp')]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $Name,
+    [Parameter()][ValidateSet('true','false')][string] $Enabled,
+    [Parameter()][string[]] $ProjectId,
+    [Parameter()][string[]] $DomainSafeList,
+    [Parameter()][ValidateSet('true','false')][string] $UnrestrictedEmbedding
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.14
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_conn = $tsRequest.AppendChild($xml.CreateElement("connectedApplication"))
+    $el_conn.SetAttribute("name", $Name)
+    if ($Enabled) {
+        $el_conn.SetAttribute("enabled", $Enabled)
+    }
+    if ($DomainSafeList) {
+        $domain_list_str = $DomainSafeList -join ' '
+        $el_conn.SetAttribute("domainSafelist", $domain_list_str)
+        if ($UnrestrictedEmbedding) {
+            $UnrestrictedEmbedding = $false
+        }
+    }
+    if ($UnrestrictedEmbedding) {
+        $el_conn.SetAttribute("unrestrictedEmbedding", $UnrestrictedEmbedding)
+    }
+    if ($ProjectId) {
+        if ($script:TableauRestVersion -ge 3.22) {
+            $el_projs = $el_conn.AppendChild($xml.CreateElement("projectIds"))
+            foreach ($proj in $ProjectId) {
+                $el_proj = $el_projs.AppendChild($xml.CreateElement("projectId"))
+                $el_proj.InnerText = $proj
+            }
+        } else {
+            if ($ProjectId.Length -gt 1) {
+                Write-Warning "Multiple project are not supported in this API version. Using the first project ID from the list."
+            }
+            $el_conn.SetAttribute("projectId", $ProjectId[0])
+        }
+    }
+    if ($PSCmdlet.ShouldProcess($Name)) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ConnectedApp) -Body $xml.OuterXml -Method Post
+        return $response.tsResponse.connectedApplication
+    }
+}
+
+function Remove-TableauConnectedApp {
+<#
+.SYNOPSIS
+Delete Connected App
+
+.DESCRIPTION
+Permanently remove a connected app from the site, and also the secrets associated with the connected app.
+
+.PARAMETER ClientId
+The client ID of the connected app to be removed.
+
+.EXAMPLE
+$result = Remove-TableauConnectedApp -ClientId $cid
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_connected_app.htm#delete_connectedapp
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $ClientId
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.14
+    if ($PSCmdlet.ShouldProcess($ClientId)) {
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ConnectedApp -Param $ClientId) -Method Delete
     }
 }
 

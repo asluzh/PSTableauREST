@@ -228,6 +228,39 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 }
             }
         }
+        Context "Tableau connected apps operations" -Tag ConnectedApp {
+            It "Add dummy Tableau connected app on <ConfigFile.server>" {
+                $app = New-TableauConnectedApp -Name "Connected App Test"
+                $app | Should -Not -BeNullOrEmpty
+                $app.clientId | Should -Not -BeNullOrEmpty
+                $script:ConnectedAppDummy = $app.clientId
+            }
+            It "List/get Tableau connected apps on <ConfigFile.server>" {
+                $apps = Get-TableauConnectedApp
+                $apps | Should -Not -BeNullOrEmpty
+                $app = $apps | Select-Object -First 1
+                $app.clientId | Should -Not -BeNullOrEmpty
+                $app = Get-TableauConnectedApp -ClientId $app.clientId
+                $app | Should -Not -BeNullOrEmpty
+            }
+            It "Update dummy Tableau connected app on <ConfigFile.server>" {
+                if ($script:ConnectedAppDummy) {
+                    $app = Set-TableauConnectedApp -ClientId $script:ConnectedAppDummy -Name "Test 2" -Enabled true
+                    $app | Should -Not -BeNullOrEmpty
+                    $app.clientId | Should -Not -BeNullOrEmpty
+                } else {
+                    Set-ItResult -Skipped -Because "Connected app dummy was not added in the previous test"
+                }
+            }
+            It "Remove dummy Tableau connected app on <ConfigFile.server>" {
+                if ($script:ConnectedAppDummy) {
+                    {Remove-TableauConnectedApp -ClientId $script:ConnectedAppDummy} | Should -Not -Throw
+                } else {
+                    Set-ItResult -Skipped -Because "Connected app dummy was not added in the previous test"
+                }
+                $script:ConnectedAppDummy = $null
+            }
+        }
         Context "Site operations" -Tag Site {
             It "Create new site on <ConfigFile.server>" {
                 if ($ConfigFile.server_admin -and $ConfigFile.test_site_name) {
