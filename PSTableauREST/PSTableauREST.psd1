@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.5.7'
+ModuleVersion = '0.5.8'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -137,12 +137,9 @@ FunctionsToExport = @(
 ### Connected App methods
 'Get-TableauConnectedApp', 'Set-TableauConnectedApp',
 'New-TableauConnectedApp', 'Remove-TableauConnectedApp',
-# 'Get-TableauConnectedAppSecret', 'New-TableauConnectedAppSecret', 'Remove-TableauConnectedAppSecret',
+'Get-TableauConnectedAppSecret', 'New-TableauConnectedAppSecret', 'Remove-TableauConnectedAppSecret',
 # 'Get-TableauConnectedAppEAS', 'Set-TableauConnectedAppEAS',
 # 'New-TableauConnectedAppEAS', 'Remove-TableauConnectedAppEAS',
-# Get Connected App Secret
-# Create Connected App Secret
-# Delete Connected App Secret
 # List All Registered EAS
 # List Registered EAS
 # Register EAS
@@ -305,7 +302,7 @@ AliasesToExport = @('Login-TableauServer','Logout-TableauServer',
 'Add-TableauSubscription','Update-TableauSubscription',
 'Update-TableauServerSettingsExtension','Update-TableauSiteSettingsExtension',
 'Update-TableauAnalyticsExtension','Add-TableauAnalyticsExtension','Update-TableauAnalyticsExtensionState',
-'Update-TableauConnectedApp','Add-TableauConnectedApp',
+'Update-TableauConnectedApp','Add-TableauConnectedApp','Add-TableauConnectedAppSecret',
 'Query-TableauDataAlert','Add-TableauDataAlert','Update-TableauDataAlert',
 'Run-TableauMetadataGraphQL','Query-TableauMetadata')
 

@@ -21,18 +21,23 @@ $Release = (Import-PowerShellDataFile ./$ModuleName/$ModuleName.psd1).ModuleVers
 # https://cli.github.com/manual/gh_release_create
 $secureKey = Get-SecurePassword -Namespace 'https://www.github.com' -Username GithubCliToken
 (New-Object System.Net.NetworkCredential("", $secureKey)).Password | gh auth login --with-token
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "GitHub login failed ($LASTEXITCODE)"
+    Exit
+}
 gh release create "v$Release" --notes "Module v$Release"
 if ($LASTEXITCODE -eq 0) {
     Write-Host "Module $ModuleName, release $Release is published to GitHub"
     gh auth logout
 } else {
+    Write-Host "GitHub release create failed ($LASTEXITCODE)"
     Exit
 }
 
 $secureKey = Get-SecurePassword -Namespace 'https://www.powershellgallery.com' -Username NuGetApiKey
 $NuGetApiKey = (New-Object System.Net.NetworkCredential("", $secureKey)).Password
 
-Publish-Module -Path ./$ModuleName -NuGetApiKey $NuGetApiKey -Verbose -WarningAction SilentlyContinue -ErrorAction Stop
+Publish-Module -Path ./$ModuleName -NuGetApiKey $NuGetApiKey -WarningAction SilentlyContinue -ErrorAction Stop
 # -Tags $Tags -Verbose -Repository PSGallery
 
 Write-Host "Module $ModuleName, release $Release is published to PSGallery"

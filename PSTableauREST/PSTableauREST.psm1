@@ -9311,6 +9311,101 @@ Param(
     }
 }
 
+function Get-TableauConnectedAppSecret {
+<#
+.SYNOPSIS
+Get Connected App Secret
+
+.DESCRIPTION
+Query a connected app secret and the token value using the connected app's ID.
+
+.PARAMETER ClientId
+The client ID of the connected app.
+
+.PARAMETER SecretId
+The unique ID of the connected app secret.
+
+.EXAMPLE
+$secret = Get-TableauConnectedAppSecret -ClientId $cid -SecretId $sid
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_connected_app.htm#get_connectedapp_secret
+#>
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $ClientId,
+    [Parameter(Mandatory)][string] $SecretId
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.14
+    $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ConnectedApp -Param $ClientId/secrets/$SecretId) -Method Get
+    $response.tsResponse.connectedApplicationSecret
+}
+
+function New-TableauConnectedAppSecret {
+<#
+.SYNOPSIS
+Create Connected App Secret
+
+.DESCRIPTION
+Generate a secret for a connected app.
+
+.PARAMETER ClientId
+The client ID of the connected app.
+
+.EXAMPLE
+$secret = New-TableauConnectedAppSecret -ClientId $cid
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_connected_app.htm#create_connectedapp_secret
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[Alias('Add-TableauConnectedAppSecret')]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $ClientId
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.14
+    if ($PSCmdlet.ShouldProcess($ClientId)) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ConnectedApp -Param $ClientId/secrets) -Method Post
+        return $response.tsResponse.connectedApplicationSecret
+    }
+}
+
+function Remove-TableauConnectedAppSecret {
+<#
+.SYNOPSIS
+Delete Connected App Secret
+
+.DESCRIPTION
+Permanently remove a secret associated with a connected app.
+
+.PARAMETER ClientId
+The client ID of the connected app.
+
+.PARAMETER SecretId
+The unique ID of the connected app secret to be removed.
+
+.EXAMPLE
+$result = Remove-TableauConnectedAppSecret -ClientId $cid -SecretId $sid
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_connected_app.htm#delete_connectedapp_secret
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $ClientId,
+    [Parameter(Mandatory)][string] $SecretId
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.14
+    if ($PSCmdlet.ShouldProcess("Client ID: $ClientId, Secret ID: $SecretId")) {
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ConnectedApp -Param $ClientId/secrets/$SecretId) -Method Delete
+    }
+}
+
 ### Notifications methods
 function Get-TableauDataAlert {
 <#

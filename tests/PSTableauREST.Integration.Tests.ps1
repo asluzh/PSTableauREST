@@ -242,12 +242,27 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 $app.clientId | Should -Not -BeNullOrEmpty
                 $app = Get-TableauConnectedApp -ClientId $app.clientId
                 $app | Should -Not -BeNullOrEmpty
+                $app.clientId | Should -Not -BeNullOrEmpty
             }
             It "Update dummy Tableau connected app on <ConfigFile.server>" {
                 if ($script:ConnectedAppDummy) {
                     $app = Set-TableauConnectedApp -ClientId $script:ConnectedAppDummy -Name "Test 2" -Enabled true
                     $app | Should -Not -BeNullOrEmpty
                     $app.clientId | Should -Not -BeNullOrEmpty
+                } else {
+                    Set-ItResult -Skipped -Because "Connected app dummy was not added in the previous test"
+                }
+            }
+            It "Generate/get/remove Tableau connected app secret on <ConfigFile.server>" {
+                if ($script:ConnectedAppDummy) {
+                    $app = Get-TableauConnectedApp -ClientId $script:ConnectedAppDummy
+                    $app | Should -Not -BeNullOrEmpty
+                    $app.clientId | Should -Not -BeNullOrEmpty
+                    $secret = New-TableauConnectedAppSecret -ClientId $app.clientId
+                    $secret | Should -Not -BeNullOrEmpty
+                    $secret = Get-TableauConnectedAppSecret -ClientId $app.clientId -SecretId $secret.id
+                    $secret | Should -Not -BeNullOrEmpty
+                    {Remove-TableauConnectedAppSecret -ClientId $app.clientId -SecretId $secret.id} | Should -Not -Throw
                 } else {
                     Set-ItResult -Skipped -Because "Connected app dummy was not added in the previous test"
                 }
