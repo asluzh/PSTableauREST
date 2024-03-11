@@ -129,7 +129,7 @@ Expand ValidateSet to add support for more Endpoints.
 [OutputType([string])]
 Param(
     [Parameter(Mandatory)][ValidateSet('Auth','Site','Session','Domain',
-        'Setting','ServerSetting','AnalyticsSetting','ConnectedApp',
+        'Setting','ServerSetting','AnalyticsSetting','ConnectedApp','EAS',
         'Project','User','Group','Workbook','Datasource','View','Flow','FileUpload',
         'Recommendation','CustomView','Favorite','OrderFavorite',
         'Schedule','ServerSchedule','Job','Task','Subscription','DataAlert',
@@ -171,6 +171,10 @@ Param(
             } else {
                 $uri += "sites/$script:TableauSiteId/connected-applications"
             }
+            if ($Param) { $uri += "/$Param" }
+        }
+        'EAS' {
+            $uri += "sites/$script:TableauSiteId/connected-apps/external-authorization-servers"
             if ($Param) { $uri += "/$Param" }
         }
         'GraphQL' {
@@ -9403,6 +9407,194 @@ Param(
     Assert-TableauRestVersion -AtLeast 3.14
     if ($PSCmdlet.ShouldProcess("Client ID: $ClientId, Secret ID: $SecretId")) {
         Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ConnectedApp -Param $ClientId/secrets/$SecretId) -Method Delete
+    }
+}
+
+function Get-TableauConnectedAppEAS {
+<#
+.SYNOPSIS
+List All Registered EAS
+or
+List Registered EAS
+
+.DESCRIPTION
+Get all external authorization servers (EASs) registered to a site, or details of an EAS registered to a site.
+Tableau Cloud only, currently not supported for Tableau Server.
+
+.PARAMETER EasId
+List Registered EAS: The unique ID of the registered EAS.
+
+.PARAMETER PageSize
+(Optional, List All Registered EAS) Page size when paging through results.
+
+.EXAMPLE
+$list = Get-TableauConnectedAppEAS
+
+.EXAMPLE
+$eas = Get-TableauConnectedApp -EasId $id
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_connected_app.htm#get_connectedapps_eas
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_connected_app.htm#get_connectedapp_eas
+#>
+[OutputType([PSCustomObject[]])]
+Param(
+    [Parameter(Mandatory,ParameterSetName='ConnectedAppById')][string] $EasId,
+    [Parameter(ParameterSetName='ConnectedApps')][ValidateRange(1,100)][int] $PageSize = 100
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.16
+    if ($ClientId) { # List Registered EAS by ID
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint EAS -Param $EasId) -Method Get
+        $response.tsResponse.externalAuthorizationServerList.externalAuthorizationServer
+    } else { # List All Registered EAS
+        $pageNumber = 0
+        do {
+            $pageNumber++
+            $uri = Get-TableauRequestUri -Endpoint EAS
+            $uri += "?pageSize=$PageSize" + "&pageNumber=$pageNumber"
+            $response = Invoke-TableauRestMethod -Uri $uri -Method Get
+            $totalAvailable = $response.tsResponse.pagination.totalAvailable
+            $response.tsResponse.externalAuthorizationServerList.externalAuthorizationServer
+        } until ($PageSize*$pageNumber -ge $totalAvailable)
+    }
+}
+
+function Set-TableauConnectedAppEAS {
+<#
+.SYNOPSIS
+Update EAS
+
+.DESCRIPTION
+Update a connected app with OAuth 2.0 trust.
+Tableau Cloud only, currently not supported for Tableau Server.
+
+.PARAMETER EasId
+The unique ID of the registered EAS.
+
+.PARAMETER IssuerUrl
+(Optional) The entity id of your identity provider (IdP) or URL that uniquely identifies your IdP.
+
+.PARAMETER JwksUri
+(Optional) The JSON Web Key (JKWS) of the EAS.
+
+.PARAMETER Name
+(Optional) The name of the connected app.
+
+.EXAMPLE
+$app = Set-TableauConnectedAppEAS -EasId $id -IssuerUrl $url
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_connected_app.htm#update_connectedapp_eas
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauConnectedAppEAS')]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $EasId,
+    [Parameter()][string] $IssuerUrl,
+    [Parameter()][string] $JwksUri,
+    [Parameter()][string] $Name
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.16
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_eas = $tsRequest.AppendChild($xml.CreateElement("externalAuthorizationServer"))
+    if ($IssuerUrl) {
+        $el_eas.SetAttribute("issuerUrl", $IssuerUrl)
+    }
+    if ($JwksUri) {
+        $el_eas.SetAttribute("jwksUri", $JwksUri)
+    }
+    if ($Name) {
+        $el_eas.SetAttribute("name", $Name)
+    }
+    if ($PSCmdlet.ShouldProcess($EasId)) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint EAS -Param $EasId) -Body $xml.OuterXml -Method Put
+        return $response.tsResponse.externalAuthorizationServer
+    }
+}
+
+function New-TableauConnectedAppEAS {
+<#
+.SYNOPSIS
+Register EAS
+
+.DESCRIPTION
+Create a connected app with OAuth 2.0 trust by registering an external authorization server (EAS) to a site.
+Tableau Cloud only, currently not supported for Tableau Server.
+
+.PARAMETER IssuerUrl
+The entity id of your identity provider (IdP) or URL that uniquely identifies your IdP.
+
+.PARAMETER JwksUri
+(Optional) The JSON Web Key (JKWS) of the EAS.
+
+.PARAMETER Name
+(Optional) The name of the connected app.
+
+.EXAMPLE
+$eas = New-TableauConnectedAppEAS -IssuerUrl $url -Name "External Authorization Server"
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_connected_app.htm#create_connectedapp_eas
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[Alias('Add-TableauConnectedAppEAS')]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $IssuerUrl,
+    [Parameter()][string] $JwksUri,
+    [Parameter()][string] $Name
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.16
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_eas = $tsRequest.AppendChild($xml.CreateElement("externalAuthorizationServer"))
+    $el_eas.SetAttribute("issuerUrl", $IssuerUrl)
+    if ($JwksUri) {
+        $el_eas.SetAttribute("jwksUri", $JwksUri)
+    }
+    if ($Name) {
+        $el_eas.SetAttribute("name", $Name)
+    }
+    if ($PSCmdlet.ShouldProcess($IssuerUrl)) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint EAS) -Body $xml.OuterXml -Method Post
+        return $response.tsResponse.externalAuthorizationServer
+    }
+}
+
+function Remove-TableauConnectedAppEAS {
+<#
+.SYNOPSIS
+Delete EAS
+
+.DESCRIPTION
+Delete a registered external authorization server (EAS).
+Tableau Cloud only, currently not supported for Tableau Server.
+
+.PARAMETER EasId
+The unique ID of the registered EAS.
+
+.EXAMPLE
+$result = Remove-TableauConnectedAppEAS -EasId $id
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_connected_app.htm#delete_connectedapp_eas
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $EasId
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.16
+    if ($PSCmdlet.ShouldProcess($EasId)) {
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint EAS -Param $EasId) -Method Delete
     }
 }
 

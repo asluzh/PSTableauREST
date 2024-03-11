@@ -27,10 +27,10 @@ if ($LASTEXITCODE -ne 0) {
 }
 gh release create "v$Release" --notes "Module v$Release"
 if ($LASTEXITCODE -eq 0) {
-    Write-Host "Module $ModuleName, release $Release is published to GitHub"
+    Write-Host "Module $ModuleName, release $Release is published to GitHub" -ForegroundColor Green
     gh auth logout
 } else {
-    Write-Host "GitHub release create failed ($LASTEXITCODE)"
+    Write-Error "GitHub release create failed ($LASTEXITCODE)"
     Exit
 }
 
@@ -40,4 +40,4 @@ $NuGetApiKey = (New-Object System.Net.NetworkCredential("", $secureKey)).Passwor
 Publish-Module -Path ./$ModuleName -NuGetApiKey $NuGetApiKey -WarningAction SilentlyContinue -ErrorAction Stop
 # -Tags $Tags -Verbose -Repository PSGallery
 
-Write-Host "Module $ModuleName, release $Release is published to PSGallery"
+Write-Host "Module $ModuleName, release $Release is published to PSGallery" -ForegroundColor Green

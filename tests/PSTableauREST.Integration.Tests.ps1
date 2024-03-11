@@ -275,6 +275,19 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 }
                 $script:ConnectedAppDummy = $null
             }
+            It "Generate/get/update/remove Tableau connected app EAS on <ConfigFile.server>" {
+                if ($ConfigFile.tableau_cloud) {
+                    $eas = New-TableauConnectedAppEAS -IssuerUrl "https://google.com/auth/add_oauth_token"
+                    $eas | Should -Not -BeNullOrEmpty
+                    $list = Get-TableauConnectedAppEAS
+                    $list | Should -Not -BeNullOrEmpty
+                    Get-TableauConnectedAppEAS -EasId $eas.id | Should -Not -BeNullOrEmpty
+                    Set-TableauConnectedAppEAS -EasId $eas.id -Name "EAS" | Should -Not -BeNullOrEmpty
+                    {Remove-TableauConnectedAppEAS -EasId $eas.id} | Should -Not -Throw
+                } else {
+                    Set-ItResult -Skipped -Because "EAS methods not supported on Tableau Server"
+                }
+            }
         }
         Context "Site operations" -Tag Site {
             It "Create new site on <ConfigFile.server>" {
