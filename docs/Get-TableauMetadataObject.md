@@ -6,8 +6,8 @@ Run Metadata GraphQL query
 ## SYNTAX
 
 ```
-Get-TableauMetadataObject [-Query] <String> [[-PaginatedEntity] <String>] [[-PageSize] <Int32>]
- [-ProgressAction <ActionPreference>] [<CommonParameters>]
+Get-TableauMetadataObject [-Query] <String> [[-Variables] <Hashtable>] [[-PaginatedEntity] <String>]
+ [[-PageSize] <Int32>] [-ProgressAction <ActionPreference>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -37,6 +37,23 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
+### -Variables
+The hashtable of query variables values.
+The names of the variables should match to the those defined in the query, otherwise they will be e.g.
+ignored in filters.
+
+```yaml
+Type: Hashtable
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: 2
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
 ### -PaginatedEntity
 If this parameter is provided: modifies the query to implement paginating through results.
 Pagination in Tableau Metadata API is supported on entities ending with "Connection" (edges), such as fieldsConnection, workbooksConnection, etc.
@@ -47,7 +64,7 @@ Parameter Sets: (All)
 Aliases:
 
 Required: False
-Position: 2
+Position: 3
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -62,7 +79,7 @@ Parameter Sets: (All)
 Aliases:
 
 Required: False
-Position: 3
+Position: 4
 Default value: 100
 Accept pipeline input: False
 Accept wildcard characters: False

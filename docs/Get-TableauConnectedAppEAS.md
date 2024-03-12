@@ -30,7 +30,7 @@ $list = Get-TableauConnectedAppEAS
 
 ### EXAMPLE 2
 ```
-$eas = Get-TableauConnectedApp -EasId $id
+$eas = Get-TableauConnectedAppEAS -EasId $id
 ```
 
 ## PARAMETERS

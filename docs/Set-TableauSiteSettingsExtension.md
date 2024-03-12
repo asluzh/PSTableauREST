@@ -2,17 +2,21 @@
 
 ## SYNOPSIS
 Update Tableau extensions site settings
+or
+Update dashboard extension settings of site - Retired in API 3.21
 
 ## SYNTAX
 
 ```
-Set-TableauSiteSettingsExtension [-Enabled] <String> [[-UseDefaultSetting] <String>]
- [[-SafeList] <Hashtable[]>] [-ProgressAction <ActionPreference>] [-WhatIf] [-Confirm] [<CommonParameters>]
+Set-TableauSiteSettingsExtension [-Enabled] <String> [[-AllowSandboxed] <String>] [[-SafeList] <Hashtable[]>]
+ [[-SafeListLegacyAPI] <PSObject>] [-ProgressAction <ActionPreference>] [-WhatIf] [-Confirm]
+ [<CommonParameters>]
 ```
 
 ## DESCRIPTION
 Updates the settings for extensions of a site.
 This method can only be called by site or server administrators.
+Note: for API prior to 3.21, the method calls a different API endpoint, which returns a JSON object - see online help for more details.
 
 ## EXAMPLES
 
@@ -40,10 +44,10 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -UseDefaultSetting
+### -AllowSandboxed
 (Optional) True/false.
-If extensions are enabled on the server, the default settings allow extensions to run on a site,
-provided the extension is not specifically blocked on the server.
+If extensions are enabled on the server, this setting allows to run sandboxed extensions by default,
+unless an extension is not specifically blocked on the server.
 
 ```yaml
 Type: String
@@ -71,6 +75,21 @@ Aliases:
 
 Required: False
 Position: 3
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -SafeListLegacyAPI
+(Optional) For API prior to 3.21: Object containing the extension safe list settings (see online API help).
+
+```yaml
+Type: PSObject
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: 4
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -135,4 +154,6 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 ## RELATED LINKS
 
 [https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_tableau_extensions_settings.htm#update_tableau_extensions_site_settings](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_tableau_extensions_settings.htm#update_tableau_extensions_site_settings)
+
+[https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_dashboard_extensions_settings.htm#DashboardExtensionsSiteSettingsService_updateDashboardExtensionsSiteSettings](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_dashboard_extensions_settings.htm#DashboardExtensionsSiteSettingsService_updateDashboardExtensionsSiteSettings)
 

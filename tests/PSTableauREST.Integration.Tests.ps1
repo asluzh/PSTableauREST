@@ -58,7 +58,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             $response | Should -BeOfType "String"
         }
     }
-    Context "Content operations" -Tag Content {
+    Context "Logged-in operations" -Tag LoggedIn {
         BeforeAll {
             if ($ConfigFile.pat_name) {
                 Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -Credential $ConfigFile.pat_credential -PersonalAccessToken | Out-Null
@@ -107,12 +107,19 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 }
             }
         }
-        Context "Tableau extensions operations" -Tag Extension {
+        Context "Tableau Dashboard extensions operations" -Tag Extension {
             It "Get Tableau extensions setting (server) on <ConfigFile.server>" {
                 if ($ConfigFile.server_admin) {
                     $settings = Get-TableauServerSettingsExtension
-                    $settings.extensionsGloballyEnabled | Should -BeOfType String
-                    $script:ServerExtensionsGloballyEnabled = $settings.extensionsGloballyEnabled
+                    $settings | Should -Not -BeNullOrEmpty
+                    if ($settings.GetType().Name -eq 'XmlElement') {
+                        $settings.extensionsGloballyEnabled | Should -BeOfType String
+                        $script:ServerExtensionsGloballyEnabled = $settings.extensionsGloballyEnabled
+                    } else {
+                        Write-Warning ("Older Extension Settings API detected (API: {0})" -f (Get-TableauRestVersion))
+                        $settings.extensions_enabled | Should -BeOfType Boolean
+                        $script:ServerExtensionsSettings = $settings
+                    }
                 } else {
                     Set-ItResult -Skipped -Because "Server admin privileges required"
                 }
@@ -120,30 +127,59 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             It "Update Tableau extensions setting (server) on <ConfigFile.server>" {
                 if ($ConfigFile.server_admin -and $script:ServerExtensionsGloballyEnabled) {
                     $settings = Set-TableauServerSettingsExtension -Enabled true -BlockList 'https://test123.com'
+                    $settings | Should -Not -BeNullOrEmpty
                     $settings.extensionsGloballyEnabled | Should -Be true
                     $settings = Set-TableauServerSettingsExtension -Enabled $script:ServerExtensionsGloballyEnabled
+                    $script:ServerExtensionsGloballyEnabled = $null
+                } elseif ($ConfigFile.server_admin -and $script:ServerExtensionsSettings) {
+                    Write-Warning ("Older Extension Settings API detected (API: {0})" -f (Get-TableauRestVersion))
+                    $settings = Set-TableauServerSettingsExtension -Enabled true #-BlockListLegacyAPI 'https://test123.com'
+                    $settings | Should -Not -BeNullOrEmpty
+                    $settings.extensions_enabled | Should -BeTrue
+                    $settings = Set-TableauServerSettingsExtension -Enabled $script:ServerExtensionsSettings.extensions_enabled -BlockListLegacyAPI $script:ServerExtensionsSettings.block_list_items
+                    $script:ServerExtensionsSettings = $null
                 } else {
                     Set-ItResult -Skipped -Because "Server admin privileges required"
                 }
             }
             It "Get Tableau extensions setting (site) on <ConfigFile.server>" {
                 $settings = Get-TableauSiteSettingsExtension
-                $settings.extensionsEnabled | Should -BeOfType String
-                $settings.useDefaultSetting | Should -BeOfType String
-                $script:SiteExtensionsEnabled = $settings.extensionsEnabled
-                $script:SiteUseDefaultSetting = $settings.useDefaultSetting
-                $script:SiteSafeList = @()
-                foreach ($safeext in $settings.safeList) {
-                    $ht = @{}
-                    $safeext.ChildNodes | ForEach-Object { $ht[$_.Name] = $_.InnerText }
-                    $script:SiteSafeList += $ht
+                $settings | Should -Not -BeNullOrEmpty
+                if ($settings.GetType().Name -eq 'XmlElement') {
+                    $settings.extensionsEnabled | Should -BeOfType String
+                    $settings.useDefaultSetting | Should -BeOfType String
+                    $script:SiteExtensionsEnabled = $settings.extensionsEnabled
+                    $script:SiteAllowSandboxed = $settings.useDefaultSetting
+                    $script:SiteSafeList = @()
+                    foreach ($safeext in $settings.safeList) {
+                        $ht = @{}
+                        $safeext.ChildNodes | ForEach-Object { $ht[$_.Name] = $_.InnerText }
+                        $script:SiteSafeList += $ht
+                    }
+                } else {
+                    Write-Warning ("Older Extension Settings API detected (API: {0})" -f (Get-TableauRestVersion))
+                    $settings.extensions_enabled | Should -BeOfType Boolean
+                    $settings.allow_sandboxed | Should -BeOfType Boolean
+                    $script:SiteExtensionsSettings = $settings
                 }
             }
             It "Update Tableau extensions setting (site) on <ConfigFile.server>" {
                 if ($script:SiteExtensionsEnabled) {
-                    $settings = Set-TableauSiteSettingsExtension -Enabled true -SafeList @{url='https://tableau.com';fullDataAllowed='false';promptNeeded='true'}
+                    $settings = Set-TableauSiteSettingsExtension -Enabled true -AllowSandboxed false -SafeList @{url='https://tableau.com';fullDataAllowed='false';promptNeeded='true'}
+                    # note: AllowSandboxed=true seems to be ignored by the API 3.22
+                    $settings | Should -Not -BeNullOrEmpty
                     $settings.extensionsEnabled | Should -Be true
-                    $settings = Set-TableauSiteSettingsExtension -Enabled $script:SiteExtensionsEnabled -UseDefaultSetting $script:SiteUseDefaultSetting -SafeList $script:SiteSafeList
+                    $settings.useDefaultSetting | Should -Be false
+                    $settings = Set-TableauSiteSettingsExtension -Enabled $script:SiteExtensionsEnabled -AllowSandboxed $script:SiteAllowSandboxed -SafeList $script:SiteSafeList
+                    $script:SiteExtensionsEnabled = $null
+                } elseif ($script:SiteExtensionsSettings) {
+                    Write-Warning ("Older Extension Settings API detected (API: {0})" -f (Get-TableauRestVersion))
+                    $settings = Set-TableauSiteSettingsExtension -Enabled true -AllowSandboxed false #-SafeListLegacyAPI @{url='https://tableau.com';fullDataAllowed='false';promptNeeded='true'}
+                    $settings | Should -Not -BeNullOrEmpty
+                    $settings.extensions_enabled | Should -BeTrue
+                    $settings.allow_sandboxed | Should -BeFalse
+                    $settings = Set-TableauSiteSettingsExtension -Enabled $script:SiteExtensionsEnabled -AllowSandboxed $script:SiteAllowSandboxed -SafeListLegacyAPI $script:SiteExtensionsSettings.safe_list_items
+                    $script:SiteExtensionsSettings = $null
                 } else {
                     Set-ItResult -Skipped -Because "Site extension settings were not saved in the previous test"
                 }
@@ -1425,7 +1461,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     $jobFinished.finishCode | Should -Be 0
                     # Remove-TableauDatasource -DatasourceId $datasource.id | Out-Null
                 }
-                It "Publish datasource with connections on <ConfigFile.server>" -Tag DatasourceP -Skip {
+                It "Publish datasource with connections on <ConfigFile.server>" -Tag DatasourceP {
                     # note: this option is still not supported by the API as of v2023.3
                     # although it's coded the same way in the tsc python module
                     $securePw = Get-SecurePassword -Namespace "asl-tableau-testsql" -Username "sqladmin"
@@ -1763,10 +1799,10 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                         Assert-Equivalent -Actual $actualPermissionTable -Expected $expectedPermissionTable
                     }
                 }
-                It "Get/hide/unhide view recommendations on <ConfigFile.server>" -Skip {
+                It "Get/hide/unhide view recommendations on <ConfigFile.server>" -Skip { #TODO add test for Get/hide/unhide view recommendations
                 }
             }
-            It "Get custom views on <ConfigFile.server>" -Skip {
+            It "Get custom views on <ConfigFile.server>" -Skip { #TODO add tests for custom views
             }
             It "Update custom view on <ConfigFile.server>" -Skip {
             }
@@ -1968,17 +2004,17 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 It "Publish flow with invalid contents on <ConfigFile.server>" {
                     {Publish-TableauFlow -Name "invalid" -InFile "tests/assets/Misc/invalid.tflx" -ProjectId $samplesProjectId} | Should -Throw
                 }
-                It "Publish and check flow with output steps on <ConfigFile.server>" -Skip {
+                It "Publish and check flow with output steps on <ConfigFile.server>" -Skip { #TODO flow tests with output steps
                     $flow = Publish-TableauFlow -Name $sampleFlowName -InFile "tests/output/$sampleFlowName.tflx" -ProjectId $samplesProjectId -Overwrite
                     $flow.id | Should -BeOfType String
                     $outputSteps = Get-TableauFlow -FlowId $flow.id -OutputSteps
                     ($outputSteps | Measure-Object).Count | Should -BeGreaterThan 0
                     $outputSteps.id | Select-Object -First 1 -ExpandProperty id | Should -BeOfType String
                 }
-                It "Publish flow with connections on <ConfigFile.server>" -Skip {
+                It "Publish flow with connections on <ConfigFile.server>" -Skip { #TODO flow tests with connections
                     Publish-TableauFlow -Name "Flow" -InFile "tests/assets/Misc/Flow.txt" -ProjectId $samplesProjectId
                 }
-                It "Publish flow with credentials on <ConfigFile.server>" -Skip {
+                It "Publish flow with credentials on <ConfigFile.server>" -Skip { #TODO flow tests with credentials
                     Publish-TableauFlow -Name "Flow" -InFile "tests/assets/Misc/Flow.txt" -ProjectId $samplesProjectId
                 }
                 Context "Publish / download flows from test assets on <ConfigFile.server>" -Tag FlowSamples -ForEach $FlowFiles {
@@ -2531,8 +2567,8 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             }
         }
         Context "Metadata operations" -Tag Metadata {
-            It "Query databases on <ConfigFile.server>" {
-                Set-ItResult -Skipped -Because "Query databases doesn't work for some reason"
+            It "Query databases on <ConfigFile.server>" -Skip {
+                # TODO Query databases doesn't work for some reason
                 $databases = Get-TableauDatabase
                 ($databases | Measure-Object).Count | Should -BeGreaterThan 0
                 $databaseId = $databases | Select-Object -First 1 -ExpandProperty id
@@ -2556,22 +2592,69 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 $column = Get-TableauTableColumn -TableId $script:tableId -ColumnId $columnId
                 $column.id | Should -Be $columnId
             }
-            It "Simple GraphQL queries on <ConfigFile.server>" {
+            It "Non-paginated GraphQL queries on <ConfigFile.server>" {
                 $query = Get-Content "tests/assets/GraphQL/workbooks.gql" | Out-String
-                $results = Get-TableauMetadataObject -Query $query
-                ($results | Measure-Object).Count | Should -BeGreaterThan 0
+                $result = Get-TableauMetadataObject -Query $query
+                ($result | Measure-Object).Count | Should -BeGreaterThan 0
+            }
+            It "Non-paginated GraphQL queries with variables on <ConfigFile.server>" {
+                $query = Get-Content "tests/assets/GraphQL/workbook-sheets.gql" | Out-String
+                $workbooks = Get-TableauMetadataObject -Query $query
+                if ($workbooks) {
+                    $query = Get-Content "tests/assets/GraphQL/workbook-sheet-vars.gql" | Out-String
+                    $wb_tested = @()
+                    foreach ($wb in $workbooks) {
+                        if ($wb.name -NotIn $wb_tested) {
+                            # Write-Warning $wb.name
+                            $vars = @{workbookName=$wb.name; sheetName=($wb.sheets | Select-Object -First 1).name}
+                            # Write-Warning ($vars | ConvertTo-Json -Depth 4)
+                            $result = Get-TableauMetadataObject -Query $query -Variables $vars
+                            # Write-Warning ($result | ConvertTo-Json)
+                            ($result | Measure-Object).Count | Should -BeGreaterThan 0
+                            ($result | Where-Object name -eq $wb.name | Measure-Object).Count | Should -Be ($result | Measure-Object).Count
+                            $wb_tested += $wb.name
+                            if ($wb_tested.length -ge 3) { # test on 3 different workbooks
+                                break
+                            }
+                        }
+                    }
+                } else {
+                    Set-ItResult -Skipped -Because "Workbooks content is empty"
+                }
+            }
+            It "Paginated GraphQL queries with variables on <ConfigFile.server>" {
+                $query = Get-Content "tests/assets/GraphQL/workbook-sheets.gql" | Out-String
+                $workbooks = Get-TableauMetadataObject -Query $query
+                if ($workbooks) {
+                    $query = Get-Content "tests/assets/GraphQL/workbooks-paginated-vars.gql" | Out-String
+                    $wb_tested = @()
+                    foreach ($wb in $workbooks) {
+                        if ($wb.name -NotIn $wb_tested) {
+                            $vars = @{workbookName=$wb.name}
+                            $result = Get-TableauMetadataObject -Query $query -Variables $vars -PaginatedEntity workbooksConnection -PageSize 3
+                            ($result | Measure-Object).Count | Should -BeGreaterThan 0
+                            ($result | Where-Object name -eq $wb.name | Measure-Object).Count | Should -Be ($result | Measure-Object).Count
+                            $wb_tested += $wb.name
+                            if ($wb_tested.length -ge 3) { # test on 3 different workbooks
+                                break
+                            }
+                        }
+                    }
+                } else {
+                    Set-ItResult -Skipped -Because "Workbooks content is empty"
+                }
             }
             It "Paginated GraphQL queries on <ConfigFile.server>" {
                 $query = Get-Content "tests/assets/GraphQL/fields-paginated.gql" | Out-String
                 # Query-TableauMetadata: alias -> Get-TableauMetadataObject
-                $results = Query-TableauMetadata -Query $query -PaginatedEntity "fieldsConnection"
-                ($results | Measure-Object).Count | Should -BeGreaterThan 100
-                $results = Query-TableauMetadata -Query $query -PaginatedEntity "fieldsConnection" -PageSize 500
-                ($results | Measure-Object).Count | Should -BeGreaterThan 100
-                $results = Query-TableauMetadata -Query $query -PaginatedEntity "fieldsConnection" -PageSize 1000
-                ($results | Measure-Object).Count | Should -BeGreaterThan 100
-                $results = Query-TableauMetadata -Query $query -PaginatedEntity "fieldsConnection" -PageSize 20000
-                ($results | Measure-Object).Count | Should -BeGreaterThan 100
+                $result = Query-TableauMetadata -Query $query -PaginatedEntity fieldsConnection
+                ($result | Measure-Object).Count | Should -BeGreaterThan 100
+                $result = Query-TableauMetadata -Query $query -PaginatedEntity fieldsConnection -PageSize 500
+                ($result | Measure-Object).Count | Should -BeGreaterThan 100
+                $result = Query-TableauMetadata -Query $query -PaginatedEntity fieldsConnection -PageSize 1000
+                ($result | Measure-Object).Count | Should -BeGreaterThan 100
+                $result = Query-TableauMetadata -Query $query -PaginatedEntity fieldsConnection -PageSize 20000
+                ($result | Measure-Object).Count | Should -BeGreaterThan 100
             }
         }
     }

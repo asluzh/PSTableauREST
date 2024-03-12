@@ -129,7 +129,7 @@ Expand ValidateSet to add support for more Endpoints.
 [OutputType([string])]
 Param(
     [Parameter(Mandatory)][ValidateSet('Auth','Site','Session','Domain',
-        'Setting','ServerSetting','AnalyticsSetting','ConnectedApp','EAS',
+        'Setting','ServerSetting','ExtensionSetting','ConnectedApp','EAS',
         'Project','User','Group','Workbook','Datasource','View','Flow','FileUpload',
         'Recommendation','CustomView','Favorite','OrderFavorite',
         'Schedule','ServerSchedule','Job','Task','Subscription','DataAlert',
@@ -161,7 +161,7 @@ Param(
             $uri += "settings"
             if ($Param) { $uri += "/$Param" }
         }
-        'AnalyticsSetting' {
+        'ExtensionSetting' {
             $uri = "$script:TableauServerUrl/api/-/settings"
             if ($Param) { $uri += "/$Param" }
         }
@@ -290,10 +290,10 @@ Param(
     [Parameter()][version] $LessThan
 )
     if ($AtLeast -and $script:TableauRestVersion -lt $AtLeast) {
-        Write-Error "Method or Parameter not supported, needs API version >= $AtLeast" -Category NotImplemented -ErrorAction Stop
+        Write-Error "Method or parameter not supported, needs API version >= $AtLeast" -Category NotImplemented -ErrorAction Stop
     }
     if ($LessThan -and $script:TableauRestVersion -ge $LessThan) {
-        Write-Error "Method or Parameter not supported, needs API version < $LessThan" -Category NotImplemented -ErrorAction Stop
+        Write-Error "Method or parameter not supported, needs API version < $LessThan" -Category NotImplemented -ErrorAction Stop
     }
 }
 
@@ -8546,33 +8546,51 @@ function Get-TableauServerSettingsExtension {
 <#
 .SYNOPSIS
 List Tableau extensions server settings
+or
+List dashboard extension settings of server - Retired in API 3.21
 
 .DESCRIPTION
 Lists the settings for extensions of a server.
 This method can only be called by server administrators; it is not available on Tableau Cloud.
+Note: for API prior to 3.21, the method calls a different API endpoint, which returns a JSON object - see online help for more details.
 
 .EXAMPLE
 $settings = Get-TableauServerSettingsExtension
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_tableau_extensions_settings.htm#list_tableau_extensions_server_settings
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_dashboard_extensions_settings.htm#DashboardExtensionsServerSettingsService_getDashboardExtensionsServerSettings
 #>
 [OutputType([PSCustomObject])]
 Param()
     Assert-TableauAuthToken
-    Assert-TableauRestVersion -AtLeast 3.21
-    $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ServerSetting -Param extensions) -Method Get
-    return $response.tsResponse.extensionsServerSettings
+    if ($script:TableauRestVersion -ge 3.21) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ServerSetting -Param extensions) -Method Get
+        return $response.tsResponse.extensionsServerSettings
+    } else {
+        Assert-TableauRestVersion -AtLeast 3.11
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param server/extensions/dashboard) -Method Get
+        # return result in the structure of API 3.21
+        # return @{
+        #     extensionsGloballyEnabled=$response.extensions_enabled.ToString().ToLower();
+        #     block_list_items=$response.block_list_items;
+        # }
+    }
 }
 
 function Set-TableauServerSettingsExtension {
 <#
 .SYNOPSIS
 Update Tableau extensions server settings
+or
+Update dashboard extensions settings of server - Retired in API 3.21
 
 .DESCRIPTION
 Updates the settings for extensions of a server.
 This method can only be called by server administrators; it is not available on Tableau Cloud.
+Note: for API prior to 3.21, the method calls a different API endpoint, which returns a JSON object - see online help for more details.
 
 .PARAMETER Enabled
 True/false. True: extensions are allowed to run on the server. False: all extendions are disabled on the server.
@@ -8580,35 +8598,58 @@ True/false. True: extensions are allowed to run on the server. False: all extend
 .PARAMETER BlockList
 (Optional) List of domains that are not allowed to serve extensions to the Tableau Server. Domains are in the form of https://blocked_example.com
 
+.PARAMETER BlockListLegacyAPI
+(Optional) For API prior to 3.21: Object containing the extension block list settings (see online API help).
+
 .EXAMPLE
 $settings = Set-TableauServerSettingsExtension -Enabled true -BlockList 'https://test.com'
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_tableau_extensions_settings.htm#update_tableau_extensions_server_settings
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_dashboard_extensions_settings.htm#DashboardExtensionsServerSettingsService_updateDashboardExtensionsServerSettings
 #>
 [CmdletBinding(SupportsShouldProcess)]
 [Alias('Update-TableauServerSettingsExtension')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][ValidateSet('true','false')][string] $Enabled,
-    [Parameter()][string[]] $BlockList
+    [Parameter()][string[]] $BlockList,
+    [Parameter()][pscustomobject] $BlockListLegacyAPI
 )
     Assert-TableauAuthToken
-    Assert-TableauRestVersion -AtLeast 3.21
-    $xml = New-Object System.Xml.XmlDocument
-    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
-    $el_settings = $tsRequest.AppendChild($xml.CreateElement("extensionsServerSettings"))
-    $el_enabled = $el_settings.AppendChild($xml.CreateElement("extensionsGloballyEnabled"))
-    $el_enabled.InnerText = $Enabled
-    if ($BlockList) {
-        foreach ($blockext in $BlockList) {
-            $el_block = $el_settings.AppendChild($xml.CreateElement("blockList"))
-            $el_block.InnerText = $blockext
+    if ($script:TableauRestVersion -ge 3.21) {
+        $xml = New-Object System.Xml.XmlDocument
+        $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+        $el_settings = $tsRequest.AppendChild($xml.CreateElement("extensionsServerSettings"))
+        $el_enabled = $el_settings.AppendChild($xml.CreateElement("extensionsGloballyEnabled"))
+        $el_enabled.InnerText = $Enabled
+        if ($BlockList) {
+            foreach ($blockext in $BlockList) {
+                $el_settings.AppendChild($xml.CreateElement("blockList")).InnerText = $blockext
+            }
         }
-    }
-    if ($PSCmdlet.ShouldProcess("Server Extensions: $Enabled")) {
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ServerSetting -Param extensions) -Method Put -Body $xml.OuterXml
-        return $response.tsResponse.extensionsServerSettings
+        if ($PSCmdlet.ShouldProcess("Server Extensions: $Enabled")) {
+            $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ServerSetting -Param extensions) -Method Put -Body $xml.OuterXml
+            return $response.tsResponse.extensionsServerSettings
+        }
+    } else {
+        Assert-TableauRestVersion -AtLeast 3.11
+        $options = @{
+            extensions_enabled=$Enabled;
+        }
+        if ($BlockListLegacyAPI) {
+            $options.block_list_items = $BlockListLegacyAPI
+        }
+        $jsonBody = $Settings | ConvertTo-Json -Compress -Depth 2
+        # Write-Debug $jsonBody
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param server/extensions/dashboard) -Body $jsonBody -Method Put -ContentType "application/json"
+        # return result in the structure of API 3.21
+        # return @{
+        #     extensionsGloballyEnabled=$response.extensions_enabled.ToString().ToLower();
+        #     block_list_items=$response.block_list_items;
+        # }
     }
 }
 
@@ -8616,40 +8657,70 @@ function Get-TableauSiteSettingsExtension {
 <#
 .SYNOPSIS
 List Tableau extensions site settings
+or
+List dashboard extension settings of site - Retired in API 3.21
 
 .DESCRIPTION
 Lists the settings for extensions of a site.
 This method can only be called by site or server administrators.
+Note: for API prior to 3.21, the method calls a different API endpoint, which returns a JSON object - see online help for more details.
 
 .EXAMPLE
 $settings = Get-TableauSiteSettingsExtension
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_tableau_extensions_settings.htm#list_tableau_extensions_site_settings
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_dashboard_extensions_settings.htm#DashboardExtensionsSiteSettingsService_getDashboardExtensionsSiteSettings
 #>
 [OutputType([PSCustomObject])]
 Param()
     Assert-TableauAuthToken
-    Assert-TableauRestVersion -AtLeast 3.21
-    $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Setting -Param extensions) -Method Get
-    return $response.tsResponse.extensionsSiteSettings
+    if ($script:TableauRestVersion -ge 3.21) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Setting -Param extensions) -Method Get
+        return $response.tsResponse.extensionsSiteSettings
+    } else {
+        Assert-TableauRestVersion -AtLeast 3.11
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/dashboard) -Method Get
+        # return result in the structure of API 3.21
+        # $safeList = @()
+        # if ($response.safe_list_items) {
+        #     foreach ($sl in $response.safe_list_items) {
+        #         $safeList += @{
+        #             url=$sl.url;
+        #             fullDataAllowed=$sl.allow_full_data;
+        #             promptNeeded=$sl.prompt_needed;
+        #         }
+        #     }
+        # }
+        # return @{
+        #     extensionsEnabled=$response.extensions_enabled.ToString().ToLower();
+        #     useDefaultSetting=$response.allow_sandboxed.ToString().ToLower();
+        #     safeList=$safeList;
+        # }
+    }
 }
 
 function Set-TableauSiteSettingsExtension {
 <#
 .SYNOPSIS
 Update Tableau extensions site settings
+or
+Update dashboard extension settings of site - Retired in API 3.21
 
 .DESCRIPTION
 Updates the settings for extensions of a site.
 This method can only be called by site or server administrators.
+Note: for API prior to 3.21, the method calls a different API endpoint, which returns a JSON object - see online help for more details.
 
 .PARAMETER Enabled
-True/false. True: extensions are allowed to run on the site. False: no extensions are allowed to run on the site even if their URL is in the site safelist.
+True/false. True: extensions are allowed to run on the site.
+False: no extensions are allowed to run on the site even if their URL is in the site safelist.
 
-.PARAMETER UseDefaultSetting
-(Optional) True/false. If extensions are enabled on the server, the default settings allow extensions to run on a site,
-provided the extension is not specifically blocked on the server.
+.PARAMETER AllowSandboxed
+(Optional) True/false. If extensions are enabled on the server, this setting allows to run sandboxed extensions by default,
+unless an extension is not specifically blocked on the server.
 
 .PARAMETER SafeList
 (Optional) List of URLs of the extensions that are allowed to run on the site and their properties (full data access, prompt to run).
@@ -8658,47 +8729,91 @@ and server and site extension enablement being true.
 Note that updating the safelist replaces the existing list with the new list.
 If you want to add a URL to the existing list, you must also include the existing URLs in the new list.
 
+.PARAMETER SafeListLegacyAPI
+(Optional) For API prior to 3.21: Object containing the extension safe list settings (see online API help).
+
 .EXAMPLE
 $settings = Set-TableauSiteSettingsExtension -Enabled true -SafeList @{url='https://test.com';fullDataAllowed='true';promptNeeded='true'}
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_tableau_extensions_settings.htm#update_tableau_extensions_site_settings
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_dashboard_extensions_settings.htm#DashboardExtensionsSiteSettingsService_updateDashboardExtensionsSiteSettings
 #>
 [CmdletBinding(SupportsShouldProcess)]
 [Alias('Update-TableauSiteSettingsExtension')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][ValidateSet('true','false')][string] $Enabled,
-    [Parameter()][ValidateSet('true','false')][string] $UseDefaultSetting,
-    [Parameter()][hashtable[]] $SafeList
+    [Parameter()][ValidateSet('true','false')][string] $AllowSandboxed,
+    [Parameter()][hashtable[]] $SafeList,
+    [Parameter()][pscustomobject] $SafeListLegacyAPI
 )
     Assert-TableauAuthToken
-    Assert-TableauRestVersion -AtLeast 3.21
-    $xml = New-Object System.Xml.XmlDocument
-    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
-    $el_settings = $tsRequest.AppendChild($xml.CreateElement("extensionsSiteSettings"))
-    $el_enabled = $el_settings.AppendChild($xml.CreateElement("extensionsEnabled"))
-    $el_enabled.InnerText = $Enabled
-    if ($UseDefaultSetting) {
-        $el_default = $el_settings.AppendChild($xml.CreateElement("useDefaultSetting"))
-        $el_default.InnerText = $UseDefaultSetting
-    }
-    if ($SafeList) {
-        foreach ($safeext in $SafeList) {
-            $el_safe = $el_settings.AppendChild($xml.CreateElement("safeList"))
-            $el_url = $el_safe.AppendChild($xml.CreateElement("url"))
-            $el_url.InnerText = $safeext.url
-            $el_fulldata = $el_safe.AppendChild($xml.CreateElement("fullDataAllowed"))
-            $el_fulldata.InnerText = $safeext.fullDataAllowed
-            $el_prompt = $el_safe.AppendChild($xml.CreateElement("promptNeeded"))
-            $el_prompt.InnerText = $safeext.promptNeeded
+    if ($script:TableauRestVersion -ge 3.21) {
+        $xml = New-Object System.Xml.XmlDocument
+        $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+        $el_settings = $tsRequest.AppendChild($xml.CreateElement("extensionsSiteSettings"))
+        $el_enabled = $el_settings.AppendChild($xml.CreateElement("extensionsEnabled"))
+        $el_enabled.InnerText = $Enabled
+        if ($AllowSandboxed) {
+            $el_settings.AppendChild($xml.CreateElement("useDefaultSetting")).InnerText = $AllowSandboxed
         }
-    }
-    if ($PSCmdlet.ShouldProcess("Site Extensions: $Enabled")) {
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Setting -Param extensions) -Method Put -Body $xml.OuterXml
-        return $response.tsResponse.extensionsSiteSettings
+        if ($SafeList) {
+            foreach ($safeext in $SafeList) {
+                $el_safe = $el_settings.AppendChild($xml.CreateElement("safeList"))
+                $el_safe.AppendChild($xml.CreateElement("url")).InnerText = $safeext.url
+                $el_safe.AppendChild($xml.CreateElement("fullDataAllowed")).InnerText = $safeext.fullDataAllowed
+                $el_safe.AppendChild($xml.CreateElement("promptNeeded")).InnerText = $safeext.promptNeeded
+            }
+        }
+        # Write-Debug ($xml.OuterXml | ConvertTo-Json -Compress)
+        if ($PSCmdlet.ShouldProcess("Site Extensions: $Enabled")) {
+            $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Setting -Param extensions) -Method Put -Body $xml.OuterXml
+            return $response.tsResponse.extensionsSiteSettings
+        }
+    } else {
+        Assert-TableauRestVersion -AtLeast 3.11
+        $options = @{
+            extensions_enabled=$Enabled;
+            allow_sandboxed = $AllowSandboxed ? $AllowSandboxed : 'true'; # this parameter is required in legacy API
+        }
+        if ($SafeListLegacyAPI) {
+            $options.safe_list_items = $SafeListLegacyAPI
+        }
+        $jsonBody = $options | ConvertTo-Json -Compress -Depth 2
+        # Write-Debug $jsonBody
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/dashboard) -Body $jsonBody -Method Put -ContentType "application/json"
+        # return result in the structure of API 3.21
+        # $safeList = @()
+        # if ($response.safe_list_items) {
+        #     foreach ($sl in $response.safe_list_items) {
+        #         $safeList += @{
+        #             url=$sl.url;
+        #             fullDataAllowed=$sl.allow_full_data;
+        #             promptNeeded=$sl.prompt_needed;
+        #         }
+        #     }
+        # }
+        # return @{
+        #     extensionsEnabled=$response.extensions_enabled.ToString().ToLower();
+        #     useDefaultSetting=$response.allow_sandboxed.ToString().ToLower();
+        #     safeList=$safeList;
+        # }
     }
 }
+
+# TODO Block dashboard extension on server - Retired in API 3.21
+# TODO Unblock dashboard extension on server - Retired in API 3.21
+# TODO Get blocked dashboard extension on server - Retired in API 3.21
+# TODO List blocked dashboard extensions on server - Retired in API 3.21
+
+# TODO Allow dashboard extension on site - Retired in API 3.21
+# TODO Disallow dashboard extension on site - Retired in API 3.21
+# TODO Get allowed dashboard extension on site - Retired in API 3.21
+# TODO List allowed dashboard extensions on site - Retired in API 3.21
+# TODO Update settings for allowed dashboard extension on site - Retired in API 3.21
 
 ### Analytics Extensions Settings methods
 function Get-TableauAnalyticsExtension {
@@ -8756,22 +8871,22 @@ Param(
     Assert-TableauRestVersion -AtLeast 3.11
     if ($Current.IsPresent) {
         # Get current analytics extension for workbook
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint AnalyticsSetting -Param site/extensions/analytics/workbooks/$WorkbookId/selected_connection) -Method Get
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/analytics/workbooks/$WorkbookId/selected_connection) -Method Get
         Write-Debug $response
         return $response.connectionList
     } elseif ($WorkbookId) {
         # List analytics extension connections of workbook
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint AnalyticsSetting -Param site/extensions/analytics/workbooks/$WorkbookId/connections) -Method Get
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/analytics/workbooks/$WorkbookId/connections) -Method Get
         Write-Debug $response
         return $response.connectionList
     } elseif ($ConnectionId) {
         # Get analytics extension connection details
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint AnalyticsSetting -Param site/extensions/analytics/connections/$ConnectionId) -Method Get
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/analytics/connections/$ConnectionId) -Method Get
         # Write-Debug $response
         return $response
     } else {
         # List analytics extension connections on site
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint AnalyticsSetting -Param site/extensions/analytics/connections) -Method Get
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/analytics/connections) -Method Get
         # Write-Debug $response
         return $response.connectionList
     }
@@ -8863,17 +8978,13 @@ Param(
             $options.password = (New-Object System.Net.NetworkCredential("", $SecurePassword)).Password
         }
         $jsonBody = $options | ConvertTo-Json -Compress -Depth 2
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint AnalyticsSetting -Param site/extensions/analytics/connections/$ConnectionId) -Body $jsonBody -Method Put -ContentType "application/json"
-        # Write-Debug $response
-        return $response
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/analytics/connections/$ConnectionId) -Body $jsonBody -Method Put -ContentType "application/json"
     } elseif ($WorkbookId -and $PSCmdlet.ShouldProcess("Update Analytics Extension (workbook)")) {
         $jsonBody = @{
             workbook_luid=$WorkbookId;
             connection_luid=$ConnectionId
         } | ConvertTo-Json -Compress
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint AnalyticsSetting -Param site/extensions/analytics/workbooks/$WorkbookId/selected_connection) -Body $jsonBody -Method Put -ContentType "application/json"
-        # Write-Debug $response
-        return $response
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/analytics/workbooks/$WorkbookId/selected_connection) -Body $jsonBody -Method Put -ContentType "application/json"
     }
 }
 
@@ -8946,9 +9057,7 @@ Param(
     $jsonBody = $options | ConvertTo-Json -Compress
     Write-Debug $jsonBody
     if ($PSCmdlet.ShouldProcess("Add Analytics Extension (site)")) {
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint AnalyticsSetting -Param site/extensions/analytics/connections) -Body $jsonBody -Method Post -ContentType "application/json"
-        # Write-Debug $response
-        return $response
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/analytics/connections) -Body $jsonBody -Method Post -ContentType "application/json"
     }
 }
 
@@ -8986,9 +9095,9 @@ Param(
     Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.11
     if ($WorkbookId -and $PSCmdlet.ShouldProcess("Remove Analytics Extension (workbook)")) {
-        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint AnalyticsSetting -Param site/extensions/analytics/workbooks/$WorkbookId/selected_connection) -Method Delete
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/analytics/workbooks/$WorkbookId/selected_connection) -Method Delete
     } elseif ($ConnectionId -and $PSCmdlet.ShouldProcess("Remove Analytics Extension (site)")) {
-        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint AnalyticsSetting -Param site/extensions/analytics/connections/$ConnectionId) -Method Delete
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/analytics/connections/$ConnectionId) -Method Delete
     }
 }
 
@@ -9021,7 +9130,7 @@ Param(
 )
     Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.11
-    $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint AnalyticsSetting -Param "$($Scope.ToLower())/extensions/analytics") -Method Get
+    $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param "$($Scope.ToLower())/extensions/analytics") -Method Get
     return $response.enabled.ToString().ToLower()
 }
 
@@ -9061,7 +9170,7 @@ Param(
     Assert-TableauRestVersion -AtLeast 3.11
     $jsonBody = @{enabled=$Enabled} | ConvertTo-Json -Compress
     if ($PSCmdlet.ShouldProcess("Change Analytics Extensions ($Scope) to $Enabled")) {
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint AnalyticsSetting -Param "$($Scope.ToLower())/extensions/analytics") -Body $jsonBody -Method Put -ContentType "application/json"
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param "$($Scope.ToLower())/extensions/analytics") -Body $jsonBody -Method Put -ContentType "application/json"
         return $response.enabled.ToString().ToLower()
     }
 }
@@ -9431,7 +9540,7 @@ List Registered EAS: The unique ID of the registered EAS.
 $list = Get-TableauConnectedAppEAS
 
 .EXAMPLE
-$eas = Get-TableauConnectedApp -EasId $id
+$eas = Get-TableauConnectedAppEAS -EasId $id
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_connected_app.htm#get_connectedapps_eas
@@ -10083,6 +10192,10 @@ Runs the specified GraphQL query through the Tableau Metadata API, including pag
 .PARAMETER Query
 The GraphQL query
 
+.PARAMETER Variables
+The hashtable of query variables values.
+The names of the variables should match to the those defined in the query, otherwise they will be e.g. ignored in filters.
+
 .PARAMETER PaginatedEntity
 If this parameter is provided: modifies the query to implement paginating through results.
 Pagination in Tableau Metadata API is supported on entities ending with "Connection" (edges), such as fieldsConnection, workbooksConnection, etc.
@@ -10101,6 +10214,7 @@ https://help.tableau.com/current/api/metadata_api/en-us/index.html
 [OutputType([PSCustomObject[]])]
 Param(
     [Parameter(Mandatory)][string] $Query,
+    [Parameter()][hashtable] $Variables,
     [Parameter()][string] $PaginatedEntity,
     [Parameter()][ValidateRange(1,20000)][int] $PageSize = 100
 )
@@ -10114,14 +10228,23 @@ Param(
         $hasNextPage = $true
         while ($hasNextPage) {
             if ($endCursor) {
-                $queryPage = $Query -replace $PaginatedEntity, "$PaginatedEntity(first: $PageSize, after: ""$endCursor"")"
+                if ($Query.Contains("$PaginatedEntity(")) {
+                    $queryPage = $Query -replace "$PaginatedEntity\(", "$PaginatedEntity(first: $PageSize, after: ""$endCursor"", "
+                } else {
+                    $queryPage = $Query -replace $PaginatedEntity, "$PaginatedEntity(first: $PageSize, after: ""$endCursor"")"
+                }
             } else {
-                $queryPage = $Query -replace $PaginatedEntity, "$PaginatedEntity(first: $PageSize)"
+                if ($Query.Contains("$PaginatedEntity(")) {
+                    $queryPage = $Query -replace "$PaginatedEntity\(", "$PaginatedEntity(first: $PageSize, "
+                } else {
+                    $queryPage = $Query -replace $PaginatedEntity, "$PaginatedEntity(first: $PageSize)"
+                }
             }
             $jsonQuery = @{
                 query = $queryPage
-                # TODO variables = $null
+                variables = $Variables
             } | ConvertTo-Json
+            # Write-Debug $jsonQuery
             $response = Invoke-TableauRestMethod -Uri $uri -Body $jsonQuery -Method Post -ContentType 'application/json'
             $endCursor = $response.data.$PaginatedEntity.pageInfo.endCursor
             $hasNextPage = $response.data.$PaginatedEntity.pageInfo.hasNextPage
@@ -10139,8 +10262,8 @@ Param(
         }
     } else { # run non-paginated (unmodified) query
         $jsonQuery = @{
-            query = $Query
-            # TODO variables = $null
+            query = $Query;
+            variables = $Variables
         } | ConvertTo-Json
         $response = Invoke-TableauRestMethod -Uri $uri -Body $jsonQuery -Method Post -ContentType 'application/json'
         $entity = $response.data.PSObject.Properties | Select-Object -First 1 -ExpandProperty Name

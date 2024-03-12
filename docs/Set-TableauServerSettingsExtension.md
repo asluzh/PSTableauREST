@@ -2,17 +2,21 @@
 
 ## SYNOPSIS
 Update Tableau extensions server settings
+or
+Update dashboard extensions settings of server - Retired in API 3.21
 
 ## SYNTAX
 
 ```
 Set-TableauServerSettingsExtension [-Enabled] <String> [[-BlockList] <String[]>]
- [-ProgressAction <ActionPreference>] [-WhatIf] [-Confirm] [<CommonParameters>]
+ [[-BlockListLegacyAPI] <PSObject>] [-ProgressAction <ActionPreference>] [-WhatIf] [-Confirm]
+ [<CommonParameters>]
 ```
 
 ## DESCRIPTION
 Updates the settings for extensions of a server.
 This method can only be called by server administrators; it is not available on Tableau Cloud.
+Note: for API prior to 3.21, the method calls a different API endpoint, which returns a JSON object - see online help for more details.
 
 ## EXAMPLES
 
@@ -51,6 +55,21 @@ Aliases:
 
 Required: False
 Position: 2
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -BlockListLegacyAPI
+(Optional) For API prior to 3.21: Object containing the extension block list settings (see online API help).
+
+```yaml
+Type: PSObject
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: 3
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -115,4 +134,6 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 ## RELATED LINKS
 
 [https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_tableau_extensions_settings.htm#update_tableau_extensions_server_settings](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_tableau_extensions_settings.htm#update_tableau_extensions_server_settings)
+
+[https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_dashboard_extensions_settings.htm#DashboardExtensionsServerSettingsService_updateDashboardExtensionsServerSettings](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_dashboard_extensions_settings.htm#DashboardExtensionsServerSettingsService_updateDashboardExtensionsServerSettings)
 
