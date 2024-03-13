@@ -14,7 +14,7 @@ Get-TableauServerSettingsExtension
 ## DESCRIPTION
 Lists the settings for extensions of a server.
 This method can only be called by server administrators; it is not available on Tableau Cloud.
-Note: for API prior to 3.21, the method calls a different API endpoint, which returns a JSON object - see online help for more details.
+Note: for API prior to 3.21, the method calls a different API endpoint, which returns a PSCustomObject from JSON - see online help for more details.
 
 ## EXAMPLES
 

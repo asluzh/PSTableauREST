@@ -2009,7 +2009,7 @@ Param(
         "--$boundaryString--"
         )
     $multipartContent = $bodyLines -join "`r`n"
-    Write-Debug $multipartContent
+    # Write-Debug $multipartContent
 
     $uri = Get-TableauRequestUri -Endpoint User -Param import
     if ($PSCmdlet.ShouldProcess("import users using file $fileName")) {
@@ -2056,7 +2056,7 @@ Param(
         "--$boundaryString--"
         )
     $multipartContent = $bodyLines -join "`r`n"
-    Write-Debug $multipartContent
+    # Write-Debug $multipartContent
 
     $uri = Get-TableauRequestUri -Endpoint User -Param delete
     if ($PSCmdlet.ShouldProcess("delete users using file $fileName")) {
@@ -2064,6 +2064,15 @@ Param(
         return $response.tsResponse.job
     }
 }
+
+# TODO new group set methods - 3.22
+# Add Group to Group Set
+# Create Group Set
+# Delete Group Set
+# Get Group Set
+# Query Group Sets
+# Remove Group from Group Set
+# Update Group Set
 
 ### Publishing methods
 function Send-TableauFileUpload {
@@ -4210,10 +4219,11 @@ Param(
 function Get-TableauCustomViewUserDefault {
 <#
 .SYNOPSIS
-List Users with Custom View as Default
+List Users with Custom View as Default - Preview Release
 
 .DESCRIPTION
 Gets the list of users whose default view is the specified custom view.
+Note: This method is currently available as a preview release in some regions.
 
 .PARAMETER CustomViewId
 The LUID for the custom view.
@@ -4238,10 +4248,11 @@ Param(
 function Set-TableauCustomViewUserDefault {
 <#
 .SYNOPSIS
-Set Custom View as Default for Users
+Set Custom View as Default for Users - Preview release
 
 .DESCRIPTION
 Sets the specified custom for as the default view for up to 100 specified users.
+Note: This method is currently available as a preview release in some regions.
 
 .PARAMETER CustomViewId
 The LUID for the custom view.
@@ -8552,7 +8563,7 @@ List dashboard extension settings of server - Retired in API 3.21
 .DESCRIPTION
 Lists the settings for extensions of a server.
 This method can only be called by server administrators; it is not available on Tableau Cloud.
-Note: for API prior to 3.21, the method calls a different API endpoint, which returns a JSON object - see online help for more details.
+Note: for API prior to 3.21, the method calls a different API endpoint, which returns a PSCustomObject from JSON - see online help for more details.
 
 .EXAMPLE
 $settings = Get-TableauServerSettingsExtension
@@ -8572,11 +8583,6 @@ Param()
     } else {
         Assert-TableauRestVersion -AtLeast 3.11
         Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param server/extensions/dashboard) -Method Get
-        # return result in the structure of API 3.21
-        # return @{
-        #     extensionsGloballyEnabled=$response.extensions_enabled.ToString().ToLower();
-        #     block_list_items=$response.block_list_items;
-        # }
     }
 }
 
@@ -8590,7 +8596,7 @@ Update dashboard extensions settings of server - Retired in API 3.21
 .DESCRIPTION
 Updates the settings for extensions of a server.
 This method can only be called by server administrators; it is not available on Tableau Cloud.
-Note: for API prior to 3.21, the method calls a different API endpoint, which returns a JSON object - see online help for more details.
+Note: for API prior to 3.21, the method calls a different API endpoint, which returns a PSCustomObject from JSON - see online help for more details.
 
 .PARAMETER Enabled
 True/false. True: extensions are allowed to run on the server. False: all extendions are disabled on the server.
@@ -8642,14 +8648,11 @@ Param(
         if ($BlockListLegacyAPI) {
             $options.block_list_items = $BlockListLegacyAPI
         }
-        $jsonBody = $Settings | ConvertTo-Json -Compress -Depth 2
+        $jsonBody = $options | ConvertTo-Json -Compress -Depth 2
         # Write-Debug $jsonBody
-        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param server/extensions/dashboard) -Body $jsonBody -Method Put -ContentType "application/json"
-        # return result in the structure of API 3.21
-        # return @{
-        #     extensionsGloballyEnabled=$response.extensions_enabled.ToString().ToLower();
-        #     block_list_items=$response.block_list_items;
-        # }
+        if ($PSCmdlet.ShouldProcess("Server Extensions: $Enabled")) {
+            Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param server/extensions/dashboard) -Body $jsonBody -Method Put -ContentType "application/json"
+        }
     }
 }
 
@@ -8663,7 +8666,7 @@ List dashboard extension settings of site - Retired in API 3.21
 .DESCRIPTION
 Lists the settings for extensions of a site.
 This method can only be called by site or server administrators.
-Note: for API prior to 3.21, the method calls a different API endpoint, which returns a JSON object - see online help for more details.
+Note: for API prior to 3.21, the method calls a different API endpoint, which returns a PSCustomObject from JSON - see online help for more details.
 
 .EXAMPLE
 $settings = Get-TableauSiteSettingsExtension
@@ -8683,22 +8686,6 @@ Param()
     } else {
         Assert-TableauRestVersion -AtLeast 3.11
         Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/dashboard) -Method Get
-        # return result in the structure of API 3.21
-        # $safeList = @()
-        # if ($response.safe_list_items) {
-        #     foreach ($sl in $response.safe_list_items) {
-        #         $safeList += @{
-        #             url=$sl.url;
-        #             fullDataAllowed=$sl.allow_full_data;
-        #             promptNeeded=$sl.prompt_needed;
-        #         }
-        #     }
-        # }
-        # return @{
-        #     extensionsEnabled=$response.extensions_enabled.ToString().ToLower();
-        #     useDefaultSetting=$response.allow_sandboxed.ToString().ToLower();
-        #     safeList=$safeList;
-        # }
     }
 }
 
@@ -8712,7 +8699,7 @@ Update dashboard extension settings of site - Retired in API 3.21
 .DESCRIPTION
 Updates the settings for extensions of a site.
 This method can only be called by site or server administrators.
-Note: for API prior to 3.21, the method calls a different API endpoint, which returns a JSON object - see online help for more details.
+Note: for API prior to 3.21, the method calls a different API endpoint, which returns a PSCustomObject from JSON - see online help for more details.
 
 .PARAMETER Enabled
 True/false. True: extensions are allowed to run on the site.
@@ -8784,36 +8771,295 @@ Param(
         }
         $jsonBody = $options | ConvertTo-Json -Compress -Depth 2
         # Write-Debug $jsonBody
-        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/dashboard) -Body $jsonBody -Method Put -ContentType "application/json"
-        # return result in the structure of API 3.21
-        # $safeList = @()
-        # if ($response.safe_list_items) {
-        #     foreach ($sl in $response.safe_list_items) {
-        #         $safeList += @{
-        #             url=$sl.url;
-        #             fullDataAllowed=$sl.allow_full_data;
-        #             promptNeeded=$sl.prompt_needed;
-        #         }
-        #     }
-        # }
-        # return @{
-        #     extensionsEnabled=$response.extensions_enabled.ToString().ToLower();
-        #     useDefaultSetting=$response.allow_sandboxed.ToString().ToLower();
-        #     safeList=$safeList;
-        # }
+        if ($PSCmdlet.ShouldProcess("Site Extensions: $Enabled")) {
+            Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/dashboard) -Body $jsonBody -Method Put -ContentType "application/json"
+        }
     }
 }
 
-# TODO Block dashboard extension on server - Retired in API 3.21
-# TODO Unblock dashboard extension on server - Retired in API 3.21
-# TODO Get blocked dashboard extension on server - Retired in API 3.21
-# TODO List blocked dashboard extensions on server - Retired in API 3.21
+### Dashboard Extensions Settings methods - introduced in API 3.11, retired in API 3.21
+function Get-TableauServerSettingsBlockedExtension {
+<#
+.SYNOPSIS
+List blocked dashboard extensions on server - Retired in API 3.21
+or
+Get blocked dashboard extension on server - Retired in API 3.21
 
-# TODO Allow dashboard extension on site - Retired in API 3.21
-# TODO Disallow dashboard extension on site - Retired in API 3.21
-# TODO Get allowed dashboard extension on site - Retired in API 3.21
-# TODO List allowed dashboard extensions on site - Retired in API 3.21
-# TODO Update settings for allowed dashboard extension on site - Retired in API 3.21
+.DESCRIPTION
+Lists the dashboard extensions on the blocked list of a server, or retrieves the details of a blocked extension.
+This method can only be called by server administrators; it is not available on Tableau Cloud.
+This method returns a PSCustomObject from JSON - see online help for more details.
+
+.PARAMETER ExtensionId
+(Optional) The unique ID of the extension on the blocked list.
+
+.EXAMPLE
+$settings = Get-TableauServerSettingsBlockedExtension
+
+.EXAMPLE
+$ext = Get-TableauServerSettingsBlockedExtension -ExtensionId $eid
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_dashboard_extensions_settings.htm#DashboardExtensionsServerSettingsService_getDashboardExtensionsBlockListItems
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_dashboard_extensions_settings.htm#DashboardExtensionsServerSettingsService_getDashboardExtensionsBlockListItem
+#>
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter()][string] $ExtensionId
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.11 -LessThan 3.21
+    if ($ExtensionId) {
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param server/extensions/dashboard/blockListItems/$ExtensionId) -Method Get
+    } else {
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param server/extensions/dashboard/blockListItems) -Method Get
+    }
+}
+
+function Add-TableauServerSettingsBlockedExtension {
+<#
+.SYNOPSIS
+Block dashboard extension on server - Retired in API 3.21
+
+.DESCRIPTION
+Adds a dashboard extension to the block list of a server.
+This method can only be called by server administrators; it is not available on Tableau Cloud.
+This method returns a PSCustomObject from JSON - see online help for more details.
+
+.PARAMETER ExtensionUrl
+Location of the dashboard extension to be blocked from a site.
+
+.PARAMETER ExtensionId
+The unique ID of the extension on the blocked list.
+
+.EXAMPLE
+$ext = Add-TableauServerSettingsBlockedExtension -ExtensionUrl 'https://test.com'
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_dashboard_extensions_settings.htm#DashboardExtensionsServerSettingsService_createDashboardExtensionsBlockListItem
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $ExtensionUrl
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.11 -LessThan 3.21
+    $options = @{
+        url=$ExtensionUrl;
+    }
+    $jsonBody = $options | ConvertTo-Json -Compress -Depth 2
+    # Write-Debug $jsonBody
+    if ($PSCmdlet.ShouldProcess($ExtensionUrl)) {
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param server/extensions/dashboard/blockListItems) -Body $jsonBody -Method Post -ContentType "application/json"
+    }
+}
+
+function Remove-TableauServerSettingsBlockedExtension {
+<#
+.SYNOPSIS
+Unblock dashboard extension on server - Retired in API 3.21
+
+.DESCRIPTION
+Deletes a specific extension from the block list of a server.
+This method can only be called by server administrators; it is not available on Tableau Cloud.
+This method returns a PSCustomObject from JSON - see online help for more details.
+
+.PARAMETER ExtensionId
+The unique ID of the extension on the blocked list.
+
+.EXAMPLE
+$response = Remove-TableauServerSettingsBlockedExtension -ExtensionId $eid
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_dashboard_extensions_settings.htm#DashboardExtensionsServerSettingsService_deleteDashboardExtensionsBlockListItem
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $ExtensionId
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.11 -LessThan 3.21
+    if ($PSCmdlet.ShouldProcess($ExtensionId)) {
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param server/extensions/dashboard/blockListItems/$ExtensionId) -Method Delete
+    }
+}
+
+function Get-TableauSiteSettingsAllowedExtension {
+<#
+.SYNOPSIS
+List allowed dashboard extensions on site - Retired in API 3.21
+or
+Get allowed dashboard extension on site - Retired in API 3.21
+
+.DESCRIPTION
+Lists the dashboard extensions on the safe list of the site you are signed into, or
+Gets the details of a specific dashboard extension on the safe list of the site you are signed into.
+This method is retired and is not available on Tableau Cloud.
+This method returns a PSCustomObject from JSON - see online help for more details.
+
+.PARAMETER ExtensionId
+(Optional) The unique ID of the extension on the allowed list.
+
+.EXAMPLE
+$settings = Get-TableauSiteSettingsAllowedExtension
+
+.EXAMPLE
+$ext = Get-TableauSiteSettingsAllowedExtension -ExtensionId $eid
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_dashboard_extensions_settings.htm#DashboardExtensionsServerSettingsService_getDashboardExtensionsSafeListItems
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_dashboard_extensions_settings.htm#DashboardExtensionsSiteSettingsService_getDashboardExtensionsSafeListItem
+#>
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter()][string] $ExtensionId
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.11 -LessThan 3.21
+    if ($ExtensionId) {
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/dashboard/safeListItems/$ExtensionId) -Method Get
+    } else {
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/dashboard/safeListItems) -Method Get
+    }
+}
+
+function Set-TableauSiteSettingsAllowedExtension {
+<#
+.SYNOPSIS
+Update settings for allowed dashboard extension on site - Retired in API 3.21
+
+.DESCRIPTION
+Updates the settings of a specific dashboard extension in the safe list of the site you are signed into.
+This method is retired and is not available on Tableau Cloud.
+This method returns a PSCustomObject from JSON - see online help for more details.
+
+.PARAMETER ExtensionId
+The unique ID of the extension on the allowed list.
+
+.PARAMETER ExtensionUrl
+Location (URL) of the dashboard extension to be allowed on a site.
+
+.PARAMETER AllowFullData
+When true, the extension has access to underlying data of a workbook.
+This setting is only effective when the extension is on the site safe list.
+
+.PARAMETER PromptNeeded
+When true, the user will be prompted to grant an extension access to the underlying data of a workbook.
+This setting is only effective when the extension is on the site safe list.
+
+.EXAMPLE
+$ext = Set-TableauSiteSettingsAllowedExtension -ExtensionId $eid -ExtensionUrl "https://test.com" -AllowFullData false -PromptNeeded false
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_dashboard_extensions_settings.htm#DashboardExtensionsSiteSettingsService_updateDashboardExtensionsSafeListItem
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $ExtensionId,
+    [Parameter(Mandatory)][string] $ExtensionUrl,
+    [Parameter(Mandatory)][ValidateSet('true','false')][string] $AllowFullData,
+    [Parameter(Mandatory)][ValidateSet('true','false')][string] $PromptNeeded
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.11 -LessThan 3.21
+    $options = @{
+        safe_list_item_luid=$ExtensionId;
+        url=$ExtensionUrl;
+        allow_full_data=$AllowFullData;
+        prompt_needed=$PromptNeeded;
+    }
+    $jsonBody = $options | ConvertTo-Json -Compress -Depth 2
+    # Write-Debug $jsonBody
+    if ($PSCmdlet.ShouldProcess($ExtensionId)) {
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/dashboard/safeListItems/$ExtensionId) -Body $jsonBody -Method Put -ContentType "application/json"
+    }
+}
+
+function Add-TableauSiteSettingsAllowedExtension {
+<#
+.SYNOPSIS
+Allow dashboard extension on site - Retired in API 3.21
+
+.DESCRIPTION
+Adds a dashboard extension to the safe list of the site you are signed into.
+This method is retired and is not available on Tableau Cloud.
+This method returns a PSCustomObject from JSON - see online help for more details.
+
+.PARAMETER ExtensionUrl
+Location (URL) of the dashboard extension to be allowed on a site.
+
+.PARAMETER AllowFullData
+When true, the extension has access to underlying data of a workbook.
+This setting is only effective when the extension is on the site safe list.
+
+.PARAMETER PromptNeeded
+When true, the user will be prompted to grant an extension access to the underlying data of a workbook.
+This setting is only effective when the extension is on the site safe list.
+
+.EXAMPLE
+$ext = Add-TableauSiteSettingsAllowedExtension -ExtensionUrl "https://test.com" -AllowFullData false -PromptNeeded false
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_dashboard_extensions_settings.htm#DashboardExtensionsServerSettingsService_createDashboardExtensionsBlockListItem
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $ExtensionUrl,
+    [Parameter(Mandatory)][ValidateSet('true','false')][string] $AllowFullData,
+    [Parameter(Mandatory)][ValidateSet('true','false')][string] $PromptNeeded
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.11 -LessThan 3.21
+    $options = @{
+        url=$ExtensionUrl;
+        allow_full_data=$AllowFullData;
+        prompt_needed=$PromptNeeded;
+    }
+    $jsonBody = $options | ConvertTo-Json -Compress -Depth 2
+    # Write-Debug $jsonBody
+    if ($PSCmdlet.ShouldProcess($ExtensionUrl)) {
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/dashboard/safeListItems) -Body $jsonBody -Method Post -ContentType "application/json"
+    }
+}
+
+function Remove-TableauSiteSettingsAllowedExtension {
+<#
+.SYNOPSIS
+Disallow dashboard extension on site - Retired in API 3.21
+
+.DESCRIPTION
+Deletes a specific dashboard extension from the safe list of the site you are signed into.
+This method is retired and is not available on Tableau Cloud.
+This method returns a PSCustomObject from JSON - see online help for more details.
+
+.PARAMETER ExtensionId
+The unique ID of the extension on the allowed list.
+
+.EXAMPLE
+$response = Remove-TableauSiteSettingsAllowedExtension -ExtensionId $eid
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_dashboard_extensions_settings.htm#DashboardExtensionsServerSettingsService_deleteDashboardExtensionsBlockListItem
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $ExtensionId
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.11 -LessThan 3.21
+    if ($PSCmdlet.ShouldProcess($ExtensionId)) {
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/dashboard/safeListItems/$ExtensionId) -Method Delete
+    }
+}
 
 ### Analytics Extensions Settings methods
 function Get-TableauAnalyticsExtension {
@@ -8831,6 +9077,7 @@ Get current analytics extension for workbook
 Retrieves a list of configured analytics extensions for a site or workbook
 or
 Retrieves the details of the configured analytics extension for a site or workbook
+This method returns a PSCustomObject (from JSON response) - see online help for more details.
 
 .PARAMETER ConnectionId
 The LUID of the connection to get the details for.

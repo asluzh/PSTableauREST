@@ -1,36 +1,32 @@
-# Set-TableauServerSettingsExtension
+# Set-TableauSiteSettingsAllowedExtension
 
 ## SYNOPSIS
-Update Tableau extensions server settings
-or
-Update dashboard extensions settings of server - Retired in API 3.21
+Update settings for allowed dashboard extension on site - Retired in API 3.21
 
 ## SYNTAX
 
 ```
-Set-TableauServerSettingsExtension [-Enabled] <String> [[-BlockList] <String[]>]
- [[-BlockListLegacyAPI] <PSObject>] [-ProgressAction <ActionPreference>] [-WhatIf] [-Confirm]
+Set-TableauSiteSettingsAllowedExtension [-ExtensionId] <String> [-ExtensionUrl] <String>
+ [-AllowFullData] <String> [-PromptNeeded] <String> [-ProgressAction <ActionPreference>] [-WhatIf] [-Confirm]
  [<CommonParameters>]
 ```
 
 ## DESCRIPTION
-Updates the settings for extensions of a server.
-This method can only be called by server administrators; it is not available on Tableau Cloud.
-Note: for API prior to 3.21, the method calls a different API endpoint, which returns a PSCustomObject from JSON - see online help for more details.
+Updates the settings of a specific dashboard extension in the safe list of the site you are signed into.
+This method is retired and is not available on Tableau Cloud.
+This method returns a PSCustomObject from JSON - see online help for more details.
 
 ## EXAMPLES
 
 ### EXAMPLE 1
 ```
-$settings = Set-TableauServerSettingsExtension -Enabled true -BlockList 'https://test.com'
+$ext = Set-TableauSiteSettingsAllowedExtension -ExtensionId $eid -ExtensionUrl "https://test.com" -AllowFullData false -PromptNeeded false
 ```
 
 ## PARAMETERS
 
-### -Enabled
-True/false.
-True: extensions are allowed to run on the server.
-False: all extendions are disabled on the server.
+### -ExtensionId
+The unique ID of the extension on the allowed list.
 
 ```yaml
 Type: String
@@ -44,32 +40,48 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -BlockList
-(Optional) List of domains that are not allowed to serve extensions to the Tableau Server.
-Domains are in the form of https://blocked_example.com
+### -ExtensionUrl
+Location (URL) of the dashboard extension to be allowed on a site.
 
 ```yaml
-Type: String[]
+Type: String
 Parameter Sets: (All)
 Aliases:
 
-Required: False
+Required: True
 Position: 2
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -BlockListLegacyAPI
-(Optional) For API prior to 3.21: Object containing the extension block list settings (see online API help).
+### -AllowFullData
+When true, the extension has access to underlying data of a workbook.
+This setting is only effective when the extension is on the site safe list.
 
 ```yaml
-Type: PSObject
+Type: String
 Parameter Sets: (All)
 Aliases:
 
-Required: False
+Required: True
 Position: 3
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -PromptNeeded
+When true, the user will be prompted to grant an extension access to the underlying data of a workbook.
+This setting is only effective when the extension is on the site safe list.
+
+```yaml
+Type: String
+Parameter Sets: (All)
+Aliases:
+
+Required: True
+Position: 4
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -133,7 +145,5 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## RELATED LINKS
 
-[https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_tableau_extensions_settings.htm#update_tableau_extensions_server_settings](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_tableau_extensions_settings.htm#update_tableau_extensions_server_settings)
-
-[https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_dashboard_extensions_settings.htm#DashboardExtensionsServerSettingsService_updateDashboardExtensionsServerSettings](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_dashboard_extensions_settings.htm#DashboardExtensionsServerSettingsService_updateDashboardExtensionsServerSettings)
+[https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_dashboard_extensions_settings.htm#DashboardExtensionsSiteSettingsService_updateDashboardExtensionsSafeListItem](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_dashboard_extensions_settings.htm#DashboardExtensionsSiteSettingsService_updateDashboardExtensionsSafeListItem)
 

@@ -1,7 +1,7 @@
 # Get-TableauCustomViewUserDefault
 
 ## SYNOPSIS
-List Users with Custom View as Default
+List Users with Custom View as Default - Preview Release
 
 ## SYNTAX
 
@@ -12,6 +12,7 @@ Get-TableauCustomViewUserDefault [-CustomViewId] <String> [-ProgressAction <Acti
 
 ## DESCRIPTION
 Gets the list of users whose default view is the specified custom view.
+Note: This method is currently available as a preview release in some regions.
 
 ## EXAMPLES
 

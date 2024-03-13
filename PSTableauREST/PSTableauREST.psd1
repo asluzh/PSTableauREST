@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.6.0'
+ModuleVersion = '0.6.1'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -126,10 +126,13 @@ FunctionsToExport = @(
 # Add Metric to Favorites - retired in API 3.22
 ### Subscription methods
 'Get-TableauSubscription', 'New-TableauSubscription', 'Set-TableauSubscription', 'Remove-TableauSubscription',
-### Dashboard Extensions Settings methods - introduced in API 3.8, retired in API 3.21
 ### Tableau Extensions Settings Methods - introduced in API 3.21
 'Get-TableauServerSettingsExtension', 'Set-TableauServerSettingsExtension',
 'Get-TableauSiteSettingsExtension', 'Set-TableauSiteSettingsExtension',
+### Dashboard Extensions Settings methods - introduced in API 3.11, retired in API 3.21
+'Get-TableauServerSettingsBlockedExtension','Add-TableauServerSettingsBlockedExtension','Remove-TableauServerSettingsBlockedExtension',
+'Get-TableauSiteSettingsAllowedExtension','Set-TableauSiteSettingsAllowedExtension',
+'Add-TableauSiteSettingsAllowedExtension','Remove-TableauSiteSettingsAllowedExtension',
 ### Analytics Extensions Settings methods - introduced in API 3.11
 'Get-TableauAnalyticsExtension', 'Set-TableauAnalyticsExtension',
 'New-TableauAnalyticsExtension', 'Remove-TableauAnalyticsExtension',
@@ -162,7 +165,7 @@ FunctionsToExport = @(
 ### Ask Data Lens methods - retired in API 3.22
 ### Metrics methods - retired in API 3.22
 
-### Identity Pools methods
+### Identity Pools methods - introduced in API 3.19
 # List Authentication Configurations
 # Create Authentication Configuration
 # Update Authentication Configuration
@@ -265,6 +268,17 @@ FunctionsToExport = @(
 # - Get a specified batch of subscriptions to a metric
 # - Create subscriptions for a batch of users or groups to a metric
 # - Get a count of followers for a specified batch of subscriptions to a metric
+
+### Mobile Settings Methods - introduced in API 3.19
+# Get Mobile Security Settings for Server
+# Get Mobile Security Settings for Site
+# Update Mobile Security Settings for Site
+
+### OpenID Connect Methods - introduced in API 3.22
+# Create OpenID Connect Configuration
+# Get OpenID Connect Configuration
+# Remove OpenID Connect Configuration
+# Update OpenID Connect Configuration
 )
 # see also: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_whats_new.htm#added-in-rest-api-315-for-tableau-server-20221-and-tableau-cloud
 

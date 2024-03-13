@@ -14,7 +14,7 @@ Get-TableauSiteSettingsExtension
 ## DESCRIPTION
 Lists the settings for extensions of a site.
 This method can only be called by site or server administrators.
-Note: for API prior to 3.21, the method calls a different API endpoint, which returns a JSON object - see online help for more details.
+Note: for API prior to 3.21, the method calls a different API endpoint, which returns a PSCustomObject from JSON - see online help for more details.
 
 ## EXAMPLES
 

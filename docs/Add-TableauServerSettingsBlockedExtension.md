@@ -1,30 +1,31 @@
-# Set-TableauCustomViewUserDefault
+# Add-TableauServerSettingsBlockedExtension
 
 ## SYNOPSIS
-Set Custom View as Default for Users - Preview release
+Block dashboard extension on server - Retired in API 3.21
 
 ## SYNTAX
 
 ```
-Set-TableauCustomViewUserDefault [-CustomViewId] <String> [-UserId] <String[]>
- [-ProgressAction <ActionPreference>] [-WhatIf] [-Confirm] [<CommonParameters>]
+Add-TableauServerSettingsBlockedExtension [-ExtensionUrl] <String> [-ProgressAction <ActionPreference>]
+ [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
-Sets the specified custom for as the default view for up to 100 specified users.
-Note: This method is currently available as a preview release in some regions.
+Adds a dashboard extension to the block list of a server.
+This method can only be called by server administrators; it is not available on Tableau Cloud.
+This method returns a PSCustomObject from JSON - see online help for more details.
 
 ## EXAMPLES
 
 ### EXAMPLE 1
 ```
-$result = Set-TableauCustomViewUserDefault -CustomViewId $id -UserId $user1,$user2
+$ext = Add-TableauServerSettingsBlockedExtension -ExtensionUrl 'https://test.com'
 ```
 
 ## PARAMETERS
 
-### -CustomViewId
-The LUID for the custom view.
+### -ExtensionUrl
+Location of the dashboard extension to be blocked from a site.
 
 ```yaml
 Type: String
@@ -33,21 +34,6 @@ Aliases:
 
 Required: True
 Position: 1
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -UserId
-List of user LUIDs.
-
-```yaml
-Type: String[]
-Parameter Sets: (All)
-Aliases:
-
-Required: True
-Position: 2
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -106,10 +92,10 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## OUTPUTS
 
-### System.Management.Automation.PSObject[]
+### System.Management.Automation.PSObject
 ## NOTES
 
 ## RELATED LINKS
 
-[https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#set_custom_view_as_default_for_users](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#set_custom_view_as_default_for_users)
+[https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_dashboard_extensions_settings.htm#DashboardExtensionsServerSettingsService_createDashboardExtensionsBlockListItem](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_dashboard_extensions_settings.htm#DashboardExtensionsServerSettingsService_createDashboardExtensionsBlockListItem)
 

@@ -32,6 +32,7 @@ Get-TableauAnalyticsExtension -WorkbookId <String> [-ProgressAction <ActionPrefe
 Retrieves a list of configured analytics extensions for a site or workbook
 or
 Retrieves the details of the configured analytics extension for a site or workbook
+This method returns a PSCustomObject (from JSON response) - see online help for more details.
 
 ## EXAMPLES
 
