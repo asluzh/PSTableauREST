@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.6.1'
+ModuleVersion = '0.6.2'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -88,6 +88,9 @@ FunctionsToExport = @(
 'Get-TableauGroup', 'New-TableauGroup', 'Set-TableauGroup', 'Remove-TableauGroup',
 'Add-TableauUserToGroup', 'Remove-TableauUserFromGroup', 'Get-TableauUsersInGroup', 'Get-TableauGroupsForUser',
 'Import-TableauUsersCsv', 'Remove-TableauUsersCsv',
+# new group set methods - API 3.22
+'Get-TableauGroupSet','New-TableauGroupSet','Set-TableauGroupSet','Remove-TableauGroupSet',
+'Add-TableauGroupToGroupSet','Remove-TableauGroupFromGroupSet',
 ### Publishing methods
 'Send-TableauFileUpload',
 ### Workbooks methods
@@ -295,6 +298,7 @@ AliasesToExport = @('Login-TableauServer','Logout-TableauServer',
 'Query-TableauProject','Update-TableauProject',
 'Query-TableauUser','Add-TableauUser','Update-TableauUser',
 'Query-TableauGroup','Add-TableauGroup','Update-TableauGroup',
+'Add-TableauGroupSet','Update-TableauGroupSet',
 'Query-TableauWorkbook','Update-TableauWorkbook',
 'Query-TableauWorkbooksForUser','Update-TableauWorkbookConnection',
 'Download-TableauWorkbook','Upload-TableauWorkbook','Download-TableauWorkbookToFormat',

@@ -130,8 +130,8 @@ Expand ValidateSet to add support for more Endpoints.
 Param(
     [Parameter(Mandatory)][ValidateSet('Auth','Site','Session','Domain',
         'Setting','ServerSetting','ExtensionSetting','ConnectedApp','EAS',
-        'Project','User','Group','Workbook','Datasource','View','Flow','FileUpload',
-        'Recommendation','CustomView','Favorite','OrderFavorite',
+        'Project','User','Group','Groupset','Workbook','Datasource','View','Flow',
+        'FileUpload','Recommendation','CustomView','Favorite','OrderFavorite',
         'Schedule','ServerSchedule','Job','Task','Subscription','DataAlert',
         'Database','Table','GraphQL')][string] $Endpoint,
     [Parameter()][string] $Param
@@ -2065,14 +2065,268 @@ Param(
     }
 }
 
-# TODO new group set methods - 3.22
-# Add Group to Group Set
-# Create Group Set
-# Delete Group Set
-# Get Group Set
-# Query Group Sets
-# Remove Group from Group Set
-# Update Group Set
+function Get-TableauGroupSet {
+<#
+.SYNOPSIS
+Query Group Sets
+or
+Get Group Set
+
+.DESCRIPTION
+Lists all group sets matching optional filter and ordered by optional sort expression.
+or
+Returns information about the specified group set including ID, name, and member groups.
+
+.PARAMETER GroupSetId
+Get Group Set: specifies the LUID of the group set.
+
+.PARAMETER ResultLevel
+(Optional) tbd
+
+.PARAMETER Filter
+(Optional)
+An expression that lets you specify a subset of data records to return.
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#groups
+
+.PARAMETER Sort
+(Optional)
+An expression that lets you specify the order in which data is returned.
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm#groups
+
+.PARAMETER Fields
+(Optional)
+An expression that lets you specify which data attributes are included in response.
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_fields.htm#query_groups
+
+.PARAMETER PageSize
+(Optional) Page size when paging through results.
+
+.EXAMPLE
+$group = Get-TableauGroupSet -Filter "name:eq:$groupSet"
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#query_group_sets
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#get_group_set
+#>
+[Alias('Query-TableauGroupSet')]
+[OutputType([PSCustomObject[]])]
+Param(
+    [Parameter(Mandatory,ParameterSetName='GroupsetById')][string] $GroupSetId,
+    [Parameter(ParameterSetName='Groupsets')][ValidateSet('member','local')][string] $ResultLevel,
+    [Parameter(ParameterSetName='Groupsets')][string[]] $Filter,
+    [Parameter(ParameterSetName='Groupsets')][string[]] $Sort,
+    [Parameter(ParameterSetName='Groupsets')][string[]] $Fields,
+    [Parameter(ParameterSetName='Groupsets')][ValidateRange(1,100)][int] $PageSize = 100
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.22
+    if ($GroupSetId) { # Get Group Set
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Groupset -Param $GroupSetId) -Method Get
+        $response.tsResponse.groupSet
+    } else { # Query Group Sets
+        $pageNumber = 0
+        do {
+            $pageNumber++
+            $uri = Get-TableauRequestUri -Endpoint Groupset
+            $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
+            $uriParam.Add("pageSize", $PageSize)
+            $uriParam.Add("pageNumber", $pageNumber)
+            if ($ResultLevel) {
+                $uriParam.Add("resultlevel", $ResultLevel)
+            }
+            if ($Filter) {
+                $uriParam.Add("filter", $Filter -join ',')
+            }
+            if ($Sort) {
+                $uriParam.Add("sort", $Sort -join ',')
+            }
+            if ($Fields) {
+                $uriParam.Add("fields", $Fields -join ',')
+            }
+            $uriRequest = [System.UriBuilder]$uri
+            $uriRequest.Query = $uriParam.ToString()
+            $response = Invoke-TableauRestMethod -Uri $uriRequest.Uri.OriginalString -Method Get
+            $totalAvailable = $response.tsResponse.pagination.totalAvailable
+            $response.tsResponse.groupSets.groupSet
+        } until ($PageSize*$pageNumber -ge $totalAvailable)
+    }
+}
+
+function New-TableauGroupSet {
+<#
+.SYNOPSIS
+Create Group Set
+
+.DESCRIPTION
+Creates a group set with a specified name.
+
+.PARAMETER Name
+The name for the new group set.
+
+.EXAMPLE
+$group = New-TableauGroupSet -Name $groupSetName
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#create_group_set
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[Alias('Add-TableauGroupSet')]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $Name
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.22
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_groupset = $tsRequest.AppendChild($xml.CreateElement("groupSet"))
+    $el_groupset.SetAttribute("name", $Name)
+    if ($PSCmdlet.ShouldProcess($Name)) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Groupset) -Body $xml.OuterXml -Method Post
+        return $response.tsResponse.groupSet
+    }
+}
+
+function Set-TableauGroupSet {
+<#
+.SYNOPSIS
+Update Group Set
+
+.DESCRIPTION
+Updates a group set name on a Tableau Server or Tableau Cloud site.
+If a Tableau Server or Tableau Cloud site is configured to use local authentication, the method lets you update the group name.
+If Tableau Server is configured to use Active Directory authentication, the method synchronizes the group with Active Directory.
+
+.PARAMETER GroupSetId
+The LUID of the group set to update.
+
+.PARAMETER Name
+(Optional) The new name for the group set.
+
+.EXAMPLE
+$groupset = Set-TableauGroupSet -GroupSetId $groupSetId -Name $newName
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#update_group_set
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauGroupSet')]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $GroupSetId,
+    [Parameter()][string] $Name
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.22
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_groupset = $tsRequest.AppendChild($xml.CreateElement("groupSet"))
+    $el_groupset.SetAttribute("name", $Name)
+    if ($PSCmdlet.ShouldProcess($GroupSetId)) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Groupset -Param $GroupSetId) -Body $xml.OuterXml -Method Put
+        return $response.tsResponse.groupSet
+    }
+}
+
+function Remove-TableauGroupSet {
+<#
+.SYNOPSIS
+Delete Group Set
+
+.DESCRIPTION
+Deletes the group set on a specific site.
+Deleting a group set doesn’t delete the users in the group set, but users are no longer members of the group set.
+Any permissions that were previously assigned to the group set no longer apply.
+
+.PARAMETER GroupSetId
+The LUID of the group set to delete.
+
+.EXAMPLE
+$response = Remove-TableauGroupSet -GroupSetId $gsId
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#delete_group_set
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $GroupSetId
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.22
+    if ($PSCmdlet.ShouldProcess($GroupSetId)) {
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Groupset -Param $GroupSetId) -Method Delete
+    }
+}
+
+function Add-TableauGroupToGroupSet {
+<#
+.SYNOPSIS
+Add Group to Group Set
+
+.DESCRIPTION
+Adds group to a group set.
+
+.PARAMETER GroupId
+The LUID of the group to add.
+
+.PARAMETER GroupSetId
+The LUID of the group set to add the group to.
+
+.EXAMPLE
+$result = Add-TableauGroupToGroupSet -GroupId $groupId -GroupSetId $gsId
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#add_group_to_group_set
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $GroupId,
+    [Parameter(Mandatory)][string] $GroupSetId
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.22
+    if ($PSCmdlet.ShouldProcess("group:$GroupId, group set:$GroupSetId")) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Groupset -Param $GroupSetId/groups/$GroupId) -Method Put
+        return $response #.tsResponse
+    }
+}
+
+function Remove-TableauGroupFromGroupSet {
+<#
+.SYNOPSIS
+Remove Group from Group Set
+
+.DESCRIPTION
+Removes a group from the specified group set.
+
+.PARAMETER GroupId
+The LUID of the group to remove.
+
+.PARAMETER GroupSetId
+The LUID of the group set to remove the group from.
+
+.EXAMPLE
+$response = Remove-TableauGroupFromGroupSet -GroupId $groupId -GroupSetId $gsId
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#remove_group_from_group_set
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $GroupId,
+    [Parameter(Mandatory)][string] $GroupSetId
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.22
+    if ($PSCmdlet.ShouldProcess("group:$GroupId, group set:$GroupSetId")) {
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Groupset -Param $GroupSetId/groups/$GroupId) -Method Delete
+    }
+}
 
 ### Publishing methods
 function Send-TableauFileUpload {

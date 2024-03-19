@@ -854,6 +854,23 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 ($groups | Measure-Object).Count | Should -Be 1
                 ($groups | Get-Member -MemberType Property | Measure-Object).Count | Should -BeGreaterOrEqual 2
             }
+            # It "Add new group set on <ConfigFile.server>" { # note: Tableau Cloud isn't permitting to use group sets
+            #     $groupSetName = New-Guid
+            #     $groupSet = New-TableauGroupSet -Name $groupSetName
+            #     $groupSet.id | Should -BeOfType String
+            #     $script:testGroupSetId = $groupSet.id
+            # }
+            It "Update group <testGroupId> on <ConfigFile.server>" {
+                $groupName = New-Guid
+                $group = Set-TableauGroup -GroupId $script:testGroupId -Name $groupName
+                $group.id | Should -Be $script:testGroupId
+                $group.name | Should -Be $groupName
+            }
+            # It "Remove group set <testGroupSetId> on <ConfigFile.server>" { # note: Tableau Cloud isn't permitting to use group sets
+            #     $response = Remove-TableauGroupSet -GroupSetId $script:testGroupSetId
+            #     $response | Should -BeOfType String
+            #     $script:testGroupSetId = $null
+            # }
             It "Remove group <testGroupId> on <ConfigFile.server>" {
                 $response = Remove-TableauGroup -GroupId $script:testGroupId
                 $response | Should -BeOfType String
