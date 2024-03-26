@@ -1,9 +1,3 @@
-BeforeAll {
-    #Requires -Modules PSScriptAnalyzer
-    # Import-Module PSScriptAnalyzer
-    # $script:VerbosePreference = 'Continue' # display verbose output of the tests
-    $script:DebugPreference = 'Continue' # display debug output of the tests
-}
 BeforeDiscovery {
     $script:ParentDir = (Get-Item $PSCommandPath).Directory.Parent.FullName
     $script:ModuleName = (Split-Path -Leaf $PSCommandPath) -Replace ".Module.Tests.ps1"
@@ -12,6 +6,12 @@ BeforeDiscovery {
     $script:CodeFiles = Get-ChildItem -Path "$ParentDir" -Filter *.ps1 -Recurse | Resolve-Path -Relative
     $script:ScriptAnalyzerRules = Get-ScriptAnalyzerRule
     $script:ScriptAnalyzerResults = Invoke-ScriptAnalyzer -Path $ModuleFile -ExcludeRule PSUseBOMForUnicodeEncodedFile -Severity Error,Warning
+}
+BeforeAll {
+    #Requires -Modules PSScriptAnalyzer
+    # Import-Module PSScriptAnalyzer
+    # $script:VerbosePreference = 'Continue' # display verbose output of the tests
+    $script:DebugPreference = 'Continue' # display debug output of the tests
 }
 
 Describe "Module Structure and Validation Tests" -Tag Module -WarningAction SilentlyContinue {

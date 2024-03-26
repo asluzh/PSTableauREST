@@ -1,3 +1,9 @@
+BeforeDiscovery {
+    $script:ConfigFiles = Get-ChildItem -Path "./tests/config" -Filter "test_*.json" | Resolve-Path -Relative
+    $script:DatasourceFiles = Get-ChildItem -Path "./tests/assets/Datasources" -Recurse | Resolve-Path -Relative
+    $script:WorkbookFiles = Get-ChildItem -Path "./tests/assets/Workbooks" -Recurse | Resolve-Path -Relative
+    $script:FlowFiles = Get-ChildItem -Path "./tests/assets/Flows" -Recurse | Resolve-Path -Relative
+}
 BeforeAll {
     # Requires -Modules Assert
     # Import-Module Assert
@@ -8,12 +14,6 @@ BeforeAll {
     InModuleScope 'PSTableauREST' { $script:DebugPreference = 'Continue' } # display debug output of the module
     # InModuleScope 'PSTableauREST' { $script:ProgressPreference = 'SilentlyContinue' } # suppress progress for upload/download operations
     # see also: https://stackoverflow.com/questions/18770723/hide-progress-of-invoke-webrequest
-}
-BeforeDiscovery {
-    $script:ConfigFiles = Get-ChildItem -Path "./tests/config" -Filter "test_*.json" | Resolve-Path -Relative
-    $script:DatasourceFiles = Get-ChildItem -Path "./tests/assets/Datasources" -Recurse | Resolve-Path -Relative
-    $script:WorkbookFiles = Get-ChildItem -Path "./tests/assets/Workbooks" -Recurse | Resolve-Path -Relative
-    $script:FlowFiles = Get-ChildItem -Path "./tests/assets/Flows" -Recurse | Resolve-Path -Relative
 }
 
 Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $ConfigFiles {

@@ -1,9 +1,9 @@
+BeforeDiscovery {
+    $script:ConfigFiles = Get-ChildItem -Path "tests/config" -Filter "test_*.json" -Recurse
+}
 BeforeAll {
     Import-Module ./PSTableauREST -Force
     . ./scripts/SecretStore.Functions.ps1
-}
-BeforeDiscovery {
-    $script:ConfigFiles = Get-ChildItem -Path "tests/config" -Filter "test_*.json" -Recurse
 }
 
 Describe "Unit Tests for PSTableauREST" -Tag Unit {
