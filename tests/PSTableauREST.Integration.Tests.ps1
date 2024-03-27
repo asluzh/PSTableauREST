@@ -1755,6 +1755,12 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                     ((Get-TableauView -ViewId $sampleViewId).tags.tag | Measure-Object).Count | Should -Be 1
                     Remove-TableauContentTag -ViewId $sampleViewId -Tag "active" | Out-Null
                     (Get-TableauView -ViewId $sampleViewId).tags | Should -BeNullOrEmpty
+                    {Remove-TableauContentTag -ViewId $sampleViewId -Tag "nonexistent"} | Should -Throw
+                    Add-TableauContentTag -ViewId $sampleViewId -Tags "test-tag","test_123","asd|qwe" | Out-Null
+                    ((Get-TableauView -ViewId $sampleViewId).tags.tag | Measure-Object).Count | Should -Be 3
+                    Remove-TableauContentTag -ViewId $sampleViewId -Tag "test-tag" | Out-Null
+                    Remove-TableauContentTag -ViewId $sampleViewId -Tag "test_123" | Out-Null
+                    Remove-TableauContentTag -ViewId $sampleViewId -Tag "asd|qwe" | Out-Null
                 }
                 It "Update sample workbook (showTabs=false) on <ConfigFile.server>" {
                     $workbook = Get-TableauWorkbook -Filter "name:eq:World Indicators","projectName:eq:$samplesProjectName"

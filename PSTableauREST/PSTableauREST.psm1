@@ -6581,6 +6581,10 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sourc
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#delete_tag_from_view
+
+.NOTES
+It appears to be impossible to remove a tag named with special characters, e.g. "/".
+Encoding such names with UrlEncode() or HttpEncode() doesn't work either.
 #>
 [CmdletBinding(SupportsShouldProcess)]
 [OutputType([PSCustomObject])]
@@ -6592,13 +6596,14 @@ Param(
     [Parameter(Mandatory)][string] $Tag
 )
     Assert-TableauAuthToken
-    if ($WorkbookId -and $PSCmdlet.ShouldProcess("workbook:$WorkbookId, tag:$Tag")) {
+    # $Tag = [System.Web.HttpUtility]::UrlEncode($Tag)
+    if ($WorkbookId -and $PSCmdlet.ShouldProcess("workbook:$WorkbookId, tag:'$Tag'")) {
         Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId/tags/$Tag) -Method Delete
-    } elseif ($DatasourceId -and $PSCmdlet.ShouldProcess("datasource:$DatasourceId, tag:$Tag")) {
+    } elseif ($DatasourceId -and $PSCmdlet.ShouldProcess("datasource:$DatasourceId, tag:'$Tag'")) {
         Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId/tags/$Tag) -Method Delete
-    } elseif ($ViewId -and $PSCmdlet.ShouldProcess("view:$ViewId, tag:$Tag")) {
+    } elseif ($ViewId -and $PSCmdlet.ShouldProcess("view:$ViewId, tag:'$Tag'")) {
         Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint View -Param $ViewId/tags/$Tag) -Method Delete
-    } elseif ($FlowId -and $PSCmdlet.ShouldProcess("flow:$FlowId, tag:$Tag")) {
+    } elseif ($FlowId -and $PSCmdlet.ShouldProcess("flow:$FlowId, tag:'$Tag'")) {
         Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Flow -Param $FlowId/tags/$Tag) -Method Delete
     }
 }
