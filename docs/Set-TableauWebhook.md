@@ -1,30 +1,31 @@
-# Set-TableauDataAlert
+# Set-TableauWebhook
 
 ## SYNOPSIS
-Update Data-Driven Alert
+Update a Webhook
 
 ## SYNTAX
 
 ```
-Set-TableauDataAlert [-DataAlertId] <String> [[-OwnerUserId] <String>] [[-Subject] <String>]
- [[-Frequency] <String>] [[-Visibility] <String>] [-ProgressAction <ActionPreference>] [-WhatIf] [-Confirm]
- [<CommonParameters>]
+Set-TableauWebhook [-WebhookId] <String> [[-Name] <String>] [[-EventName] <String>]
+ [[-DestinationUrl] <String>] [[-Enabled] <String>] [[-ReasonForDisablement] <String>]
+ [-ProgressAction <ActionPreference>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
-Update one or more settings for the specified data-driven alert; including the alert subject, frequency, and owner.
+Modify the properties of an existing webhook.
+This method can only be called by server and site administrators.
 
 ## EXAMPLES
 
 ### EXAMPLE 1
 ```
-$dataAlert = Set-TableauDataAlert -DataAlertId $id -Subject "New Alert for Forecast"
+$webhook = Set-TableauWebhook -WebhookId $id -Name "Updated Webhook"
 ```
 
 ## PARAMETERS
 
-### -DataAlertId
-The LUID of the data-driven alert.
+### -WebhookId
+The LUID of the webhook.
 
 ```yaml
 Type: String
@@ -38,8 +39,8 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -OwnerUserId
-(Optional) The LUID of the user to assign as owner of the data-driven alert.
+### -Name
+(Optional) The new name for the webhook.
 
 ```yaml
 Type: String
@@ -53,8 +54,8 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -Subject
-(Optional) The string to set as the new subject of the alert.
+### -EventName
+(Optional) The new event name for the webhook.
 
 ```yaml
 Type: String
@@ -68,8 +69,9 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -Frequency
-(Optional) The frequency of the data-driven alert: once, frequently, hourly, daily, or weekly.
+### -DestinationUrl
+(Optional) The new destination URL for the webhook.
+The webhook destination URL must be https and have a valid certificate.
 
 ```yaml
 Type: String
@@ -83,10 +85,10 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -Visibility
-(Optional) Determines the visibility of the data-driven alert (private or public).
-If Visibility is set to private, the alert is only visible to the owner, site or server administrators, and specific users they add as recipients.
-If Visibility is set to public, users with access to the view containing the alert can see the alert and add themselves as recipients.
+### -Enabled
+(Optional) Boolean.
+If true (default), the newly created webhook is enabled.
+If false then the webhook will be disabled.
 
 ```yaml
 Type: String
@@ -95,6 +97,23 @@ Aliases:
 
 Required: False
 Position: 5
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -ReasonForDisablement
+(Optional) The reason a webhook is disabled.
+If Enabled is set to false, provides the reason for changing the status, or defaults to "Webhook disabled by user".
+If Enabled set to true, this parameter is ignored.
+
+```yaml
+Type: String
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: 6
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -158,5 +177,5 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## RELATED LINKS
 
-[https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#update_data-driven_alert](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#update_data-driven_alert)
+[https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#update_webhook](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#update_webhook)
 

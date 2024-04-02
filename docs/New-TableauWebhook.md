@@ -1,30 +1,30 @@
-# Set-TableauDataAlert
+# New-TableauWebhook
 
 ## SYNOPSIS
-Update Data-Driven Alert
+Create a Webhook
 
 ## SYNTAX
 
 ```
-Set-TableauDataAlert [-DataAlertId] <String> [[-OwnerUserId] <String>] [[-Subject] <String>]
- [[-Frequency] <String>] [[-Visibility] <String>] [-ProgressAction <ActionPreference>] [-WhatIf] [-Confirm]
- [<CommonParameters>]
+New-TableauWebhook [-Name] <String> [-EventName] <String> [-DestinationUrl] <String> [[-Enabled] <String>]
+ [-ProgressAction <ActionPreference>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
-Update one or more settings for the specified data-driven alert; including the alert subject, frequency, and owner.
+Creates a new webhook for a site.
+This method can only be called by server and site administrators.
 
 ## EXAMPLES
 
 ### EXAMPLE 1
 ```
-$dataAlert = Set-TableauDataAlert -DataAlertId $id -Subject "New Alert for Forecast"
+$webhook = New-TableauWebhook -Name "New Webhook" -Condition above -Threshold 14000 -WorksheetName "one_measure_no_dimension" -ViewId $view.id
 ```
 
 ## PARAMETERS
 
-### -DataAlertId
-The LUID of the data-driven alert.
+### -Name
+The name for the webhook
 
 ```yaml
 Type: String
@@ -38,38 +38,42 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -OwnerUserId
-(Optional) The LUID of the user to assign as owner of the data-driven alert.
+### -EventName
+The event name that should trigger the webhook.
+See full list here: https://help.tableau.com/current/developer/webhooks/en-us/docs/webhooks-events-payload.html
 
 ```yaml
 Type: String
 Parameter Sets: (All)
 Aliases:
 
-Required: False
+Required: True
 Position: 2
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -Subject
-(Optional) The string to set as the new subject of the alert.
+### -DestinationUrl
+The destination URL for the webhook.
+The webhook destination URL must be https and have a valid certificate.
 
 ```yaml
 Type: String
 Parameter Sets: (All)
 Aliases:
 
-Required: False
+Required: True
 Position: 3
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -Frequency
-(Optional) The frequency of the data-driven alert: once, frequently, hourly, daily, or weekly.
+### -Enabled
+(Optional) Boolean.
+If true (default), the newly created webhook is enabled.
+If false then the webhook will be disabled.
 
 ```yaml
 Type: String
@@ -78,23 +82,6 @@ Aliases:
 
 Required: False
 Position: 4
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -Visibility
-(Optional) Determines the visibility of the data-driven alert (private or public).
-If Visibility is set to private, the alert is only visible to the owner, site or server administrators, and specific users they add as recipients.
-If Visibility is set to public, users with access to the view containing the alert can see the alert and add themselves as recipients.
-
-```yaml
-Type: String
-Parameter Sets: (All)
-Aliases:
-
-Required: False
-Position: 5
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -158,5 +145,5 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## RELATED LINKS
 
-[https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#update_data-driven_alert](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#update_data-driven_alert)
+[https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#create_webhook](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#create_webhook)
 

@@ -1,29 +1,31 @@
-# Remove-TableauDataAlert
+# Set-TableauGroupSet
 
 ## SYNOPSIS
-Delete Data-Driven Alert
+Update Group Set
 
 ## SYNTAX
 
 ```
-Remove-TableauDataAlert [-DataAlertId] <String> [-ProgressAction <ActionPreference>] [-WhatIf] [-Confirm]
- [<CommonParameters>]
+Set-TableauGroupSet [-GroupSetId] <String> [[-Name] <String>] [-ProgressAction <ActionPreference>] [-WhatIf]
+ [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
-Deletes the specified data-driven alert.
+Updates a group set name on a Tableau Server or Tableau Cloud site.
+If a Tableau Server or Tableau Cloud site is configured to use local authentication, the method lets you update the group name.
+If Tableau Server is configured to use Active Directory authentication, the method synchronizes the group with Active Directory.
 
 ## EXAMPLES
 
 ### EXAMPLE 1
 ```
-Remove-TableauDataAlert -DataAlertId $id
+$groupset = Set-TableauGroupSet -GroupSetId $groupSetId -Name $newName
 ```
 
 ## PARAMETERS
 
-### -DataAlertId
-The LUID of the data-driven alert.
+### -GroupSetId
+The LUID of the group set to update.
 
 ```yaml
 Type: String
@@ -32,6 +34,21 @@ Aliases:
 
 Required: True
 Position: 1
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Name
+(Optional) The new name for the group set.
+
+```yaml
+Type: String
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: 2
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -95,5 +112,5 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## RELATED LINKS
 
-[https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#delete_data-driven_alert](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#delete_data-driven_alert)
+[https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#update_group_set](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#update_group_set)
 

@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.6.2'
+ModuleVersion = '0.6.3'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -150,12 +150,8 @@ FunctionsToExport = @(
 ### Notifications methods
 'Get-TableauDataAlert', 'New-TableauDataAlert', 'Set-TableauDataAlert', 'Remove-TableauDataAlert',
 'Add-TableauDataAlertUser', 'Remove-TableauDataAlertUser',
-# List Webhooks - introduced in API 3.6
-# Get a Webhook
-# Create a Webhook
-# Test a Webhook
-# Update a Webhook
-# Delete a Webhook
+'Get-TableauWebhook', 'New-TableauWebhook', 'Set-TableauWebhook', 'Remove-TableauWebhook',
+'Test-TableauWebhook',
 # Get User Notification Preferences
 # Update User Notification Preferences
 
@@ -309,7 +305,7 @@ AliasesToExport = @('Login-TableauServer','Logout-TableauServer',
 'Query-TableauCustomView','Update-TableauCustomView','Download-TableauCustomViewImage',
 'Query-TableauFlow','Update-TableauFlow','Query-TableauFlowsForUser',
 'Download-TableauFlow','Upload-TableauFlow','Update-TableauFlowConnection',
-'Run-TableauFlow','Cancel-TableauFlowRun','Update-TableauSchedule',
+'Run-TableauFlow','Query-TableauFlowRun','Cancel-TableauFlowRun','Update-TableauSchedule',
 'Query-TableauJob','Cancel-TableauJob', 'Run-TableauTask',
 'Create-TableauContentExtract','Add-TableauCloudExtractRefreshTask','Update-TableauCloudExtractRefreshTask',
 'Add-TableauSubscription','Update-TableauSubscription',
@@ -318,6 +314,7 @@ AliasesToExport = @('Login-TableauServer','Logout-TableauServer',
 'Update-TableauConnectedApp','Add-TableauConnectedApp','Add-TableauConnectedAppSecret',
 'Update-TableauConnectedAppEAS','Add-TableauConnectedAppEAS',
 'Query-TableauDataAlert','Add-TableauDataAlert','Update-TableauDataAlert',
+'Query-TableauWebhook','Add-TableauWebhook','Update-TableauWebhook',
 'Run-TableauMetadataGraphQL','Query-TableauMetadata')
 
 # DSC resources to export from this module

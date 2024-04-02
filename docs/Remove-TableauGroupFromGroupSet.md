@@ -1,29 +1,29 @@
-# Remove-TableauDataAlert
+# Remove-TableauGroupFromGroupSet
 
 ## SYNOPSIS
-Delete Data-Driven Alert
+Remove Group from Group Set
 
 ## SYNTAX
 
 ```
-Remove-TableauDataAlert [-DataAlertId] <String> [-ProgressAction <ActionPreference>] [-WhatIf] [-Confirm]
- [<CommonParameters>]
+Remove-TableauGroupFromGroupSet [-GroupId] <String> [-GroupSetId] <String> [-ProgressAction <ActionPreference>]
+ [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
-Deletes the specified data-driven alert.
+Removes a group from the specified group set.
 
 ## EXAMPLES
 
 ### EXAMPLE 1
 ```
-Remove-TableauDataAlert -DataAlertId $id
+$response = Remove-TableauGroupFromGroupSet -GroupId $groupId -GroupSetId $gsId
 ```
 
 ## PARAMETERS
 
-### -DataAlertId
-The LUID of the data-driven alert.
+### -GroupId
+The LUID of the group to remove.
 
 ```yaml
 Type: String
@@ -32,6 +32,21 @@ Aliases:
 
 Required: True
 Position: 1
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -GroupSetId
+The LUID of the group set to remove the group from.
+
+```yaml
+Type: String
+Parameter Sets: (All)
+Aliases:
+
+Required: True
+Position: 2
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -95,5 +110,5 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## RELATED LINKS
 
-[https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#delete_data-driven_alert](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#delete_data-driven_alert)
+[https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#remove_group_from_group_set](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#remove_group_from_group_set)
 

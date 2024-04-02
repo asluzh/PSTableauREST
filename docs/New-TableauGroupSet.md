@@ -1,29 +1,29 @@
-# Remove-TableauDataAlert
+# New-TableauGroupSet
 
 ## SYNOPSIS
-Delete Data-Driven Alert
+Create Group Set
 
 ## SYNTAX
 
 ```
-Remove-TableauDataAlert [-DataAlertId] <String> [-ProgressAction <ActionPreference>] [-WhatIf] [-Confirm]
+New-TableauGroupSet [-Name] <String> [-ProgressAction <ActionPreference>] [-WhatIf] [-Confirm]
  [<CommonParameters>]
 ```
 
 ## DESCRIPTION
-Deletes the specified data-driven alert.
+Creates a group set with a specified name.
 
 ## EXAMPLES
 
 ### EXAMPLE 1
 ```
-Remove-TableauDataAlert -DataAlertId $id
+$group = New-TableauGroupSet -Name $groupSetName
 ```
 
 ## PARAMETERS
 
-### -DataAlertId
-The LUID of the data-driven alert.
+### -Name
+The name for the new group set.
 
 ```yaml
 Type: String
@@ -95,5 +95,5 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## RELATED LINKS
 
-[https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#delete_data-driven_alert](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#delete_data-driven_alert)
+[https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#create_group_set](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#create_group_set)
 

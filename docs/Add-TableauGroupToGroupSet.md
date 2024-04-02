@@ -1,29 +1,29 @@
-# Remove-TableauDataAlert
+# Add-TableauGroupToGroupSet
 
 ## SYNOPSIS
-Delete Data-Driven Alert
+Add Group to Group Set
 
 ## SYNTAX
 
 ```
-Remove-TableauDataAlert [-DataAlertId] <String> [-ProgressAction <ActionPreference>] [-WhatIf] [-Confirm]
- [<CommonParameters>]
+Add-TableauGroupToGroupSet [-GroupId] <String> [-GroupSetId] <String> [-ProgressAction <ActionPreference>]
+ [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
-Deletes the specified data-driven alert.
+Adds group to a group set.
 
 ## EXAMPLES
 
 ### EXAMPLE 1
 ```
-Remove-TableauDataAlert -DataAlertId $id
+$result = Add-TableauGroupToGroupSet -GroupId $groupId -GroupSetId $gsId
 ```
 
 ## PARAMETERS
 
-### -DataAlertId
-The LUID of the data-driven alert.
+### -GroupId
+The LUID of the group to add.
 
 ```yaml
 Type: String
@@ -32,6 +32,21 @@ Aliases:
 
 Required: True
 Position: 1
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -GroupSetId
+The LUID of the group set to add the group to.
+
+```yaml
+Type: String
+Parameter Sets: (All)
+Aliases:
+
+Required: True
+Position: 2
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -95,5 +110,5 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## RELATED LINKS
 
-[https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#delete_data-driven_alert](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#delete_data-driven_alert)
+[https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#add_group_to_group_set](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#add_group_to_group_set)
 

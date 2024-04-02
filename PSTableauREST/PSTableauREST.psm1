@@ -132,7 +132,8 @@ Param(
         'Setting','ServerSetting','ExtensionSetting','ConnectedApp','EAS',
         'Project','User','Group','Groupset','Workbook','Datasource','View','Flow',
         'FileUpload','Recommendation','CustomView','Favorite','OrderFavorite',
-        'Schedule','ServerSchedule','Job','Task','Subscription','DataAlert',
+        'Schedule','ServerSchedule','Job','Task',
+        'Subscription','DataAlert','Webhook',
         'Database','Table','GraphQL')][string] $Endpoint,
     [Parameter()][string] $Param
 )
@@ -5370,6 +5371,7 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#g
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#get_flow_runs
 #>
+[Alias('Query-TableauFlowRun')]
 [OutputType([PSCustomObject[]])]
 Param(
     [Parameter(Mandatory,ParameterSetName='FlowRunById')][string] $FlowRunId,
@@ -10312,7 +10314,7 @@ Numeric value for the alert threshold. A data alert is triggered when this thres
 
 .PARAMETER Frequency
 The time period between attempts by Tableau to assess whether the alert threshold has been crossed.
-Valid values: once, freguently, hourly, daily, weekly.
+Valid values: once, frequently, hourly, daily, weekly.
 Default is once.
 
 .PARAMETER Visibility
@@ -10339,6 +10341,10 @@ $dataAlert = New-TableauDataAlert -Subject "Data Driven Alert for Forecast" -Con
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#create_data_driven_alert
+
+.NOTES
+The 'id' attribute returned by the New-TableauDataAlert request is not the LUID of the data alert, but an internal (numeric) id
+The LUID should to be retrieved separately by calling Get-TableauDataAlert, if the data alert needs to be updated or removed.
 #>
 [CmdletBinding(SupportsShouldProcess)]
 [Alias('Add-TableauDataAlert')]
@@ -10347,7 +10353,7 @@ Param(
     [Parameter(Mandatory)][string] $Subject,
     [Parameter(Mandatory)][ValidateSet('above','above-equal','below','below-equal','equal')][string] $Condition,
     [Parameter(Mandatory)][int] $Threshold,
-    [Parameter()][ValidateSet('once','freguently','hourly','daily','weekly')][string] $Frequency = 'once',
+    [Parameter()][ValidateSet('once','frequently','hourly','daily','weekly')][string] $Frequency = 'once',
     [Parameter()][ValidateSet('private','public')][string] $Visibility = 'private',
     [Parameter()][ValidateSet('desktop','phone','tablet')][string] $Device,
     [Parameter(Mandatory)][string] $WorksheetName,
@@ -10375,6 +10381,7 @@ Param(
     }
     if ($PSCmdlet.ShouldProcess($Name)) {
         $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint DataAlert) -Body $xml.OuterXml -Method Post
+        # Write-Debug ($response.tsResponse.OuterXml.ToString())
         return $response.tsResponse.dataAlertCreateAlert
     }
 }
@@ -10399,10 +10406,10 @@ The LUID of the data-driven alert.
 .PARAMETER Frequency
 (Optional) The frequency of the data-driven alert: once, frequently, hourly, daily, or weekly.
 
-.PARAMETER Public
-(Optional) Determines the visibility of the data-driven alert.
-If the flag is true, users with access to the view containing the alert can see the alert and add themselves as recipients.
-If the flag is false, then the alert is only visible to the owner, site or server administrators, and specific users they add as recipients.
+.PARAMETER Visibility
+(Optional) Determines the visibility of the data-driven alert (private or public).
+If Visibility is set to private, the alert is only visible to the owner, site or server administrators, and specific users they add as recipients.
+If Visibility is set to public, users with access to the view containing the alert can see the alert and add themselves as recipients.
 
 .EXAMPLE
 $dataAlert = Set-TableauDataAlert -DataAlertId $id -Subject "New Alert for Forecast"
@@ -10417,8 +10424,8 @@ Param(
     [Parameter(Mandatory)][string] $DataAlertId,
     [Parameter()][string] $OwnerUserId,
     [Parameter()][string] $Subject,
-    [Parameter()][ValidateSet('once','freguently','hourly','daily','weekly')][string] $Frequency,
-    [Parameter()][ValidateSet('true','false')][string] $Public
+    [Parameter()][ValidateSet('once','frequently','hourly','daily','weekly')][string] $Frequency,
+    [Parameter()][ValidateSet('private','public')][string] $Visibility
 )
     Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.2
@@ -10431,8 +10438,10 @@ Param(
     if ($Frequency) {
         $el_alert.SetAttribute("frequency", $Frequency)
     }
-    if ($Public) {
-        $el_alert.SetAttribute("public", $Public)
+    if ($Visibility -eq "public") {
+        $el_alert.SetAttribute("public", "true")
+    } elseif ($Visibility -eq "private") {
+        $el_alert.SetAttribute("public", "false")
     }
     if ($OwnerUserId) {
         $el_owner = $el_alert.AppendChild($xml.CreateElement("owner"))
@@ -10453,7 +10462,7 @@ Delete Data-Driven Alert
 Deletes the specified data-driven alert.
 
 .PARAMETER DataAlertId
-Parameter description
+The LUID of the data-driven alert.
 
 .EXAMPLE
 Remove-TableauDataAlert -DataAlertId $id
@@ -10541,6 +10550,289 @@ Param(
     Assert-TableauRestVersion -AtLeast 3.2
     if ($PSCmdlet.ShouldProcess("user:$UserId, data alert:$DataAlertId")) {
         Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint DataAlert -Param $DataAlertId/users/$UserId) -Method Delete
+    }
+}
+
+function Get-TableauWebhook {
+<#
+.SYNOPSIS
+Get a Webhook / List Webhooks
+
+.DESCRIPTION
+Returns information about the specified webhook, or a list of webhooks on the specified site.
+This method can only be called by server and site administrators.
+
+.PARAMETER WebhookId
+Get a Webhook: The LUID of the webhook
+
+.PARAMETER Filter
+(Optional, List Webhooks)
+An expression that lets you specify a subset of data records to return.
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm
+
+.PARAMETER Sort
+(Optional, List Webhooks)
+An expression that lets you specify the order in which data is returned.
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm
+
+.PARAMETER Fields
+(Optional, List Webhooks)
+An expression that lets you specify which data attributes are included in response.
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_fields.htm
+
+.PARAMETER PageSize
+(Optional, List Webhooks) Page size when paging through results.
+
+.EXAMPLE
+$webhook = Get-TableauWebhook -WebhookId $id
+
+.EXAMPLE
+$webhooks = Get-TableauWebhook
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#get_webhook
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#list_webhooks_for_site
+#>
+[Alias('Query-TableauWebhook')]
+[OutputType([PSCustomObject[]])]
+Param(
+    [Parameter(Mandatory,ParameterSetName='WebhookById')][string] $WebhookId,
+    [Parameter(ParameterSetName='Webhooks')][string[]] $Filter,
+    [Parameter(ParameterSetName='Webhooks')][string[]] $Sort,
+    [Parameter(ParameterSetName='Webhooks')][string[]] $Fields,
+    [Parameter(ParameterSetName='Webhooks')][ValidateRange(1,100)][int] $PageSize = 100
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.6
+    if ($WebhookId) { # Get a Webhook
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Webhook -Param $WebhookId) -Method Get
+        $response.tsResponse.webhook
+    } else { # List Webhooks
+        $pageNumber = 0
+        do {
+            $pageNumber++
+            $uri = Get-TableauRequestUri -Endpoint Webhook
+            $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
+            $uriParam.Add("pageSize", $PageSize)
+            $uriParam.Add("pageNumber", $pageNumber)
+            if ($Filter) {
+                $uriParam.Add("filter", $Filter -join ',')
+            }
+            if ($Sort) {
+                $uriParam.Add("sort", $Sort -join ',')
+            }
+            if ($Fields) {
+                $uriParam.Add("fields", $Fields -join ',')
+            }
+            $uriRequest = [System.UriBuilder]$uri
+            $uriRequest.Query = $uriParam.ToString()
+            $response = Invoke-TableauRestMethod -Uri $uriRequest.Uri.OriginalString -Method Get
+            $totalAvailable = $response.tsResponse.pagination.totalAvailable
+            $response.tsResponse.webhooks.webhook
+        } until ($PageSize*$pageNumber -ge $totalAvailable)
+    }
+}
+
+function New-TableauWebhook {
+<#
+.SYNOPSIS
+Create a Webhook
+
+.DESCRIPTION
+Creates a new webhook for a site.
+This method can only be called by server and site administrators.
+
+.PARAMETER Name
+The name for the webhook
+
+.PARAMETER EventName
+The event name that should trigger the webhook.
+See full list here: https://help.tableau.com/current/developer/webhooks/en-us/docs/webhooks-events-payload.html
+
+.PARAMETER DestinationUrl
+The destination URL for the webhook. The webhook destination URL must be https and have a valid certificate.
+
+.PARAMETER Enabled
+(Optional) Boolean. If true (default), the newly created webhook is enabled. If false then the webhook will be disabled.
+
+.EXAMPLE
+$webhook = New-TableauWebhook -Name "New Webhook" -Condition above -Threshold 14000 -WorksheetName "one_measure_no_dimension" -ViewId $view.id
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#create_webhook
+
+.NOTES
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[Alias('Add-TableauWebhook')]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $Name,
+    [Parameter(Mandatory)][ValidateSet('AdminPromoted','AdminDemoted',
+        'DatasourceUpdated','DatasourceCreated','DatasourceDeleted','DatasourceRefreshStarted','DatasourceRefreshSucceeded','DatasourceRefreshFailed',
+        'WorkbookUpdated',  'WorkbookCreated',  'WorkbookDeleted',  'WorkbookRefreshStarted',  'WorkbookRefreshSucceeded',  'WorkbookRefreshFailed',
+        'LabelCreated','LabelUpdated','LabelDeleted','SiteCreated','SiteUpdated','SiteDeleted','UserDeleted','ViewDeleted')]
+    [string] $EventName,
+    [Parameter(Mandatory)][string] $DestinationUrl,
+    [Parameter()][ValidateSet('true','false')][string] $Enabled
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.6
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_webhook = $tsRequest.AppendChild($xml.CreateElement("webhook"))
+    $el_webhook.SetAttribute("name", $Name)
+    if ($Enabled) {
+        $el_webhook.SetAttribute("isEnabled", $Enabled)
+    }
+    $el_webhook.SetAttribute("event", $EventName)
+    $el_wd = $el_webhook.AppendChild($xml.CreateElement("webhook-destination"))
+    $el_wdh = $el_wd.AppendChild($xml.CreateElement("webhook-destination-http"))
+    $el_wdh.SetAttribute("method", "POST")
+    $el_wdh.SetAttribute("url", $DestinationUrl)
+    if ($PSCmdlet.ShouldProcess($Name)) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Webhook) -Body $xml.OuterXml -Method Post
+        return $response.tsResponse.webhook
+    }
+}
+
+function Set-TableauWebhook {
+<#
+.SYNOPSIS
+Update a Webhook
+
+.DESCRIPTION
+Modify the properties of an existing webhook.
+This method can only be called by server and site administrators.
+
+.PARAMETER WebhookId
+The LUID of the webhook.
+
+.PARAMETER Name
+(Optional) The new name for the webhook.
+
+.PARAMETER EventName
+(Optional) The new event name for the webhook.
+
+.PARAMETER DestinationUrl
+(Optional) The new destination URL for the webhook. The webhook destination URL must be https and have a valid certificate.
+
+.PARAMETER Enabled
+(Optional) Boolean. If true (default), the newly created webhook is enabled. If false then the webhook will be disabled.
+
+.PARAMETER ReasonForDisablement
+(Optional) The reason a webhook is disabled.
+If Enabled is set to false, provides the reason for changing the status, or defaults to "Webhook disabled by user".
+If Enabled set to true, this parameter is ignored.
+
+.EXAMPLE
+$webhook = Set-TableauWebhook -WebhookId $id -Name "Updated Webhook"
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#update_webhook
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauWebhook')]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $WebhookId,
+    [Parameter()][string] $Name,
+    [Parameter()][ValidateSet('AdminPromoted','AdminDemoted',
+        'DatasourceUpdated','DatasourceCreated','DatasourceDeleted','DatasourceRefreshStarted','DatasourceRefreshSucceeded','DatasourceRefreshFailed',
+        'WorkbookUpdated',  'WorkbookCreated',  'WorkbookDeleted',  'WorkbookRefreshStarted',  'WorkbookRefreshSucceeded',  'WorkbookRefreshFailed',
+        'LabelCreated','LabelUpdated','LabelDeleted','SiteCreated','SiteUpdated','SiteDeleted','UserDeleted','ViewDeleted')]
+    [string] $EventName,
+    [Parameter()][string] $DestinationUrl,
+    [Parameter()][ValidateSet('true','false')][string] $Enabled,
+    [Parameter()][string] $ReasonForDisablement
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.6
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_webhook = $tsRequest.AppendChild($xml.CreateElement("webhook"))
+    if ($Name) {
+        $el_webhook.SetAttribute("name", $Name)
+    }
+    if ($Enabled) {
+        $el_webhook.SetAttribute("isEnabled", $Enabled)
+        if ($Enabled -eq "false" -and $ReasonForDisablement) {
+            $el_webhook.SetAttribute("statusChangeReason", $ReasonForDisablement)
+        }
+    }
+    if ($EventName) {
+        $el_webhook.SetAttribute("event", $EventName)
+    }
+    if ($DestinationUrl) {
+        $el_wd = $el_webhook.AppendChild($xml.CreateElement("webhook-destination"))
+        $el_wdh = $el_wd.AppendChild($xml.CreateElement("webhook-destination-http"))
+        $el_wdh.SetAttribute("method", "POST")
+        $el_wdh.SetAttribute("url", $DestinationUrl)
+    }
+    if ($PSCmdlet.ShouldProcess($WebhookId)) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Webhook -Param $WebhookId) -Body $xml.OuterXml -Method Put
+        return $response.tsResponse.webhook
+    }
+}
+
+function Test-TableauWebhook {
+<#
+.SYNOPSIS
+Test a Webhook
+
+.DESCRIPTION
+Tests the specified webhook. 
+Sends an empty payload to the configured destination URL of the webhook and returns the response from the server.
+This method can only be called by server and site administrators.
+
+.PARAMETER WebhookId
+The LUID of the webhook.
+
+.EXAMPLE
+$result = Test-TableauWebhook -WebhookId $id
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#test_webhook
+#>
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $WebhookId
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.6
+    $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Webhook -Param $WebhookId/test) -Method Get
+    return $response.tsResponse.webhookTestResult
+}
+
+function Remove-TableauWebhook {
+<#
+.SYNOPSIS
+Delete a Webhook
+
+.DESCRIPTION
+Deletes the specified webhook.
+This method can only be called by server and site administrators.
+
+.PARAMETER WebhookId
+The LUID of the webhook.
+
+.EXAMPLE
+Remove-TableauWebhook -WebhookId $id
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#delete_webhook
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $WebhookId
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.6
+    if ($PSCmdlet.ShouldProcess($WebhookId)) {
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Webhook -Param $WebhookId) -Method Delete
     }
 }
 

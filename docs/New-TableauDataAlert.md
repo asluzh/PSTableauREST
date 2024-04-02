@@ -81,7 +81,7 @@ Accept wildcard characters: False
 
 ### -Frequency
 The time period between attempts by Tableau to assess whether the alert threshold has been crossed.
-Valid values: once, freguently, hourly, daily, weekly.
+Valid values: once, frequently, hourly, daily, weekly.
 Default is once.
 
 ```yaml
@@ -231,6 +231,8 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ### System.Management.Automation.PSObject
 ## NOTES
+The 'id' attribute returned by the New-TableauDataAlert request is not the LUID of the data alert, but an internal (numeric) id
+The LUID should to be retrieved separately by calling Get-TableauDataAlert, if the data alert needs to be updated or removed.
 
 ## RELATED LINKS
 

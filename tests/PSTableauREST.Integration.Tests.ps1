@@ -1,4 +1,5 @@
 BeforeDiscovery {
+    $script:ModuleName = (Split-Path -Leaf $PSCommandPath) -Replace ".Module.Tests.ps1"
     $script:ConfigFiles = Get-ChildItem -Path "./tests/config" -Filter "test_*.json" | Resolve-Path -Relative
     $script:DatasourceFiles = Get-ChildItem -Path "./tests/assets/Datasources" -Recurse | Resolve-Path -Relative
     $script:WorkbookFiles = Get-ChildItem -Path "./tests/assets/Workbooks" -Recurse | Resolve-Path -Relative
@@ -7,16 +8,17 @@ BeforeDiscovery {
 BeforeAll {
     # Requires -Modules Assert
     # Import-Module Assert
-    Import-Module ./PSTableauREST -Force
+    Get-Module -Name $ModuleName -All | Remove-Module -Force -ErrorAction Ignore
+    Import-Module ./$ModuleName -Force
     . ./scripts/SecretStore.Functions.ps1
-    # InModuleScope 'PSTableauREST' { $script:VerbosePreference = 'Continue' } # display verbose output of module functions
+    # InModuleScope $ModuleName { $script:VerbosePreference = 'Continue' } # display verbose output of module functions
     $script:VerbosePreference = 'Continue' # display verbose output of the tests
-    InModuleScope 'PSTableauREST' { $script:DebugPreference = 'Continue' } # display debug output of the module
-    # InModuleScope 'PSTableauREST' { $script:ProgressPreference = 'SilentlyContinue' } # suppress progress for upload/download operations
+    InModuleScope $ModuleName { $script:DebugPreference = 'Continue' } # display debug output of the module
+    # InModuleScope $ModuleName { $script:ProgressPreference = 'SilentlyContinue' } # suppress progress for upload/download operations
     # see also: https://stackoverflow.com/questions/18770723/hide-progress-of-invoke-webrequest
 }
 
-Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $ConfigFiles {
+Describe "Integration Tests for <ModuleName>" -Tag Integration -ForEach $ConfigFiles {
     BeforeAll {
         $script:ConfigFile = Get-Content $_ | ConvertFrom-Json
         if ($ConfigFile.username) {
@@ -26,7 +28,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             $ConfigFile | Add-Member -MemberType NoteProperty -Name "pat_credential" -Value (New-Object System.Management.Automation.PSCredential($ConfigFile.pat_name, (Get-SecurePassword -Namespace $ConfigFile.server -Username $ConfigFile.pat_name)))
         }
     }
-    Context "Auth operations" -Tag Auth {
+    Context "Auth Methods" -Tag Auth {
         It "Request auth sign-in for <ConfigFile.server>" {
             $response = Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -Credential $ConfigFile.credential
             $response.user.id | Should -BeOfType String
@@ -58,7 +60,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             $response | Should -BeOfType "String"
         }
     }
-    Context "Logged-in operations" -Tag LoggedIn {
+    Context "Logged-in" -Tag LoggedIn {
         BeforeAll {
             if ($ConfigFile.pat_name) {
                 Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -Credential $ConfigFile.pat_credential -PersonalAccessToken | Out-Null
@@ -86,7 +88,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             }
             Disconnect-TableauServer | Out-Null
         }
-        Context "Server operations" -Tag Server {
+        Context "Server Methods" -Tag Server {
             It "Get server info on <ConfigFile.server>" {
                 $serverInfo = Get-TableauServerInfo
                 $serverInfo.productVersion | Should -Not -BeNullOrEmpty
@@ -107,7 +109,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 }
             }
         }
-        Context "Tableau Dashboard extensions operations" -Tag Extension {
+        Context "Tableau Dashboard Extensions Methods" -Tag Extension {
             It "Get Tableau extensions setting (server) on <ConfigFile.server>" {
                 if ($ConfigFile.server_admin) {
                     $settings = Get-TableauServerSettingsExtension
@@ -223,7 +225,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 }
             }
         }
-        Context "Tableau analytics extensions operations" -Tag Analytics {
+        Context "Tableau Analytics Extensions Methods" -Tag Analytics {
             It "Get Tableau analytics extensions state (server) on <ConfigFile.server>" {
                 if ($ConfigFile.server_admin) {
                     $enabled = Get-TableauAnalyticsExtensionState -Scope Server
@@ -302,7 +304,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 }
             }
         }
-        Context "Tableau connected apps operations" -Tag ConnectedApp {
+        Context "Tableau Connected Apps Methods" -Tag ConnectedApp {
             It "Add dummy Tableau connected app on <ConfigFile.server>" {
                 $app = New-TableauConnectedApp -Name "Connected App Test"
                 $app | Should -Not -BeNullOrEmpty
@@ -363,7 +365,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 }
             }
         }
-        Context "Site operations" -Tag Site {
+        Context "Site Methods" -Tag Site {
             It "Create new site on <ConfigFile.server>" {
                 if ($ConfigFile.server_admin -and $ConfigFile.test_site_name) {
                     $site = New-TableauSite -Name $ConfigFile.test_site_name -ContentUrl $ConfigFile.test_site_contenturl -SiteParams @{
@@ -449,7 +451,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 }
             }
         }
-        Context "Project operations" -Tag Project {
+        Context "Project Methods" -Tag Project {
             It "Create new project on <ConfigFile.server>" {
                 $projectName = New-Guid
                 $project = New-TableauProject -Name $projectName
@@ -731,7 +733,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 }
             }
         }
-        Context "User operations" -Tag User {
+        Context "User Methods" -Tag User {
             It "Add new user on <ConfigFile.server>" {
                 if (-Not $script:testUserId) {
                     if ($ConfigFile.test_username) {
@@ -830,7 +832,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 }
             }
         }
-        Context "Group operations" -Tag Group {
+        Context "Group Methods" -Tag Group {
             It "Add new group on <ConfigFile.server>" {
                 $groupName = New-Guid
                 $group = New-TableauGroup -Name $groupName -MinimumSiteRole Viewer
@@ -877,7 +879,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 $script:testGroupId = $null
             }
         }
-        Context "User/Group operations" -Tag UserGroup {
+        Context "User/Group Methods" -Tag UserGroup {
             It "Add new user/group on <ConfigFile.server>" {
                 if (-Not $script:testUserId) {
                     if ($ConfigFile.test_username) {
@@ -916,7 +918,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 ($users | Measure-Object).Count | Should -Be 0
             }
         }
-        Context "Workbook operations" -Tag Workbook {
+        Context "Workbook Methods" -Tag Workbook {
             It "Get workbooks on <ConfigFile.server>" {
                 $workbooks = Get-TableauWorkbook
                 ($workbooks | Measure-Object).Count | Should -BeGreaterThan 0
@@ -1288,7 +1290,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 }
             }
         }
-        Context "Datasource operations" -Tag Datasource {
+        Context "Datasource Methods" -Tag Datasource {
             It "Get datasources on <ConfigFile.server>" {
                 $datasources = Get-TableauDatasource
                 ($datasources | Measure-Object).Count | Should -BeGreaterThan 0
@@ -1651,7 +1653,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 }
             }
         }
-        Context "View operations" -Tag View {
+        Context "View Methods" -Tag View {
             It "Get views on <ConfigFile.server>" {
                 $views = Get-TableauView
                 ($views | Measure-Object).Count | Should -BeGreaterThan 0
@@ -1876,7 +1878,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             It "Remove custom view on <ConfigFile.server>" -Skip {
             }
         }
-        Context "Flow operations" -Tag Flow {
+        Context "Flow Methods" -Tag Flow {
             Context "Get, publish, download sample flow on <ConfigFile.server>" {
                 BeforeAll {
                     $project = New-TableauProject -Name (New-Guid)
@@ -2195,7 +2197,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             # It "Filter metrics by <> on <ConfigFile.server>" {
             # }
         }
-        Context "Favorite operations" -Tag Favorite {
+        Context "Favorite Methods" -Tag Favorite {
             BeforeAll {
                 $project = New-TableauProject -Name (New-Guid)
                 $script:samplesProjectId = $project.id
@@ -2306,7 +2308,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 }
             }
         }
-        Context "Server schedule operations" -Tag ServerSchedule {
+        Context "Server Schedule Methods" -Tag ServerSchedule {
             It "Add new schedule on <ConfigFile.server>" {
                 if ($ConfigFile.server_admin) {
                     $scheduleName = New-Guid
@@ -2424,7 +2426,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 }
             }
         }
-        Context "Common schedule operations" -Tag Schedule {
+        Context "Common Schedule Methods" -Tag Schedule {
             BeforeAll {
                 if (-Not $ConfigFile.tableau_cloud) {
                     $project = New-TableauProject -Name (New-Guid)
@@ -2467,7 +2469,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 (Get-TableauExtractRefreshTask -ScheduleId $extractScheduleId | Measure-Object).Count | Should -BeGreaterThan 0
             }
         }
-        Context "Tasks operations" -Tag Task {
+        Context "Tasks Methods" -Tag Task {
             BeforeAll {
                 $project = New-TableauProject -Name (New-Guid)
                 $script:samplesProjectId = $project.id
@@ -2565,7 +2567,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                 }
             }
         }
-        Context "Subscription operations" -Tag Subscription {
+        Context "Subscription Methods" -Tag Subscription {
             BeforeAll {
                 $project = New-TableauProject -Name (New-Guid)
                 $script:samplesProjectId = $project.id
@@ -2589,6 +2591,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                         Write-Verbose ("Adding subscription for view '{0}'" -f $_.name)
                         $subscription = New-TableauSubscription -ContentType View -ContentId $_.id -Subject "test" -Message "Test subscription" -UserId (Get-TableauCurrentUserId) -Frequency Weekly -StartTime 12:00:00 -IntervalWeekdays 'Sunday'
                         $subscription | Should -Not -BeNullOrEmpty
+                        $script:testSubscriptionId = $subscription.id
                         $subscription = Set-TableauSubscription -SubscriptionId $subscription.id -ContentType View -ContentId $_.id -Subject "test1" -Message "Test subscription1" -UserId (Get-TableauCurrentUserId) -Frequency Monthly -StartTime 14:00:00 -IntervalMonthdays 5,10
                         $subscription | Should -Not -BeNullOrEmpty
                     }
@@ -2597,6 +2600,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                         Write-Verbose ("Adding subscription for workbook '{0}'" -f $_.name)
                         $subscription = New-TableauSubscription -ContentType Workbook -ContentId $_.id -Subject "test" -Message "Test subscription" -UserId (Get-TableauCurrentUserId) -Frequency Weekly -StartTime 12:00:00 -IntervalWeekdays 'Sunday'
                         $subscription | Should -Not -BeNullOrEmpty
+                        $script:testSubscriptionId = $subscription.id
                         $subscription = Set-TableauSubscription -SubscriptionId $subscription.id -ContentType Workbook -ContentId $_.id -Subject "test1" -Message "Test subscription1" -UserId (Get-TableauCurrentUserId) -Frequency Monthly -StartTime 14:00:00 -IntervalMonthdays 5,10
                         $subscription | Should -Not -BeNullOrEmpty
                     }
@@ -2607,6 +2611,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                         Write-Verbose ("Adding view '{0}' to subscription schedule {1}" -f $_.name, $subscriptionScheduleId)
                         $subscription = New-TableauSubscription -ScheduleId $subscriptionScheduleId -ContentType View -ContentId $_.id -Subject "test" -Message "Test subscription" -UserId (Get-TableauCurrentUserId)
                         $subscription | Should -Not -BeNullOrEmpty
+                        $script:testSubscriptionId = $subscription.id
                         $subscription = Set-TableauSubscription -SubscriptionId $subscription.id -ScheduleId $subscriptionScheduleId -ContentType View -ContentId $_.id -SendIfViewEmpty false -Subject "test1" -Message "Test subscription1"
                         $subscription | Should -Not -BeNullOrEmpty
                     }
@@ -2615,6 +2620,7 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
                         Write-Verbose ("Adding workbook '{0}' to subscription schedule {1}" -f $_.name, $subscriptionScheduleId)
                         $subscription = New-TableauSubscription -ScheduleId $subscriptionScheduleId -ContentType Workbook -ContentId $_.id -Subject "test" -Message "Test subscription" -UserId (Get-TableauCurrentUserId)
                         $subscription | Should -Not -BeNullOrEmpty
+                        $script:testSubscriptionId = $subscription.id
                         $subscription = Set-TableauSubscription -SubscriptionId $subscription.id -ScheduleId $subscriptionScheduleId -ContentType Workbook -ContentId $_.id -Subject "test1" -Message "Test subscription1"
                         $subscription | Should -Not -BeNullOrEmpty
                     }
@@ -2623,17 +2629,91 @@ Describe "Integration Tests for PSTableauREST" -Tag Integration -ForEach $Config
             It "Get subscriptions on <ConfigFile.server>" {
                 $subscriptions = Get-TableauSubscription
                 $subscriptions | Should -Not -BeNullOrEmpty
-                $subscriptionId = $subscriptions | Select-Object -First 1 -ExpandProperty id
-                $subscription = Get-TableauSubscription -SubscriptionId $subscriptionId
+                $subscription = Get-TableauSubscription -SubscriptionId $testSubscriptionId
                 $subscription | Should -Not -BeNullOrEmpty
             }
             It "Remove subscription on <ConfigFile.server>" {
-                $subscriptionId = Get-TableauSubscription | Select-Object -First 1 -ExpandProperty id
+                # remove only one (test) subscription from the content in temp project; the others will be removed by deleting the project
+                $subscriptionId = Get-TableauSubscription -SubscriptionId $testSubscriptionId
                 $subscriptionId | Should -Not -BeNullOrEmpty
-                Remove-TableauSubscription -SubscriptionId $subscriptionId | Out-Null
+                {Remove-TableauSubscription -SubscriptionId $testSubscriptionId | Out-Null} | Should -Not -Throw
             }
         }
-        Context "Metadata operations" -Tag Metadata {
+        Context "Notification Methods" -Tag Notification {
+            BeforeAll {
+                $project = New-TableauProject -Name (New-Guid)
+                $script:samplesProjectId = $project.id
+                $script:samplesProjectName = $project.name
+            }
+            AfterAll {
+                if ($samplesProjectId) {
+                    Remove-TableauProject -ProjectId $samplesProjectId | Out-Null
+                    $script:samplesProjectId = $null
+                }
+            }
+            It "Publish samples into project <samplesProjectName> on <ConfigFile.server>" {
+                $project = Set-TableauProject -ProjectId $samplesProjectId -PublishSamples
+                $project.id | Should -Be $samplesProjectId
+                # Start-Sleep -s 3
+            }
+            It "Create and filter query a data alert on <ConfigFile.server>" {
+                $view = Get-TableauView -Filter "projectName:eq:$samplesProjectName","name:eq:Business","workbookName:eq:World Indicators" #| Select-Object -First 1
+                $view | Should -Not -BeNullOrEmpty
+                $view.Length | Should -Be 1
+                $wsName = "Days to Start Biz"
+                Write-Verbose ("Adding data alert to worksheet '{0}', located in '{1}'" -f $wsName, $view.contentUrl)
+                $dataAlert = New-TableauDataAlert -Subject "test" -Condition above -Threshold 1000 -Visibility private -WorksheetName $wsName -ViewId $view.id
+                $dataAlert | Should -Not -BeNullOrEmpty
+                # note: the id returned by the New-TableauDataAlert request is not the LUID of the data alert, so we need to retrieve it separately
+                $dataAlert = Get-TableauDataAlert -Filter "viewId:eq:$($view.id)" | Select-Object -First 1
+                $dataAlert | Should -Not -BeNullOrEmpty
+                $dataAlert.Length | Should -Be 1
+                $script:testDataAlertId = $dataAlert.id
+            }
+            It "Query/get data alerts on <ConfigFile.server>" {
+                $dataAlerts = Get-TableauDataAlert
+                $dataAlerts | Should -Not -BeNullOrEmpty
+                $dataAlert = Get-TableauDataAlert -DataAlertId $testDataAlertId
+                $dataAlert | Should -Not -BeNullOrEmpty
+            }
+            It "Update data alert on <ConfigFile.server>" {
+                $dataAlert = Set-TableauDataAlert -DataAlertId $testDataAlertId -Subject "test1" -Frequency daily -Visibility public
+                $dataAlert | Should -Not -BeNullOrEmpty
+            }
+            It "Remove data alert on <ConfigFile.server>" {
+                {Remove-TableauDataAlert -DataAlertId $testDataAlertId | Out-Null} | Should -Not -Throw
+            }
+            It "Create a webhook on <ConfigFile.server>" {
+                # tutorials: https://help.tableau.com/current/developer/webhooks/en-us/docs/webhooks-get-started.html#webhooks-tutorials
+                # using a dummy/invalid key below, which is sufficient for testing
+                $webhook = New-TableauWebhook -Name "test" -EventName WorkbookCreated -DestinationUrl "https://maker.ifttt.com/trigger/WorkbookCreated/with/key/mak1234567890"
+                $webhook | Should -Not -BeNullOrEmpty
+                $script:testWebhookId = $webhook.id
+            }
+            It "Query/get webhooks on <ConfigFile.server>" {
+                $webhooks = Get-TableauWebhook
+                $webhooks | Should -Not -BeNullOrEmpty
+                $webhooks = Get-TableauWebhook -Filter "name:eq:test"
+                $webhooks | Should -Not -BeNullOrEmpty
+                $webhook = Get-TableauWebhook -WebhookId $testWebhookId
+                $webhook | Should -Not -BeNullOrEmpty
+            }
+            It "Update webhook on <ConfigFile.server>" {
+                $webhook = Set-TableauWebhook -WebhookId $testWebhookId -Name "test1"
+                $webhook | Should -Not -BeNullOrEmpty
+            }
+            It "Run test for webhook on <ConfigFile.server>" {
+                $result = Test-TableauWebhook -WebhookId $testWebhookId
+                $result | Should -Not -BeNullOrEmpty
+                $result.id | Should -Be $testWebhookId
+                $result.status | Should -Be 401
+                Write-Verbose ("Test webhook run id {0}, status: {1}, response: {2}" -f $result.id, $result.status, $result.body)
+            }
+            It "Remove webhook on <ConfigFile.server>" {
+                {Remove-TableauWebhook -WebhookId $testWebhookId | Out-Null} | Should -Not -Throw
+            }
+        }
+        Context "Metadata Methods" -Tag Metadata {
             It "Query databases on <ConfigFile.server>" {
                 # TODO Query databases doesn't work for some reason
                 $databases = Get-TableauDatabase

@@ -171,6 +171,9 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ### System.Management.Automation.PSObject
 ## NOTES
+It appears to be impossible to remove a tag named with special characters, e.g.
+"/".
+Encoding such names with UrlEncode() or HttpEncode() doesn't work either.
 
 ## RELATED LINKS
 
