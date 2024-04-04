@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.6.3'
+ModuleVersion = '0.6.4'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -151,9 +151,7 @@ FunctionsToExport = @(
 'Get-TableauDataAlert', 'New-TableauDataAlert', 'Set-TableauDataAlert', 'Remove-TableauDataAlert',
 'Add-TableauDataAlertUser', 'Remove-TableauDataAlertUser',
 'Get-TableauWebhook', 'New-TableauWebhook', 'Set-TableauWebhook', 'Remove-TableauWebhook',
-'Test-TableauWebhook',
-# Get User Notification Preferences
-# Update User Notification Preferences
+'Test-TableauWebhook','Get-TableauSiteSettingsNotification','Set-TableauSiteSettingsNotification'
 
 ### Content Exploration methods
 # Get content Suggestions
@@ -314,7 +312,7 @@ AliasesToExport = @('Login-TableauServer','Logout-TableauServer',
 'Update-TableauConnectedApp','Add-TableauConnectedApp','Add-TableauConnectedAppSecret',
 'Update-TableauConnectedAppEAS','Add-TableauConnectedAppEAS',
 'Query-TableauDataAlert','Add-TableauDataAlert','Update-TableauDataAlert',
-'Query-TableauWebhook','Add-TableauWebhook','Update-TableauWebhook',
+'Query-TableauWebhook','Add-TableauWebhook','Update-TableauWebhook','Update-TableauSiteSettingsNotification',
 'Run-TableauMetadataGraphQL','Query-TableauMetadata')
 
 # DSC resources to export from this module

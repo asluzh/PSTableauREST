@@ -10836,6 +10836,122 @@ Param(
     }
 }
 
+function Get-TableauSiteSettingsNotification {
+<#
+.SYNOPSIS
+Get User Notification Preferences
+
+.DESCRIPTION
+Returns the notification preferences for the specified site.
+You can filter by channel and notification type.
+This method can only be called by site or server administrators.
+
+.PARAMETER Filter
+(Optional)
+An expression that lets you specify a subset of data records to return.
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm
+
+.PARAMETER Sort
+(Optional)
+An expression that lets you specify the order in which data is returned.
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_filtering_and_sorting.htm
+
+.PARAMETER Fields
+(Optional)
+An expression that lets you specify which data attributes are included in response.
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_fields.htm
+
+.PARAMETER PageSize
+(Optional) Page size when paging through results.
+
+.EXAMPLE
+$settings = Get-TableauSiteSettingsNotification
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#get_user_notification_preferences
+#>
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter()][string[]] $Filter,
+    [Parameter()][string[]] $Sort,
+    [Parameter()][string[]] $Fields,
+    [Parameter()][ValidateRange(1,100)][int] $PageSize = 100
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.15
+    $pageNumber = 0
+    do {
+        $pageNumber++
+        $uri = Get-TableauRequestUri -Endpoint Setting -Param notifications
+        $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
+        $uriParam.Add("pageSize", $PageSize)
+        $uriParam.Add("pageNumber", $pageNumber)
+        if ($Filter) {
+            $uriParam.Add("filter", $Filter -join ',')
+        }
+        if ($Sort) {
+            $uriParam.Add("sort", $Sort -join ',')
+        }
+        if ($Fields) {
+            $uriParam.Add("fields", $Fields -join ',')
+        }
+        $uriRequest = [System.UriBuilder]$uri
+        $uriRequest.Query = $uriParam.ToString()
+        $response = Invoke-TableauRestMethod -Uri $uriRequest.Uri.OriginalString -Method Get
+        $totalAvailable = $response.tsResponse.pagination.totalAvailable
+        $response.tsResponse.userNotificationsPreferences.userNotificationsPreference
+    } until ($PageSize*$pageNumber -ge $totalAvailable)
+}
+
+function Set-TableauSiteSettingsNotification {
+<#
+.SYNOPSIS
+Update User Notification Preferences
+
+.DESCRIPTION
+Updates user notifications preferences to enabled or disabled on the specified site.
+This method can only be called by site or server administrators.
+
+.PARAMETER Preferences
+Array consisting of notification preferences, each preference is expected to be a hashtable with the following keys:
+- enabled: true | false
+- channel: email | in_app | slack
+- notificationType: comments | webhooks | prepflow | share | dataalerts | extractrefresh
+
+.EXAMPLE
+$settings = Set-TableauSiteSettingsNotification -Preferences @{channel='email';notificationType='extractrefresh';enabled='true'}
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_notifications.htm#update_user_notification_preferences
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauSiteSettingsNotification')]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][hashtable[]] $Preferences
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.15
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_prefs = $tsRequest.AppendChild($xml.CreateElement("userNotificationsPreferences"))
+    foreach ($preference in $Preferences) {
+        $el_pref = $el_prefs.AppendChild($xml.CreateElement("userNotificationsPreference"))
+        if ($preference["channel"] -and $preference["notificationType"] -and $preference["enabled"]) {
+            $el_pref.SetAttribute("channel", $preference["channel"])
+            $el_pref.SetAttribute("notificationType", $preference["notificationType"])
+            $el_pref.SetAttribute("enabled", $preference["enabled"])
+        } else {
+            Write-Error "Preferences must have channel, notificationType and enabled flag" -Category InvalidArgument -ErrorAction Stop
+        }
+    }
+
+    if ($PSCmdlet.ShouldProcess("Site Notification Settings")) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Setting -Param notifications) -Body $xml.OuterXml -Method Patch -ContentType "application/xml"
+        return $response.tsResponse.notificationUpdateResult.notificationUpdateStatus
+    }
+}
+
 ### Metadata methods
 function Get-TableauDatabase {
 <#

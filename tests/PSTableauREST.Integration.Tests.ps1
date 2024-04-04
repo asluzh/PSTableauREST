@@ -2647,7 +2647,7 @@ Describe "Integration Tests for <ModuleName>" -Tag Integration -ForEach $ConfigF
             }
             AfterAll {
                 if ($samplesProjectId) {
-                    Remove-TableauProject -ProjectId $samplesProjectId | Out-Null
+                    # Remove-TableauProject -ProjectId $samplesProjectId | Out-Null
                     $script:samplesProjectId = $null
                 }
             }
@@ -2657,10 +2657,15 @@ Describe "Integration Tests for <ModuleName>" -Tag Integration -ForEach $ConfigF
                 # Start-Sleep -s 3
             }
             It "Create and filter query a data alert on <ConfigFile.server>" {
-                $view = Get-TableauView -Filter "projectName:eq:$samplesProjectName","name:eq:Business","workbookName:eq:World Indicators" #| Select-Object -First 1
+                $view = Get-TableauView -Filter "projectName:eq:$samplesProjectName","name:eq:Business","workbookName:eq:World Indicators"
+                $wsName = "Days to Start Biz"
+                # TODO test with Tableau Server, the documentation says: New-TableauDataAlert method is not available for Tableau Server
+                if (-not $view) { # fallback: take a different view for older version of TS
+                    $view = Get-TableauView -Filter "projectName:eq:$samplesProjectName","name:eq:Economy","workbookName:eq:Regional"
+                    $wsName = "S&P Returns by Decade"
+                }
                 $view | Should -Not -BeNullOrEmpty
                 $view.Length | Should -Be 1
-                $wsName = "Days to Start Biz"
                 Write-Verbose ("Adding data alert to worksheet '{0}', located in '{1}'" -f $wsName, $view.contentUrl)
                 $dataAlert = New-TableauDataAlert -Subject "test" -Condition above -Threshold 1000 -Visibility private -WorksheetName $wsName -ViewId $view.id
                 $dataAlert | Should -Not -BeNullOrEmpty
@@ -2711,6 +2716,24 @@ Describe "Integration Tests for <ModuleName>" -Tag Integration -ForEach $ConfigF
             }
             It "Remove webhook on <ConfigFile.server>" {
                 {Remove-TableauWebhook -WebhookId $testWebhookId | Out-Null} | Should -Not -Throw
+            }
+            It "Get notification preferences on <ConfigFile.server>" {
+                if (-Not $ConfigFile.tableau_cloud) {
+                    $prefs = Get-TableauSiteSettingsNotification
+                    $prefs | Should -Not -BeNullOrEmpty
+                    $prefs = Get-TableauSiteSettingsNotification -Filter "channel:eq:email"
+                    $prefs | Should -Not -BeNullOrEmpty
+                } else {
+                    Set-ItResult -Skipped -Because "this feature is disabled for Tableau Cloud"
+                }
+            }
+            It "Set notification preferences on <ConfigFile.server>" {
+                if (-Not $ConfigFile.tableau_cloud) {
+                    $prefs = Set-TableauSiteSettingsNotification -Preferences @{channel='email';notificationType='extractrefresh';enabled='true'}
+                    $prefs | Should -Not -BeNullOrEmpty
+                } else {
+                    Set-ItResult -Skipped -Because "this feature is disabled for Tableau Cloud"
+                }
             }
         }
         Context "Metadata Methods" -Tag Metadata {
