@@ -2657,36 +2657,45 @@ Describe "Integration Tests for <ModuleName>" -Tag Integration -ForEach $ConfigF
                 # Start-Sleep -s 3
             }
             It "Create and filter query a data alert on <ConfigFile.server>" {
-                $view = Get-TableauView -Filter "projectName:eq:$samplesProjectName","name:eq:Business","workbookName:eq:World Indicators"
-                $wsName = "Days to Start Biz"
-                # TODO test with Tableau Server, the documentation says: New-TableauDataAlert method is not available for Tableau Server
-                if (-not $view) { # fallback: take a different view for older version of TS
-                    $view = Get-TableauView -Filter "projectName:eq:$samplesProjectName","name:eq:Economy","workbookName:eq:Regional"
-                    $wsName = "S&P Returns by Decade"
+                if ($ConfigFile.tableau_cloud) {
+                    $view = Get-TableauView -Filter "projectName:eq:$samplesProjectName","name:eq:Business","workbookName:eq:World Indicators"
+                    $view | Should -Not -BeNullOrEmpty
+                    $view.Length | Should -Be 1
+                    $wsName = "Days to Start Biz"
+                    Write-Verbose ("Adding data alert to worksheet '{0}', located in '{1}'" -f $wsName, $view.contentUrl)
+                    $dataAlert = New-TableauDataAlert -Subject "test" -Condition above -Threshold 1000 -Visibility private -WorksheetName $wsName -ViewId $view.id
+                    $dataAlert | Should -Not -BeNullOrEmpty
+                    # note: the id returned by the New-TableauDataAlert request is not the LUID of the data alert, so we need to retrieve it separately
+                    $dataAlert = Get-TableauDataAlert -Filter "viewId:eq:$($view.id)" | Select-Object -First 1
+                    $dataAlert | Should -Not -BeNullOrEmpty
+                    $dataAlert.Length | Should -Be 1
+                    $script:testDataAlertId = $dataAlert.id
+                } else {
+                    Set-ItResult -Skipped -Because "this feature is not supported for Tableau Server"
                 }
-                $view | Should -Not -BeNullOrEmpty
-                $view.Length | Should -Be 1
-                Write-Verbose ("Adding data alert to worksheet '{0}', located in '{1}'" -f $wsName, $view.contentUrl)
-                $dataAlert = New-TableauDataAlert -Subject "test" -Condition above -Threshold 1000 -Visibility private -WorksheetName $wsName -ViewId $view.id
-                $dataAlert | Should -Not -BeNullOrEmpty
-                # note: the id returned by the New-TableauDataAlert request is not the LUID of the data alert, so we need to retrieve it separately
-                $dataAlert = Get-TableauDataAlert -Filter "viewId:eq:$($view.id)" | Select-Object -First 1
-                $dataAlert | Should -Not -BeNullOrEmpty
-                $dataAlert.Length | Should -Be 1
-                $script:testDataAlertId = $dataAlert.id
             }
             It "Query/get data alerts on <ConfigFile.server>" {
                 $dataAlerts = Get-TableauDataAlert
-                $dataAlerts | Should -Not -BeNullOrEmpty
-                $dataAlert = Get-TableauDataAlert -DataAlertId $testDataAlertId
-                $dataAlert | Should -Not -BeNullOrEmpty
+                if ($testDataAlertId) {
+                    $dataAlerts | Should -Not -BeNullOrEmpty
+                    $dataAlert = Get-TableauDataAlert -DataAlertId $testDataAlertId
+                    $dataAlert | Should -Not -BeNullOrEmpty
+                }
             }
             It "Update data alert on <ConfigFile.server>" {
-                $dataAlert = Set-TableauDataAlert -DataAlertId $testDataAlertId -Subject "test1" -Frequency daily -Visibility public
-                $dataAlert | Should -Not -BeNullOrEmpty
+                if ($testDataAlertId) {
+                    $dataAlert = Set-TableauDataAlert -DataAlertId $testDataAlertId -Subject "test1" -Frequency daily -Visibility public
+                    $dataAlert | Should -Not -BeNullOrEmpty
+                } else {
+                    Set-ItResult -Skipped
+                }
             }
             It "Remove data alert on <ConfigFile.server>" {
-                {Remove-TableauDataAlert -DataAlertId $testDataAlertId | Out-Null} | Should -Not -Throw
+                if ($testDataAlertId) {
+                    {Remove-TableauDataAlert -DataAlertId $testDataAlertId | Out-Null} | Should -Not -Throw
+                } else {
+                    Set-ItResult -Skipped
+                }
             }
             It "Create a webhook on <ConfigFile.server>" {
                 # tutorials: https://help.tableau.com/current/developer/webhooks/en-us/docs/webhooks-get-started.html#webhooks-tutorials
@@ -2700,22 +2709,36 @@ Describe "Integration Tests for <ModuleName>" -Tag Integration -ForEach $ConfigF
                 $webhooks | Should -Not -BeNullOrEmpty
                 $webhooks = Get-TableauWebhook -Filter "name:eq:test"
                 $webhooks | Should -Not -BeNullOrEmpty
-                $webhook = Get-TableauWebhook -WebhookId $testWebhookId
-                $webhook | Should -Not -BeNullOrEmpty
+                if ($testWebhookId) {
+                    $webhook = Get-TableauWebhook -WebhookId $testWebhookId
+                    $webhook | Should -Not -BeNullOrEmpty
+                }
             }
             It "Update webhook on <ConfigFile.server>" {
-                $webhook = Set-TableauWebhook -WebhookId $testWebhookId -Name "test1"
-                $webhook | Should -Not -BeNullOrEmpty
+                if ($testWebhookId) {
+                    $webhook = Set-TableauWebhook -WebhookId $testWebhookId -Name "test1"
+                    $webhook | Should -Not -BeNullOrEmpty
+                } else {
+                    Set-ItResult -Skipped
+                }
             }
             It "Run test for webhook on <ConfigFile.server>" {
-                $result = Test-TableauWebhook -WebhookId $testWebhookId
-                $result | Should -Not -BeNullOrEmpty
-                $result.id | Should -Be $testWebhookId
-                $result.status | Should -Be 401
-                Write-Verbose ("Test webhook run id {0}, status: {1}, response: {2}" -f $result.id, $result.status, $result.body)
+                if ($testWebhookId) {
+                    $result = Test-TableauWebhook -WebhookId $testWebhookId
+                    $result | Should -Not -BeNullOrEmpty
+                    $result.id | Should -Be $testWebhookId
+                    $result.status | Should -Be 401
+                    Write-Verbose ("Test webhook run id {0}, status: {1}, response: {2}" -f $result.id, $result.status, $result.body)
+                } else {
+                    Set-ItResult -Skipped
+                }
             }
             It "Remove webhook on <ConfigFile.server>" {
-                {Remove-TableauWebhook -WebhookId $testWebhookId | Out-Null} | Should -Not -Throw
+                if ($testWebhookId) {
+                    {Remove-TableauWebhook -WebhookId $testWebhookId | Out-Null} | Should -Not -Throw
+                } else {
+                    Set-ItResult -Skipped
+                }
             }
             It "Get notification preferences on <ConfigFile.server>" {
                 if (-Not $ConfigFile.tableau_cloud) {
