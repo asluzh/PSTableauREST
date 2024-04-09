@@ -128,8 +128,8 @@ Expand ValidateSet to add support for more Endpoints.
 #>
 [OutputType([string])]
 Param(
-    [Parameter(Mandatory)][ValidateSet('Auth','Site','Session','Domain',
-        'Setting','ServerSetting','ExtensionSetting','ConnectedApp','EAS',
+    [Parameter(Mandatory)][ValidateSet('Versionless','Auth','Site','Session','Domain',
+        'Setting','ServerSetting','ConnectedApp','EAS',
         'Project','User','Group','Groupset','Workbook','Datasource','View','Flow',
         'FileUpload','Recommendation','CustomView','Favorite','OrderFavorite',
         'Schedule','ServerSchedule','Job','Task',
@@ -137,53 +137,53 @@ Param(
         'Database','Table','GraphQL')][string] $Endpoint,
     [Parameter()][string] $Param
 )
-    $uri = "$script:TableauServerUrl/api/$script:TableauRestVersion/"
-    switch ($Endpoint) {
-        'Auth' {
-            $uri += "auth/$Param"
-        }
-        'Site' {
-            $uri += "sites"
-            if ($Param) { $uri += "/$Param" }
-        }
-        'Session' {
-            $uri += "sessions"
-            if ($Param) { $uri += "/$Param" }
-        }
-        'Domain' {
-            $uri += "domains"
-            if ($Param) { $uri += "/$Param" }
-        }
-        'ServerSchedule' {
-            $uri += "schedules"
-            if ($Param) { $uri += "/$Param" }
-        }
-        'ServerSetting' {
-            $uri += "settings"
-            if ($Param) { $uri += "/$Param" }
-        }
-        'ExtensionSetting' {
-            $uri = "$script:TableauServerUrl/api/-/settings"
-            if ($Param) { $uri += "/$Param" }
-        }
-        'ConnectedApp' {
-            if ($script:TableauRestVersion -ge 3.17) {
-                $uri += "sites/$script:TableauSiteId/connected-apps/direct-trust"
-            } else {
-                $uri += "sites/$script:TableauSiteId/connected-applications"
+    if ($Endpoint -eq 'Versionless') {
+        $uri = "$script:TableauServerUrl/api/-/$Param"
+    } else {
+        $uri = "$script:TableauServerUrl/api/$script:TableauRestVersion/"
+        switch ($Endpoint) {
+            'Auth' {
+                $uri += "auth/$Param"
             }
-            if ($Param) { $uri += "/$Param" }
-        }
-        'EAS' {
-            $uri += "sites/$script:TableauSiteId/connected-apps/external-authorization-servers"
-            if ($Param) { $uri += "/$Param" }
-        }
-        'GraphQL' {
-            $uri = "$script:TableauServerUrl/api/metadata/graphql"
-        }
-        default {
-            $uri += "sites/$script:TableauSiteId/" + $Endpoint.ToLower() + "s" # User -> users, etc.
-            if ($Param) { $uri += "/$Param" }
+            'Site' {
+                $uri += "sites"
+                if ($Param) { $uri += "/$Param" }
+            }
+            'Session' {
+                $uri += "sessions"
+                if ($Param) { $uri += "/$Param" }
+            }
+            'Domain' {
+                $uri += "domains"
+                if ($Param) { $uri += "/$Param" }
+            }
+            'ServerSchedule' {
+                $uri += "schedules"
+                if ($Param) { $uri += "/$Param" }
+            }
+            'ServerSetting' {
+                $uri += "settings"
+                if ($Param) { $uri += "/$Param" }
+            }
+            'ConnectedApp' {
+                if ($script:TableauRestVersion -ge 3.17) {
+                    $uri += "sites/$script:TableauSiteId/connected-apps/direct-trust"
+                } else {
+                    $uri += "sites/$script:TableauSiteId/connected-applications"
+                }
+                if ($Param) { $uri += "/$Param" }
+            }
+            'EAS' {
+                $uri += "sites/$script:TableauSiteId/connected-apps/external-authorization-servers"
+                if ($Param) { $uri += "/$Param" }
+            }
+            'GraphQL' {
+                $uri = "$script:TableauServerUrl/api/metadata/graphql"
+            }
+            default {
+                $uri += "sites/$script:TableauSiteId/" + $Endpoint.ToLower() + "s" # User -> users, etc.
+                if ($Param) { $uri += "/$Param" }
+            }
         }
     }
     return $uri
@@ -3293,7 +3293,7 @@ Param(
     Assert-TableauRestVersion -AtLeast 2.8
     $uri = Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId/refresh
     if ($PSCmdlet.ShouldProcess($WorkbookId)) {
-        $response = Invoke-TableauRestMethod -Uri $uri -Body "<tsRequest />" -Method Post -ContentType "application/xml"
+        $response = Invoke-TableauRestMethod -Uri $uri -Body '<tsRequest />' -Method Post -ContentType 'application/xml'
         return $response.tsResponse.job
     }
 }
@@ -3935,7 +3935,7 @@ Param(
     Assert-TableauRestVersion -AtLeast 2.8
     $uri = Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId/refresh
     if ($PSCmdlet.ShouldProcess($DatasourceId)) {
-        $response = Invoke-TableauRestMethod -Uri $uri -Body "<tsRequest />" -Method Post -ContentType "application/xml"
+        $response = Invoke-TableauRestMethod -Uri $uri -Body '<tsRequest />' -Method Post -ContentType 'application/xml'
         return $response.tsResponse.job
     }
 }
@@ -4024,7 +4024,7 @@ Param(
     Write-Debug $jsonBody
 
     if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-        $response = Invoke-TableauRestMethod -Uri $uri -Body $jsonBody -Method Patch -ContentType "application/json" -AddHeaders @{RequestID=$RequestId}
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $jsonBody -Method Patch -ContentType 'application/json' -AddHeaders @{RequestID=$RequestId}
         # Write-Debug ($response.tsResponse.job | Format-List -Force | Out-String)
         return $response.tsResponse.job
     }
@@ -7475,17 +7475,17 @@ Param(
         switch ($Type) {
             'ExtractRefresh' { # Run Extract Refresh Task
                 Assert-TableauRestVersion -AtLeast 2.6
-                $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Task -Param extractRefreshes/$TaskId/runNow) -Body "<tsRequest />" -Method Post -ContentType "application/xml"
+                $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Task -Param extractRefreshes/$TaskId/runNow) -Body "<tsRequest />" -Method Post -ContentType 'application/xml'
                 return $response.tsResponse.job
             }
             'FlowRun' { # Run Flow Task
                 Assert-TableauRestVersion -AtLeast 3.3
-                $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Task -Param runFlow/$TaskId/runNow) -Body "<tsRequest />" -Method Post -ContentType "application/xml"
+                $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Task -Param runFlow/$TaskId/runNow) -Body "<tsRequest />" -Method Post -ContentType 'application/xml'
                 return $response.tsResponse.job
             }
             'Linked' { # Run Linked Task Now
                 Assert-TableauRestVersion -AtLeast 3.15
-                $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Task -Param linked/$TaskId/runNow) -Body "<tsRequest />" -Method Post -ContentType "application/xml"
+                $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Task -Param linked/$TaskId/runNow) -Body "<tsRequest />" -Method Post -ContentType 'application/xml'
                 return $response.tsResponse.linkedTaskJob
             }
         }
@@ -7783,7 +7783,7 @@ Param(
         }
     }
     if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Task -Param extractRefreshes) -Body $xml.OuterXml -Method Post #-ContentType "application/xml"
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Task -Param extractRefreshes) -Body $xml.OuterXml -Method Post # -ContentType 'application/xml'
         return $response.tsResponse
     }
 }
@@ -7944,7 +7944,7 @@ Param(
         }
     }
     if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Task -Param extractRefreshes/$TaskId) -Body $xml.OuterXml -Method Put #-ContentType "application/xml"
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Task -Param extractRefreshes/$TaskId) -Body $xml.OuterXml -Method Put # -ContentType 'application/xml'
         return $response.tsResponse
     }
 }
@@ -8843,7 +8843,7 @@ Param()
         return $response.tsResponse.extensionsServerSettings
     } else {
         Assert-TableauRestVersion -AtLeast 3.11
-        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param server/extensions/dashboard) -Method Get
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param settings/server/extensions/dashboard) -Method Get
     }
 }
 
@@ -8912,7 +8912,7 @@ Param(
         $jsonBody = $options | ConvertTo-Json -Compress -Depth 2
         # Write-Debug $jsonBody
         if ($PSCmdlet.ShouldProcess("Server Extensions: $Enabled")) {
-            Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param server/extensions/dashboard) -Body $jsonBody -Method Put -ContentType "application/json"
+            Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param settings/server/extensions/dashboard) -Body $jsonBody -Method Put -ContentType 'application/json'
         }
     }
 }
@@ -8946,7 +8946,7 @@ Param()
         return $response.tsResponse.extensionsSiteSettings
     } else {
         Assert-TableauRestVersion -AtLeast 3.11
-        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/dashboard) -Method Get
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param settings/site/extensions/dashboard) -Method Get
     }
 }
 
@@ -9033,7 +9033,7 @@ Param(
         $jsonBody = $options | ConvertTo-Json -Compress -Depth 2
         # Write-Debug $jsonBody
         if ($PSCmdlet.ShouldProcess("Site Extensions: $Enabled")) {
-            Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/dashboard) -Body $jsonBody -Method Put -ContentType "application/json"
+            Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param settings/site/extensions/dashboard) -Body $jsonBody -Method Put -ContentType 'application/json'
         }
     }
 }
@@ -9073,9 +9073,9 @@ Param(
     Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.11 -LessThan 3.21
     if ($ExtensionId) {
-        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param server/extensions/dashboard/blockListItems/$ExtensionId) -Method Get
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param settings/server/extensions/dashboard/blockListItems/$ExtensionId) -Method Get
     } else {
-        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param server/extensions/dashboard/blockListItems) -Method Get
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param settings/server/extensions/dashboard/blockListItems) -Method Get
     }
 }
 
@@ -9114,7 +9114,7 @@ Param(
     $jsonBody = $options | ConvertTo-Json -Compress -Depth 2
     # Write-Debug $jsonBody
     if ($PSCmdlet.ShouldProcess($ExtensionUrl)) {
-        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param server/extensions/dashboard/blockListItems) -Body $jsonBody -Method Post -ContentType "application/json"
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param settings/server/extensions/dashboard/blockListItems) -Body $jsonBody -Method Post -ContentType 'application/json'
     }
 }
 
@@ -9145,7 +9145,7 @@ Param(
     Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.11 -LessThan 3.21
     if ($PSCmdlet.ShouldProcess($ExtensionId)) {
-        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param server/extensions/dashboard/blockListItems/$ExtensionId) -Method Delete
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param settings/server/extensions/dashboard/blockListItems/$ExtensionId) -Method Delete
     }
 }
 
@@ -9184,9 +9184,9 @@ Param(
     Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.11 -LessThan 3.21
     if ($ExtensionId) {
-        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/dashboard/safeListItems/$ExtensionId) -Method Get
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param settings/site/extensions/dashboard/safeListItems/$ExtensionId) -Method Get
     } else {
-        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/dashboard/safeListItems) -Method Get
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param settings/site/extensions/dashboard/safeListItems) -Method Get
     }
 }
 
@@ -9239,7 +9239,7 @@ Param(
     $jsonBody = $options | ConvertTo-Json -Compress -Depth 2
     # Write-Debug $jsonBody
     if ($PSCmdlet.ShouldProcess($ExtensionId)) {
-        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/dashboard/safeListItems/$ExtensionId) -Body $jsonBody -Method Put -ContentType "application/json"
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param settings/site/extensions/dashboard/safeListItems/$ExtensionId) -Body $jsonBody -Method Put -ContentType 'application/json'
     }
 }
 
@@ -9287,7 +9287,7 @@ Param(
     $jsonBody = $options | ConvertTo-Json -Compress -Depth 2
     # Write-Debug $jsonBody
     if ($PSCmdlet.ShouldProcess($ExtensionUrl)) {
-        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/dashboard/safeListItems) -Body $jsonBody -Method Post -ContentType "application/json"
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param settings/site/extensions/dashboard/safeListItems) -Body $jsonBody -Method Post -ContentType 'application/json'
     }
 }
 
@@ -9318,7 +9318,7 @@ Param(
     Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.11 -LessThan 3.21
     if ($PSCmdlet.ShouldProcess($ExtensionId)) {
-        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/dashboard/safeListItems/$ExtensionId) -Method Delete
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param settings/site/extensions/dashboard/safeListItems/$ExtensionId) -Method Delete
     }
 }
 
@@ -9379,22 +9379,22 @@ Param(
     Assert-TableauRestVersion -AtLeast 3.11
     if ($Current.IsPresent) {
         # Get current analytics extension for workbook
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/analytics/workbooks/$WorkbookId/selected_connection) -Method Get
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param settings/site/extensions/analytics/workbooks/$WorkbookId/selected_connection) -Method Get
         Write-Debug $response
         return $response.connectionList
     } elseif ($WorkbookId) {
         # List analytics extension connections of workbook
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/analytics/workbooks/$WorkbookId/connections) -Method Get
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param settings/site/extensions/analytics/workbooks/$WorkbookId/connections) -Method Get
         Write-Debug $response
         return $response.connectionList
     } elseif ($ConnectionId) {
         # Get analytics extension connection details
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/analytics/connections/$ConnectionId) -Method Get
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param settings/site/extensions/analytics/connections/$ConnectionId) -Method Get
         # Write-Debug $response
         return $response
     } else {
         # List analytics extension connections on site
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/analytics/connections) -Method Get
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param settings/site/extensions/analytics/connections) -Method Get
         # Write-Debug $response
         return $response.connectionList
     }
@@ -9486,13 +9486,13 @@ Param(
             $options.password = (New-Object System.Net.NetworkCredential("", $SecurePassword)).Password
         }
         $jsonBody = $options | ConvertTo-Json -Compress -Depth 2
-        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/analytics/connections/$ConnectionId) -Body $jsonBody -Method Put -ContentType "application/json"
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param settings/site/extensions/analytics/connections/$ConnectionId) -Body $jsonBody -Method Put -ContentType 'application/json'
     } elseif ($WorkbookId -and $PSCmdlet.ShouldProcess("Update Analytics Extension (workbook)")) {
         $jsonBody = @{
             workbook_luid=$WorkbookId;
             connection_luid=$ConnectionId
         } | ConvertTo-Json -Compress
-        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/analytics/workbooks/$WorkbookId/selected_connection) -Body $jsonBody -Method Put -ContentType "application/json"
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param settings/site/extensions/analytics/workbooks/$WorkbookId/selected_connection) -Body $jsonBody -Method Put -ContentType 'application/json'
     }
 }
 
@@ -9565,7 +9565,7 @@ Param(
     $jsonBody = $options | ConvertTo-Json -Compress
     Write-Debug $jsonBody
     if ($PSCmdlet.ShouldProcess("Add Analytics Extension (site)")) {
-        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/analytics/connections) -Body $jsonBody -Method Post -ContentType "application/json"
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param settings/site/extensions/analytics/connections) -Body $jsonBody -Method Post -ContentType 'application/json'
     }
 }
 
@@ -9603,9 +9603,9 @@ Param(
     Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.11
     if ($WorkbookId -and $PSCmdlet.ShouldProcess("Remove Analytics Extension (workbook)")) {
-        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/analytics/workbooks/$WorkbookId/selected_connection) -Method Delete
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param settings/site/extensions/analytics/workbooks/$WorkbookId/selected_connection) -Method Delete
     } elseif ($ConnectionId -and $PSCmdlet.ShouldProcess("Remove Analytics Extension (site)")) {
-        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param site/extensions/analytics/connections/$ConnectionId) -Method Delete
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param settings/site/extensions/analytics/connections/$ConnectionId) -Method Delete
     }
 }
 
@@ -9638,7 +9638,7 @@ Param(
 )
     Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.11
-    $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param "$($Scope.ToLower())/extensions/analytics") -Method Get
+    $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param "settings/$($Scope.ToLower())/extensions/analytics") -Method Get
     return $response.enabled.ToString().ToLower()
 }
 
@@ -9678,7 +9678,7 @@ Param(
     Assert-TableauRestVersion -AtLeast 3.11
     $jsonBody = @{enabled=$Enabled} | ConvertTo-Json -Compress
     if ($PSCmdlet.ShouldProcess("Change Analytics Extensions ($Scope) to $Enabled")) {
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ExtensionSetting -Param "$($Scope.ToLower())/extensions/analytics") -Body $jsonBody -Method Put -ContentType "application/json"
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param "settings/$($Scope.ToLower())/extensions/analytics") -Body $jsonBody -Method Put -ContentType 'application/json'
         return $response.enabled.ToString().ToLower()
     }
 }
@@ -10947,8 +10947,184 @@ Param(
     }
 
     if ($PSCmdlet.ShouldProcess("Site Notification Settings")) {
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Setting -Param notifications) -Body $xml.OuterXml -Method Patch -ContentType "application/xml"
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Setting -Param notifications) -Body $xml.OuterXml -Method Patch -ContentType 'application/xml'
         return $response.tsResponse.notificationUpdateResult.notificationUpdateStatus
+    }
+}
+
+### Content Exploration methods
+function Get-TableauContentSuggestion {
+<#
+.SYNOPSIS
+Get content Suggestions
+
+.DESCRIPTION
+Returns a specified number of suggestions for auto-completion of user input as they type.
+You can specify content types of suggestions and prioritize recently viewed content.
+
+.PARAMETER Terms
+The term that is matched to find suggestions.
+
+.PARAMETER Filter
+(Optional) A filter to restrict suggestions to specified content types, e.g. type:eq:workbook
+
+.PARAMETER Luid
+(Optional) A comma separated list of luids that will be prioritized in scoring of content items matched to suggest.
+
+.PARAMETER Limit
+(Optional) The number of suggestions to return. The default is 10.
+
+.EXAMPLE
+$results = Get-TableauContentSuggestion -Terms regional
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/TAG/index.html#tag/Content-Exploration-Methods/operation/ContentExploration_getSuggestions
+#>
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $Terms,
+    [Parameter()][string[]] $Filter,
+    [Parameter()][string[]] $Luid,
+    [Parameter()][ValidateRange(1,10000)][int] $Limit = 10
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.19
+    $uri = Get-TableauRequestUri -Endpoint Versionless -Param suggestions
+    $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
+    $uriParam.Add("terms", $Terms -join ',')
+    $uriParam.Add("limit", $Limit)
+    if ($Filter) {
+        $uriParam.Add("filter", $Filter -join ',')
+    }
+    if ($Luid) {
+        $uriParam.Add("recentsLuids", $Luid -join ',')
+    }
+    $uriRequest = [System.UriBuilder]$uri
+    $uriRequest.Query = $uriParam.ToString()
+    $response = Invoke-TableauRestMethod -Uri $uriRequest.Uri.OriginalString -Method Get
+    $response.hits.items
+}
+
+function Get-TableauContentSearch {
+<#
+.SYNOPSIS
+Get content search results
+
+.DESCRIPTION
+Searches across all supported content types for objects relevant to the search expression specified in the querystring of the request URI.
+
+.PARAMETER Terms
+(Optional) One or more terms the search uses as the basis for which items are relevant to return.
+The items may be of any supported content type. The relevance may be assessed based on any element of a given item.
+If no terms are supplied, then results will be based filtering and page size limits.
+
+.PARAMETER Filter
+(Optional) An expression to filter the response using one of the following parameters, or a combination of expressions separated by a comma:
+- type, e.g. type:eq:workbook, type:in:[workbook,datasource]
+- ownerId, e.g. ownerId:in:[akhil,fred,alice]
+- modifiedTime, using eq, lte, gte, gt operators.
+
+.PARAMETER OrderBy
+(Optional) The sorting method for items returned, based on the popularity of the item. You can sort based on:
+hitsTotal - The number of times a content item has been viewed since it was created.
+hitsSmallSpanTotal The number of times viewed in the last month.
+hitsMediumSpanTotal The number of times viewed in the last three months.
+hitsLargeSpanTotal The number of times viewed in the last twelve months.
+downstreamWorkbookCount The number workbooks in a given project.
+
+.PARAMETER Limit
+(Optional) The number of search results to return. The default is 10.
+
+.PARAMETER All
+(Switch) When this parameter is provided, the search results are iterated for all pages
+(until the search is exhausted, that is when "next" pointer in the results is empty).
+
+.EXAMPLE
+$results = Get-TableauContentSearch -Terms sales -Filter type:eq:workbook -Limit 5
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/TAG/index.html#tag/Content-Exploration-Methods/operation/ContentExplorationService_getSearch
+#>
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter()][string[]] $Terms,
+    [Parameter()][string[]] $Filter,
+    [Parameter()][string[]] $OrderBy,
+    [Parameter()][switch] $All,
+    [Parameter()][ValidateRange(1,10000)][int] $Limit = 10
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.16
+    $pageIndex = 0
+    do {
+        $uri = Get-TableauRequestUri -Endpoint Versionless -Param search
+        $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
+        if ($Terms) {
+            $uriParam.Add("terms", $Terms -join ',')
+        }
+        $uriParam.Add("page", $pageIndex)
+        $uriParam.Add("limit", $Limit)
+        if ($Filter) {
+            $uriParam.Add("filter", $Filter -join ',')
+        }
+        if ($OrderBy) {
+            $uriParam.Add("order_by", $OrderBy -join ',')
+        }
+        $uriRequest = [System.UriBuilder]$uri
+        $uriRequest.Query = $uriParam.ToString()
+        $response = Invoke-TableauRestMethod -Uri $uriRequest.Uri.OriginalString -Method Get # -ContentType 'application/json'
+        $response.hits.items
+        # Write-Debug $response.hits.total
+        # Write-Debug $response.hits.next
+        $pageIndex++
+    } until ($null -eq $response.hits.next -or -not $All)
+}
+
+function Get-TableauContentUsage {
+<#
+.SYNOPSIS
+Get content usage statistics
+
+.DESCRIPTION
+Gets usage statistics for one or multiple content items, specified by LUID and content type (workbook, datasource, flow).
+
+.PARAMETER Content
+An array of hashtables, containing at least one item, each of those should have the following keys:
+- type: workbook, datasource, flow
+- luid: the LUID of the content
+
+.EXAMPLE
+$results = Get-TableauContentUsage -Content @{type='workbooks';luid=$id}
+
+.EXAMPLE
+$results = Get-TableauContentUsage -Content @{type='workbooks';luid=$wbid},@{type='datasources';luid=$dsid}
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/TAG/index.html#tag/Content-Exploration-Methods/operation/UsageStatsService_GetUsageStats
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/TAG/index.html#tag/Content-Exploration-Methods/operation/UsageStatsService_BatchGetUsage
+
+.NOTES
+If the Content parameter contains one element, the GET request is sent (GetUsageStats).
+If the Content parameter contains more than one element, the POST request is sent (BatchGetUsage).
+#>
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][hashtable[]] $Content
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.17
+    if ($Content.Length -eq 1) {
+        $type = $Content.type+'s'
+        $luid = $Content.luid
+        $uri = Get-TableauRequestUri -Endpoint Versionless -Param content/usage-stats/$type/$luid
+        Invoke-TableauRestMethod -Uri $uri -Method Get
+    } else {
+        $uri = Get-TableauRequestUri -Endpoint Versionless -Param content/usage-stats
+        $jsonBody = @{content_items=$Content} | ConvertTo-Json -Compress -Depth 4
+        # Write-Debug $jsonBody
+        Invoke-TableauRestMethod -Uri $uri -Body $jsonBody -Method Post -ContentType 'application/json'
     }
 }
 

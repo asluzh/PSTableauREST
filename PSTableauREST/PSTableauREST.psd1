@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.6.4'
+ModuleVersion = '0.6.5'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -151,13 +151,10 @@ FunctionsToExport = @(
 'Get-TableauDataAlert', 'New-TableauDataAlert', 'Set-TableauDataAlert', 'Remove-TableauDataAlert',
 'Add-TableauDataAlertUser', 'Remove-TableauDataAlertUser',
 'Get-TableauWebhook', 'New-TableauWebhook', 'Set-TableauWebhook', 'Remove-TableauWebhook',
-'Test-TableauWebhook','Get-TableauSiteSettingsNotification','Set-TableauSiteSettingsNotification'
+'Test-TableauWebhook','Get-TableauSiteSettingsNotification','Set-TableauSiteSettingsNotification',
 
 ### Content Exploration methods
-# Get content Suggestions
-# Get content search results
-# Get batch content usage statistics
-# Get usage statistics for content item
+'Get-TableauContentSuggestion','Get-TableauContentSearch','Get-TableauContentUsage',
 
 ### Ask Data Lens methods - retired in API 3.22
 ### Metrics methods - retired in API 3.22

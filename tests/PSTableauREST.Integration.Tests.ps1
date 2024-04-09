@@ -2647,7 +2647,7 @@ Describe "Integration Tests for <ModuleName>" -Tag Integration -ForEach $ConfigF
             }
             AfterAll {
                 if ($samplesProjectId) {
-                    # Remove-TableauProject -ProjectId $samplesProjectId | Out-Null
+                    Remove-TableauProject -ProjectId $samplesProjectId | Out-Null
                     $script:samplesProjectId = $null
                 }
             }
@@ -2757,6 +2757,47 @@ Describe "Integration Tests for <ModuleName>" -Tag Integration -ForEach $ConfigF
                 } else {
                     Set-ItResult -Skipped -Because "this feature is disabled for Tableau Cloud"
                 }
+            }
+        }
+        Context "Content Exploration Methods" -Tag ContentExploration {
+            It "Get content suggestions on <ConfigFile.server>" {
+                $results = Get-TableauContentSuggestion -Terms sales -Limit 3
+                $results | Should -Not -BeNullOrEmpty
+                $results | Should -Not -BeOfType Array
+                Write-Verbose ("{0} suggestions" -f $results.Length)
+                $results = Get-TableauContentSuggestion -Terms regional -Filter type:eq:workbook -Limit 1000
+                $results | Should -Not -BeNullOrEmpty
+                $results | Should -Not -BeOfType Array
+                Write-Verbose ("{0} suggestions" -f $results.Length)
+                # Write-Verbose ($results.uri | ConvertTo-Json -Compress -Depth 10)
+            }
+            It "Get content search results on <ConfigFile.server>" {
+                $results = Get-TableauContentSearch -Filter type:eq:workbook -Limit 3 -All
+                $results | Should -Not -BeNullOrEmpty
+                $results | Should -Not -BeOfType Array
+                Write-Verbose ("{0} search results" -f $results.Length)
+                $results = Get-TableauContentSearch -Terms regional -Filter "type:in:[workbook,datasource]" -Limit 5
+                $results | Should -Not -BeNullOrEmpty
+                $results | Should -Not -BeOfType Array
+                Write-Verbose ("{0} search results" -f $results.Length)
+                # Write-Verbose ($results.uri | ConvertTo-Json -Compress -Depth 10)
+            }
+            It "Get content usage stats on <ConfigFile.server>" {
+                $workbooks = Get-TableauWorkbook
+                ($workbooks | Measure-Object).Count | Should -BeGreaterThan 0
+                $workbookId = $workbooks | Select-Object -First 1 -ExpandProperty id
+                $results = Get-TableauContentUsage -Content @{type='workbook';luid=$workbookId}
+                $results | Should -Not -BeNullOrEmpty
+                $results | Should -Not -BeOfType Hashtable
+                Write-Verbose ("{0} usage stats" -f $results.Length)
+                $datasources = Get-TableauDatasource
+                ($datasources | Measure-Object).Count | Should -BeGreaterThan 0
+                $datasourceId = $datasources | Select-Object -First 1 -ExpandProperty id
+                $results = Get-TableauContentUsage -Content @{type='workbook';luid=$workbookId},@{type='datasource';luid=$datasourceId}
+                $results | Should -Not -BeNullOrEmpty
+                $results.content_items | Should -Not -BeOfType Array
+                Write-Verbose ("{0} usage stats" -f $results.content_items.Length)
+                # Write-Verbose ($results | ConvertTo-Json -Compress -Depth 10)
             }
         }
         Context "Metadata Methods" -Tag Metadata {
