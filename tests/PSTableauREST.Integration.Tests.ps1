@@ -2800,21 +2800,25 @@ Describe "Integration Tests for <ModuleName>" -Tag Integration -ForEach $ConfigF
             }
         }
         Context "Virtual Connection Methods" -Tag VirtualConnection {
-            It "List virtual connections on <ConfigFile.server>" -Skip {
+            It "List virtual connections on <ConfigFile.server>" {
                 if ($ConfigFile.tableau_cloud) {
-                    # TODO create a virtual connection on Tableau Cloud for testing
                     $vconn = Get-TableauVirtualConnection
                     $vconn | Should -Not -BeNullOrEmpty
+                } else {
+                    Set-ItResult -Skipped -Because "testing not implemented yet"
                 }
             }
-            It "Get/update virtual connection database connections on <ConfigFile.server>" -Skip {
+            It "Get/update virtual connection database connections on <ConfigFile.server>" {
                 if ($ConfigFile.tableau_cloud) {
                     $vconnId = Get-TableauVirtualConnection | Select-Object -First 1 -ExpandProperty id
                     $connections = Get-TableauVirtualConnection -VirtualConnectionId $vconnId
                     ($connections | Measure-Object).Count | Should -BeGreaterThan 0
-                    $connectionId = $connections | Select-Object -First 1 -ExpandProperty id
-                    $result = Set-TableauVirtualConnection -VirtualConnectionId $vconnId -ConnectionId $connectionId -ServerAddress tableau.com
+                    $connection = $connections | Select-Object -First 1
+                    # Write-Verbose ($connection.server)
+                    $result = Set-TableauVirtualConnection -VirtualConnectionId $vconnId -ConnectionId $connection.connectionId -ServerAddress $connection.server -ServerPort $connection.port
                     $result | Should -Not -BeNullOrEmpty
+                } else {
+                    Set-ItResult -Skipped -Because "testing not implemented yet"
                 }
             }
         }

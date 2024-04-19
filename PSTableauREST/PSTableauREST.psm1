@@ -11285,6 +11285,7 @@ Param(
         $el_connection.SetAttribute("password", $private:PlainPassword)
     }
     $uri = Get-TableauRequestUri -Endpoint VirtualConnection -Param $VirtualConnectionId/connections/$ConnectionId/modify
+    # Write-Debug $xml.OuterXml
     if ($PSCmdlet.ShouldProcess($ConnectionId)) {
         $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
         return $response.tsResponse.virtualConnectionConnections.connection
