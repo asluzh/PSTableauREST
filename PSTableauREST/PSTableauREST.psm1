@@ -129,7 +129,7 @@ Expand ValidateSet to add support for more Endpoints.
 [OutputType([string])]
 Param(
     [Parameter(Mandatory)][ValidateSet('Versionless','Auth','Site','Session','Domain',
-        'Setting','ServerSetting','ConnectedApp','EAS',
+        'Setting','ServerSetting','ConnectedApp','EAS','VirtualConnection',
         'Project','User','Group','Groupset','Workbook','Datasource','View','Flow',
         'FileUpload','Recommendation','CustomView','Favorite','OrderFavorite',
         'Schedule','ServerSchedule','Job','Task',
@@ -715,7 +715,7 @@ Param(
         $el_domain.SetAttribute("shortName", $ShortName)
     }
     if ($PSCmdlet.ShouldProcess($DomainId)) {
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Domain) -Method Put -Body $xml.OuterXml
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Domain) -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
         return $response.tsResponse.domain
     }
 }
@@ -902,7 +902,7 @@ Param(
     }
     if ($PSCmdlet.ShouldProcess($SiteId)) {
         if ($SiteId -eq $script:TableauSiteId) {
-            $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Site -Param $SiteId) -Body $xml.OuterXml -Method Put
+            $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Site -Param $SiteId) -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
             return $response.tsResponse.site
         } else {
             Write-Error "You can only update the site for which you are currently authenticated" -Category PermissionDenied -ErrorAction Stop
@@ -1043,7 +1043,7 @@ Param(
         $el_settings.SetAttribute("allowList", $AllowDomains)
     }
     if ($PSCmdlet.ShouldProcess("Unrestricted embedding: $UnrestrictedEmbedding, allow domains: $AllowDomains")) {
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Site -Param $SiteId/settings/embedding) -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Site -Param $SiteId/settings/embedding) -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
         return $response.tsResponse.site.settings
     }
 }
@@ -1252,7 +1252,7 @@ Param(
         $uri += "?publishSamples=true"
     }
     if ($PSCmdlet.ShouldProcess($ProjectId)) {
-        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
         $response.tsResponse.project
     }
 }
@@ -1494,7 +1494,7 @@ Param(
         $el_user.SetAttribute("authSetting", $AuthSetting)
     }
     if ($PSCmdlet.ShouldProcess($UserId)) {
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint User -Param $UserId) -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint User -Param $UserId) -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
         return $response.tsResponse.user
     }
 }
@@ -1759,7 +1759,7 @@ Param(
         $uri += "?asJob=true"
     }
     if ($PSCmdlet.ShouldProcess($GroupId)) {
-        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
         if ($BackgroundTask) {
             return $response.tsResponse.job
         } else {
@@ -2226,7 +2226,7 @@ Param(
     $el_groupset = $tsRequest.AppendChild($xml.CreateElement("groupSet"))
     $el_groupset.SetAttribute("name", $Name)
     if ($PSCmdlet.ShouldProcess($GroupSetId)) {
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Groupset -Param $GroupSetId) -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Groupset -Param $GroupSetId) -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
         return $response.tsResponse.groupSet
     }
 }
@@ -2291,7 +2291,7 @@ Param(
     Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.22
     if ($PSCmdlet.ShouldProcess("group:$GroupId, group set:$GroupSetId")) {
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Groupset -Param $GroupSetId/groups/$GroupId) -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Groupset -Param $GroupSetId/groups/$GroupId) -Method Put -ContentType 'application/xml'
         return $response #.tsResponse
     }
 }
@@ -2626,6 +2626,89 @@ Param(
     Assert-TableauAuthToken
     $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId/connections) -Method Get
     return $response.tsResponse.connections.connection
+}
+
+function Set-TableauWorkbookConnection {
+<#
+.SYNOPSIS
+Update Workbook Connection
+
+.DESCRIPTION
+Updates the server address, port, username, or password for the specified workbook connection.
+
+.PARAMETER WorkbookId
+The LUID of the workbook to update.
+
+.PARAMETER ConnectionId
+The LUID of the connection to update.
+
+.PARAMETER ServerAddress
+(Optional) The new server address of the connection.
+
+.PARAMETER ServerPort
+(Optional) The new server port of the connection.
+
+.PARAMETER Username
+(Optional) The new user name of the connection.
+
+.PARAMETER SecurePassword
+(Optional) The new password of the connection, should be supplied as SecurePassword.
+
+.PARAMETER EmbedPassword
+(Optional) Boolean switch, if supplied, the connection password is embedded.
+
+.PARAMETER QueryTagging
+(Optional) Boolean, true to enable query tagging for the connection.
+https://help.tableau.com/current/pro/desktop/en-us/performance_tips.htm
+
+.EXAMPLE
+$workbookConnection = Set-TableauWorkbookConnection -WorkbookId $sampleWorkbookId -ConnectionId $connectionId -ServerAddress myserver.com
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#update_workbook_connection
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauWorkbookConnection')]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $WorkbookId,
+    [Parameter(Mandatory)][string] $ConnectionId,
+    [Parameter()][string] $ServerAddress,
+    [Parameter()][string] $ServerPort,
+    [Parameter()][string] $Username,
+    [Parameter()][securestring] $SecurePassword,
+    [Parameter()][switch] $EmbedPassword,
+    [Parameter()][switch] $QueryTagging
+)
+    Assert-TableauAuthToken
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_connection = $tsRequest.AppendChild($xml.CreateElement("connection"))
+    if ($ServerAddress) {
+        $el_connection.SetAttribute("serverAddress", $ServerAddress)
+    }
+    if ($ServerPort) {
+        $el_connection.SetAttribute("serverPort", $ServerPort)
+    }
+    if ($Username) {
+        $el_connection.SetAttribute("userName", $Username)
+    }
+    if ($SecurePassword) {
+        $private:PlainPassword = (New-Object System.Net.NetworkCredential("", $SecurePassword)).Password
+        $el_connection.SetAttribute("password", $private:PlainPassword)
+    }
+    if ($PSBoundParameters.ContainsKey('EmbedPassword')) {
+        $el_connection.SetAttribute("embedPassword", $EmbedPassword)
+    }
+    if ($PSBoundParameters.ContainsKey('QueryTagging')) {
+        Assert-TableauRestVersion -AtLeast 3.13
+        $el_connection.SetAttribute("queryTaggingEnabled", $QueryTagging)
+    }
+    $uri = Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId/connections/$ConnectionId
+    if ($PSCmdlet.ShouldProcess($ConnectionId)) {
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
+        return $response.tsResponse.connection
+    }
 }
 
 function Export-TableauWorkbook {
@@ -3012,91 +3095,8 @@ Param(
     }
     $uri = Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId
     if ($PSCmdlet.ShouldProcess($WorkbookId)) {
-        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
         return $response.tsResponse.workbook
-    }
-}
-
-function Set-TableauWorkbookConnection {
-<#
-.SYNOPSIS
-Update Workbook Connection
-
-.DESCRIPTION
-Updates the server address, port, username, or password for the specified workbook connection.
-
-.PARAMETER WorkbookId
-The LUID of the workbook to update.
-
-.PARAMETER ConnectionId
-The LUID of the connection to update.
-
-.PARAMETER ServerAddress
-(Optional) The new server address of the connection.
-
-.PARAMETER ServerPort
-(Optional) The new server port of the connection.
-
-.PARAMETER Username
-(Optional) The new user name of the connection.
-
-.PARAMETER SecurePassword
-(Optional) The new password of the connection, should be supplied as SecurePassword.
-
-.PARAMETER EmbedPassword
-(Optional) Boolean switch, if supplied, the connection password is embedded.
-
-.PARAMETER QueryTagging
-(Optional) Boolean, true to enable query tagging for the connection.
-https://help.tableau.com/current/pro/desktop/en-us/performance_tips.htm
-
-.EXAMPLE
-$workbookConnection = Set-TableauWorkbookConnection -WorkbookId $sampleWorkbookId -ConnectionId $connectionId -ServerAddress myserver.com
-
-.LINK
-https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm#update_workbook_connection
-#>
-[CmdletBinding(SupportsShouldProcess)]
-[Alias('Update-TableauWorkbookConnection')]
-[OutputType([PSCustomObject])]
-Param(
-    [Parameter(Mandatory)][string] $WorkbookId,
-    [Parameter(Mandatory)][string] $ConnectionId,
-    [Parameter()][string] $ServerAddress,
-    [Parameter()][string] $ServerPort,
-    [Parameter()][string] $Username,
-    [Parameter()][securestring] $SecurePassword,
-    [Parameter()][switch] $EmbedPassword,
-    [Parameter()][switch] $QueryTagging
-)
-    Assert-TableauAuthToken
-    $xml = New-Object System.Xml.XmlDocument
-    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
-    $el_connection = $tsRequest.AppendChild($xml.CreateElement("connection"))
-    if ($ServerAddress) {
-        $el_connection.SetAttribute("serverAddress", $ServerAddress)
-    }
-    if ($ServerPort) {
-        $el_connection.SetAttribute("serverPort", $ServerPort)
-    }
-    if ($Username) {
-        $el_connection.SetAttribute("userName", $Username)
-    }
-    if ($SecurePassword) {
-        $private:PlainPassword = (New-Object System.Net.NetworkCredential("", $SecurePassword)).Password
-        $el_connection.SetAttribute("password", $private:PlainPassword)
-    }
-    if ($PSBoundParameters.ContainsKey('EmbedPassword')) {
-        $el_connection.SetAttribute("embedPassword", $EmbedPassword)
-    }
-    if ($PSBoundParameters.ContainsKey('QueryTagging')) {
-        Assert-TableauRestVersion -AtLeast 3.13
-        $el_connection.SetAttribute("queryTaggingEnabled", $QueryTagging)
-    }
-    $uri = Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId/connections/$ConnectionId
-    if ($PSCmdlet.ShouldProcess($ConnectionId)) {
-        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put
-        return $response.tsResponse.connection
     }
 }
 
@@ -3427,6 +3427,89 @@ Param(
     Assert-TableauAuthToken
     $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId/connections) -Method Get
     return $response.tsResponse.connections.connection
+}
+
+function Set-TableauDatasourceConnection {
+<#
+.SYNOPSIS
+Update Data Source Connection
+
+.DESCRIPTION
+Updates the server address, port, username, or password for the specified data source connection.
+
+.PARAMETER DatasourceId
+The LUID of the data source to update.
+
+.PARAMETER ConnectionId
+The LUID of the connection to update.
+
+.PARAMETER ServerAddress
+(Optional) The new server address of the connection.
+
+.PARAMETER ServerPort
+(Optional) The new server port of the connection.
+
+.PARAMETER Username
+(Optional) The new user name of the connection.
+
+.PARAMETER SecurePassword
+(Optional) The new password of the connection, should be supplied as SecurePassword.
+
+.PARAMETER EmbedPassword
+(Optional) Boolean switch, if supplied, the connection password is embedded.
+
+.PARAMETER QueryTagging
+(Optional) Boolean, true to enable query tagging for the connection.
+https://help.tableau.com/current/pro/desktop/en-us/performance_tips.htm
+
+.EXAMPLE
+$datasourceConnection = Set-TableauDatasourceConnection -DatasourceId $sampleDatasourceId -ConnectionId $connectionId -ServerAddress myserver.com
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sources.htm#update_data_source_connection
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauDatasourceConnection')]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $DatasourceId,
+    [Parameter(Mandatory)][string] $ConnectionId,
+    [Parameter()][string] $ServerAddress,
+    [Parameter()][string] $ServerPort,
+    [Parameter()][string] $Username,
+    [Parameter()][securestring] $SecurePassword,
+    [Parameter()][switch] $EmbedPassword,
+    [Parameter()][switch] $QueryTagging
+)
+    Assert-TableauAuthToken
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_connection = $tsRequest.AppendChild($xml.CreateElement("connection"))
+    if ($ServerAddress) {
+        $el_connection.SetAttribute("serverAddress", $ServerAddress)
+    }
+    if ($ServerPort) {
+        $el_connection.SetAttribute("serverPort", $ServerPort)
+    }
+    if ($Username) {
+        $el_connection.SetAttribute("userName", $Username)
+    }
+    if ($SecurePassword) {
+        $private:PlainPassword = (New-Object System.Net.NetworkCredential("", $SecurePassword)).Password
+        $el_connection.SetAttribute("password", $private:PlainPassword)
+    }
+    if ($PSBoundParameters.ContainsKey('EmbedPassword')) {
+        $el_connection.SetAttribute("embedPassword", $EmbedPassword)
+    }
+    if ($PSBoundParameters.ContainsKey('QueryTagging')) {
+        Assert-TableauRestVersion -AtLeast 3.13
+        $el_connection.SetAttribute("queryTaggingEnabled", $QueryTagging)
+    }
+    $uri = Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId/connections/$ConnectionId
+    if ($PSCmdlet.ShouldProcess($ConnectionId)) {
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
+        return $response.tsResponse.connection
+    }
 }
 
 function Export-TableauDatasource {
@@ -3776,91 +3859,8 @@ Param(
     }
     $uri = Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId
     if ($PSCmdlet.ShouldProcess($DatasourceId)) {
-        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
         return $response.tsResponse.datasource
-    }
-}
-
-function Set-TableauDatasourceConnection {
-<#
-.SYNOPSIS
-Update Data Source Connection
-
-.DESCRIPTION
-Updates the server address, port, username, or password for the specified data source connection.
-
-.PARAMETER DatasourceId
-The LUID of the data source to update.
-
-.PARAMETER ConnectionId
-The LUID of the connection to update.
-
-.PARAMETER ServerAddress
-(Optional) The new server address of the connection.
-
-.PARAMETER ServerPort
-(Optional) The new server port of the connection.
-
-.PARAMETER Username
-(Optional) The new user name of the connection.
-
-.PARAMETER SecurePassword
-(Optional) The new password of the connection, should be supplied as SecurePassword.
-
-.PARAMETER EmbedPassword
-(Optional) Boolean switch, if supplied, the connection password is embedded.
-
-.PARAMETER QueryTagging
-(Optional) Boolean, true to enable query tagging for the connection.
-https://help.tableau.com/current/pro/desktop/en-us/performance_tips.htm
-
-.EXAMPLE
-$datasourceConnection = Set-TableauDatasourceConnection -DatasourceId $sampleDatasourceId -ConnectionId $connectionId -ServerAddress myserver.com
-
-.LINK
-https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_data_sources.htm#update_data_source_connection
-#>
-[CmdletBinding(SupportsShouldProcess)]
-[Alias('Update-TableauDatasourceConnection')]
-[OutputType([PSCustomObject])]
-Param(
-    [Parameter(Mandatory)][string] $DatasourceId,
-    [Parameter(Mandatory)][string] $ConnectionId,
-    [Parameter()][string] $ServerAddress,
-    [Parameter()][string] $ServerPort,
-    [Parameter()][string] $Username,
-    [Parameter()][securestring] $SecurePassword,
-    [Parameter()][switch] $EmbedPassword,
-    [Parameter()][switch] $QueryTagging
-)
-    Assert-TableauAuthToken
-    $xml = New-Object System.Xml.XmlDocument
-    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
-    $el_connection = $tsRequest.AppendChild($xml.CreateElement("connection"))
-    if ($ServerAddress) {
-        $el_connection.SetAttribute("serverAddress", $ServerAddress)
-    }
-    if ($ServerPort) {
-        $el_connection.SetAttribute("serverPort", $ServerPort)
-    }
-    if ($Username) {
-        $el_connection.SetAttribute("userName", $Username)
-    }
-    if ($SecurePassword) {
-        $private:PlainPassword = (New-Object System.Net.NetworkCredential("", $SecurePassword)).Password
-        $el_connection.SetAttribute("password", $private:PlainPassword)
-    }
-    if ($PSBoundParameters.ContainsKey('EmbedPassword')) {
-        $el_connection.SetAttribute("embedPassword", $EmbedPassword)
-    }
-    if ($PSBoundParameters.ContainsKey('QueryTagging')) {
-        Assert-TableauRestVersion -AtLeast 3.13
-        $el_connection.SetAttribute("queryTaggingEnabled", $QueryTagging)
-    }
-    $uri = Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId/connections/$ConnectionId
-    if ($PSCmdlet.ShouldProcess($ConnectionId)) {
-        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put
-        return $response.tsResponse.connection
     }
 }
 
@@ -4024,7 +4024,7 @@ Param(
     Write-Debug $jsonBody
 
     if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-        $response = Invoke-TableauRestMethod -Uri $uri -Body $jsonBody -Method Patch -ContentType 'application/json' -AddHeaders @{RequestID=$RequestId}
+        $response = Invoke-TableauRestMethod -Uri $uri -AddHeaders @{RequestID=$RequestId} -Body $jsonBody -Method Patch -ContentType 'application/json'
         # Write-Debug ($response.tsResponse.job | Format-List -Force | Out-String)
         return $response.tsResponse.job
     }
@@ -4358,7 +4358,7 @@ Param(
     $el_view = $el_rd.AppendChild($xml.CreateElement("view"))
     $el_view.SetAttribute("id", $ViewId)
     $uri = Get-TableauRequestUri -Endpoint Recommendation -Param dismissals
-    Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put
+    Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
 }
 
 function Show-TableauViewRecommendation {
@@ -4652,7 +4652,7 @@ Param(
         $el_owner.SetAttribute("id", $NewOwnerId)
     }
     if ($PSCmdlet.ShouldProcess($CustomViewId)) {
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint CustomView -Param $CustomViewId) -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint CustomView -Param $CustomViewId) -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
         return $response.tsResponse.customView
     }
 }
@@ -4902,6 +4902,81 @@ Param(
     Assert-TableauRestVersion -AtLeast 3.3
     $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Flow -Param $FlowId/connections) -Method Get
     return $response.tsResponse.connections.connection
+}
+
+function Set-TableauFlowConnection {
+<#
+.SYNOPSIS
+Update Flow Connection
+
+.DESCRIPTION
+Updates the server address, port, username, or password for the specified flow connection.
+
+.PARAMETER FlowId
+The LUID of the data source to update.
+
+.PARAMETER ConnectionId
+The LUID of the connection to update.
+
+.PARAMETER ServerAddress
+(Optional) The new server address of the connection.
+
+.PARAMETER ServerPort
+(Optional) The new server port of the connection.
+
+.PARAMETER Username
+(Optional) The new user name of the connection.
+
+.PARAMETER SecurePassword
+(Optional) The new password of the connection, should be supplied as SecurePassword.
+
+.PARAMETER EmbedPassword
+(Optional) Boolean switch, if supplied, the connection password is embedded.
+
+.EXAMPLE
+$flowConnection = Set-TableauFlowConnection -FlowId $flow.id -ConnectionId $connectionId -ServerAddress myserver.com
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#update_flow_connection
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauFlowConnection')]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $FlowId,
+    [Parameter(Mandatory)][string] $ConnectionId,
+    [Parameter()][string] $ServerAddress,
+    [Parameter()][string] $ServerPort,
+    [Parameter()][string] $Username,
+    [Parameter()][securestring] $SecurePassword,
+    [Parameter()][switch] $EmbedPassword
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.3
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_connection = $tsRequest.AppendChild($xml.CreateElement("connection"))
+    if ($ServerAddress) {
+        $el_connection.SetAttribute("serverAddress", $ServerAddress)
+    }
+    if ($ServerPort) {
+        $el_connection.SetAttribute("serverPort", $ServerPort)
+    }
+    if ($Username) {
+        $el_connection.SetAttribute("userName", $Username)
+    }
+    if ($SecurePassword) {
+        $private:PlainPassword = (New-Object System.Net.NetworkCredential("", $SecurePassword)).Password
+        $el_connection.SetAttribute("password", $private:PlainPassword)
+    }
+    if ($PSBoundParameters.ContainsKey('EmbedPassword')) {
+        $el_connection.SetAttribute("embedPassword", $EmbedPassword)
+    }
+    $uri = Get-TableauRequestUri -Endpoint Flow -Param $FlowId/connections/$ConnectionId
+    if ($PSCmdlet.ShouldProcess($ConnectionId)) {
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
+        return $response.tsResponse.connection
+    }
 }
 
 function Export-TableauFlow {
@@ -5156,83 +5231,8 @@ Param(
         $el_owner.SetAttribute("id", $NewOwnerId)
     }
     if ($PSCmdlet.ShouldProcess($FlowId)) {
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Flow -Param $FlowId) -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Flow -Param $FlowId) -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
         return $response.tsResponse.flow
-    }
-}
-
-function Set-TableauFlowConnection {
-<#
-.SYNOPSIS
-Update Flow Connection
-
-.DESCRIPTION
-Updates the server address, port, username, or password for the specified flow connection.
-
-.PARAMETER FlowId
-The LUID of the data source to update.
-
-.PARAMETER ConnectionId
-The LUID of the connection to update.
-
-.PARAMETER ServerAddress
-(Optional) The new server address of the connection.
-
-.PARAMETER ServerPort
-(Optional) The new server port of the connection.
-
-.PARAMETER Username
-(Optional) The new user name of the connection.
-
-.PARAMETER SecurePassword
-(Optional) The new password of the connection, should be supplied as SecurePassword.
-
-.PARAMETER EmbedPassword
-(Optional) Boolean switch, if supplied, the connection password is embedded.
-
-.EXAMPLE
-$flowConnection = Set-TableauFlowConnection -FlowId $flow.id -ConnectionId $connectionId -ServerAddress myserver.com
-
-.LINK
-https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_flow.htm#update_flow_connection
-#>
-[CmdletBinding(SupportsShouldProcess)]
-[Alias('Update-TableauFlowConnection')]
-[OutputType([PSCustomObject])]
-Param(
-    [Parameter(Mandatory)][string] $FlowId,
-    [Parameter(Mandatory)][string] $ConnectionId,
-    [Parameter()][string] $ServerAddress,
-    [Parameter()][string] $ServerPort,
-    [Parameter()][string] $Username,
-    [Parameter()][securestring] $SecurePassword,
-    [Parameter()][switch] $EmbedPassword
-)
-    Assert-TableauAuthToken
-    Assert-TableauRestVersion -AtLeast 3.3
-    $xml = New-Object System.Xml.XmlDocument
-    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
-    $el_connection = $tsRequest.AppendChild($xml.CreateElement("connection"))
-    if ($ServerAddress) {
-        $el_connection.SetAttribute("serverAddress", $ServerAddress)
-    }
-    if ($ServerPort) {
-        $el_connection.SetAttribute("serverPort", $ServerPort)
-    }
-    if ($Username) {
-        $el_connection.SetAttribute("userName", $Username)
-    }
-    if ($SecurePassword) {
-        $private:PlainPassword = (New-Object System.Net.NetworkCredential("", $SecurePassword)).Password
-        $el_connection.SetAttribute("password", $private:PlainPassword)
-    }
-    if ($PSBoundParameters.ContainsKey('EmbedPassword')) {
-        $el_connection.SetAttribute("embedPassword", $EmbedPassword)
-    }
-    $uri = Get-TableauRequestUri -Endpoint Flow -Param $FlowId/connections/$ConnectionId
-    if ($PSCmdlet.ShouldProcess($ConnectionId)) {
-        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put
-        return $response.tsResponse.connection
     }
 }
 
@@ -5430,7 +5430,7 @@ Param(
     Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.10
     if ($PSCmdlet.ShouldProcess($FlowRunId)) {
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Flow -Param runs/$FlowRunId) -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Flow -Param runs/$FlowRunId) -Method Put -ContentType 'application/xml'
         if ($response.tsResponse.error) {
             return $response.tsResponse.error
         } else {
@@ -5623,7 +5623,7 @@ Param(
     }
     $shouldProcessItem += ", grantees:{0}, permissions:{1}" -f $PermissionTable.Length, $permissionsCount
     if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
         return $response.tsResponse.permissions
     }
 }
@@ -6316,7 +6316,7 @@ Param(
                     Remove-TableauDefaultPermission -ProjectId $ProjectId -ContentType $ct -GranteeType $_.granteeType -GranteeId $_.granteeId -CapabilityName $_.capabilityName -CapabilityMode $_.capabilityMode
                 }
                 if ($permissionsCount -gt 0) { # empty permissions element in xml is not allowed
-                    $response = Invoke-TableauRestMethod -Uri $uri$ct -Body $xml.OuterXml -Method Put
+                    $response = Invoke-TableauRestMethod -Uri $uri$ct -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
                     if ($response.tsResponse.permissions.granteeCapabilities) {
                         $response.tsResponse.permissions.granteeCapabilities | ForEach-Object {
                             if ($_.group -and $_.group.id) {
@@ -6535,16 +6535,16 @@ Param(
         $el_tag.SetAttribute("label", $tag)
     }
     if ($WorkbookId -and $PSCmdlet.ShouldProcess("workbook:$WorkbookId, tags:"+($Tags -join ' '))) {
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId/tags) -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Workbook -Param $WorkbookId/tags) -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
         return $response.tsResponse.tags.tag
     } elseif ($DatasourceId -and $PSCmdlet.ShouldProcess("datasource:$DatasourceId, tags:"+($Tags -join ' '))) {
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId/tags) -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Datasource -Param $DatasourceId/tags) -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
         return $response.tsResponse.tags.tag
     } elseif ($ViewId -and $PSCmdlet.ShouldProcess("view:$ViewId, tags:"+($Tags -join ' '))) {
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint View -Param $ViewId/tags) -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint View -Param $ViewId/tags) -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
         return $response.tsResponse.tags.tag
     } elseif ($FlowId -and $PSCmdlet.ShouldProcess("flow:$FlowId, tags:"+($Tags -join ' '))) {
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Flow -Param $FlowId/tags) -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Flow -Param $FlowId/tags) -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
         return $response.tsResponse.tags.tag
     }
 }
@@ -6936,7 +6936,7 @@ Param(
         }
     }
     if ($PSCmdlet.ShouldProcess($ScheduleId)) {
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ServerSchedule -Param $ScheduleId) -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ServerSchedule -Param $ScheduleId) -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
         return $response.tsResponse.schedule
     }
 }
@@ -7082,7 +7082,7 @@ Param(
         }
     }
     if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
         return $response.tsResponse.task
     }
 }
@@ -7196,7 +7196,7 @@ Param(
     Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.1
     if ($PSCmdlet.ShouldProcess($JobId)) {
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Job -Param $JobId) -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Job -Param $JobId) -Method Put -ContentType 'application/xml'
         if ($response.tsResponse.error) {
             return $response.tsResponse.error
         } else {
@@ -7944,7 +7944,7 @@ Param(
         }
     }
     if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Task -Param extractRefreshes/$TaskId) -Body $xml.OuterXml -Method Put # -ContentType 'application/xml'
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Task -Param extractRefreshes/$TaskId) -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
         return $response.tsResponse
     }
 }
@@ -8162,7 +8162,7 @@ Param(
         $shouldProcessItem = "user:$UserId, flow:$FlowId"
     }
     if ($PSCmdlet.ShouldProcess($shouldProcessItem)) {
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Favorite -Param $UserId) -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Favorite -Param $UserId) -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
         return $response.tsResponse.favorites.favorite
     }
 }
@@ -8296,7 +8296,7 @@ Param(
     $el_fo.SetAttribute("favoriteIdMoveAfter", $AfterFavoriteId)
     $el_fo.SetAttribute("favoriteTypeMoveAfter", $AfterFavoriteType.ToLower()) # note: needs to be lowercase, otherwise TS will return error 400
     if ($PSCmdlet.ShouldProcess("user:$UserId, favorite($FavoriteType):$FavoriteId, after($AfterFavoriteType):$AfterFavoriteId")) {
-        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint OrderFavorite -Param $UserId) -Body $xml.OuterXml -Method Put
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint OrderFavorite -Param $UserId) -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
     }
 }
 
@@ -8780,7 +8780,7 @@ Param(
         }
     }
     if ($PSCmdlet.ShouldProcess($SubscriptionId)) {
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Subscription -Param $SubscriptionId) -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Subscription -Param $SubscriptionId) -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
         return $response.tsResponse.subscription
     }
 }
@@ -8898,7 +8898,7 @@ Param(
             }
         }
         if ($PSCmdlet.ShouldProcess("Server Extensions: $Enabled")) {
-            $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ServerSetting -Param extensions) -Method Put -Body $xml.OuterXml
+            $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ServerSetting -Param extensions) -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
             return $response.tsResponse.extensionsServerSettings
         }
     } else {
@@ -9018,7 +9018,7 @@ Param(
         }
         # Write-Debug ($xml.OuterXml | ConvertTo-Json -Compress)
         if ($PSCmdlet.ShouldProcess("Site Extensions: $Enabled")) {
-            $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Setting -Param extensions) -Method Put -Body $xml.OuterXml
+            $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Setting -Param extensions) -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
             return $response.tsResponse.extensionsSiteSettings
         }
     } else {
@@ -9817,7 +9817,7 @@ Param(
         }
     }
     if ($PSCmdlet.ShouldProcess($ClientId)) {
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ConnectedApp -Param $ClientId) -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ConnectedApp -Param $ClientId) -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
         return $response.tsResponse.connectedApplication
     }
 }
@@ -10130,7 +10130,7 @@ Param(
         $el_eas.SetAttribute("name", $Name)
     }
     if ($PSCmdlet.ShouldProcess($EasId)) {
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint EAS -Param $EasId) -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint EAS -Param $EasId) -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
         return $response.tsResponse.externalAuthorizationServer
     }
 }
@@ -10448,7 +10448,7 @@ Param(
         $el_owner.SetAttribute("id", $OwnerUserId)
     }
     if ($PSCmdlet.ShouldProcess($DataAlertId)) {
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint DataAlert -Param $DataAlertId) -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint DataAlert -Param $DataAlertId) -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
         return $response.tsResponse.dataAlert
     }
 }
@@ -10772,7 +10772,7 @@ Param(
         $el_wdh.SetAttribute("url", $DestinationUrl)
     }
     if ($PSCmdlet.ShouldProcess($WebhookId)) {
-        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Webhook -Param $WebhookId) -Body $xml.OuterXml -Method Put
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Webhook -Param $WebhookId) -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
         return $response.tsResponse.webhook
     }
 }
@@ -11125,6 +11125,169 @@ Param(
         $jsonBody = @{content_items=$Content} | ConvertTo-Json -Compress -Depth 4
         # Write-Debug $jsonBody
         Invoke-TableauRestMethod -Uri $uri -Body $jsonBody -Method Post -ContentType 'application/json'
+    }
+}
+
+### Virtual Connections methods
+function Get-TableauVirtualConnection {
+<#
+.SYNOPSIS
+List Virtual Connections
+or
+List Virtual Connection Database Connections
+
+.DESCRIPTION
+Returns a list of available virtual connection names and IDs.
+or
+Returns a list of database connections found in the specified virtual connection and information about them.
+
+.PARAMETER VirtualConnectionId
+List Virtual Connection Database Connections: The LUID of the virtual connection.
+
+.PARAMETER Filter
+(Optional)
+An expression that lets you specify a subset of data records to return.
+
+.PARAMETER Sort
+(Optional)
+An expression that lets you specify the order in which data is returned.
+
+.PARAMETER Fields
+(Optional)
+An expression that lets you specify which data attributes are included in response.
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_fields.htm#query_workbooks_site
+
+.PARAMETER PageSize
+(Optional) Page size when paging through results.
+
+.EXAMPLE
+$vconn = Get-TableauVirtualConnection -Filter "name:eq:$vcname" -Sort name:asc -Fields id,name
+
+.EXAMPLE
+$dbConnections = Get-TableauVirtualConnection -VirtualConnectionId $id
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_virtual_connections.htm#ref_list_virtual_connections
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_virtual_connections.htm#ref_list_virtual_connection_database_connections
+#>
+[Alias('Query-TableauVirtualConnection')]
+[OutputType([PSCustomObject[]])]
+Param(
+    [Parameter(Mandatory,ParameterSetName='ListDbConnections')][string] $VirtualConnectionId,
+    [Parameter(ParameterSetName='ListVirtualConnections')][string[]] $Filter,
+    [Parameter(ParameterSetName='ListVirtualConnections')][string[]] $Sort,
+    [Parameter(ParameterSetName='ListVirtualConnections')][string[]] $Fields,
+    [Parameter(ParameterSetName='ListVirtualConnections')][ValidateRange(1,100)][int] $PageSize = 100
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.18
+    if ($VirtualConnectionId) { # List Virtual Connection Database Connections
+        $pageNumber = 0
+        do {
+            $pageNumber++
+            $uri = Get-TableauRequestUri -Endpoint VirtualConnection -Param $VirtualConnectionId/connections
+            $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
+            $uriParam.Add("pageSize", $PageSize)
+            $uriParam.Add("pageNumber", $pageNumber)
+            $uriRequest = [System.UriBuilder]$uri
+            $uriRequest.Query = $uriParam.ToString()
+            $response = Invoke-TableauRestMethod -Uri $uriRequest.Uri.OriginalString -Method Get
+            $totalAvailable = $response.tsResponse.pagination.totalAvailable
+            $response.tsResponse.virtualConnectionConnections.connection
+        } until ($PageSize*$pageNumber -ge $totalAvailable)
+    } else { # List Virtual Connections
+        $pageNumber = 0
+        do {
+            $pageNumber++
+            $uri = Get-TableauRequestUri -Endpoint VirtualConnection
+            $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
+            $uriParam.Add("pageSize", $PageSize)
+            $uriParam.Add("pageNumber", $pageNumber)
+            if ($Filter) {
+                $uriParam.Add("filter", $Filter -join ',')
+            }
+            if ($Sort) {
+                $uriParam.Add("sort", $Sort -join ',')
+            }
+            if ($Fields) {
+                $uriParam.Add("fields", $Fields -join ',')
+            }
+            $uriRequest = [System.UriBuilder]$uri
+            $uriRequest.Query = $uriParam.ToString()
+            $response = Invoke-TableauRestMethod -Uri $uriRequest.Uri.OriginalString -Method Get
+            $totalAvailable = $response.tsResponse.pagination.totalAvailable
+            $response.tsResponse.virtualConnections.virtualConnection
+        } until ($PageSize*$pageNumber -ge $totalAvailable)
+    }
+}
+
+function Set-TableauVirtualConnection {
+<#
+.SYNOPSIS
+Update Virtual Connection Database Connections
+
+.DESCRIPTION
+Updates the server address, port, username, or password for the specified database connection in a virtual connection.
+
+.PARAMETER VirtualConnectionId
+The LUID for the virtual connection that includes the database connections.
+
+.PARAMETER ConnectionId
+The LUID of the database connection to update.
+
+.PARAMETER ServerAddress
+(Optional) The new server address of the connection.
+
+.PARAMETER ServerPort
+(Optional) The new server port of the connection.
+
+.PARAMETER Username
+(Optional) The new user name of the connection.
+
+.PARAMETER SecurePassword
+(Optional) The new password of the connection, should be supplied as SecurePassword.
+
+.EXAMPLE
+$connection = Set-TableauVirtualConnection -VirtualConnectionId $vc.id -ConnectionId $connectionId -ServerAddress myserver.com
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_virtual_connections.htm#update_virtual_connection_database_connections
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauVirtualConnection')]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $VirtualConnectionId,
+    [Parameter(Mandatory)][string] $ConnectionId,
+    [Parameter()][string] $ServerAddress,
+    [Parameter()][string] $ServerPort,
+    [Parameter()][string] $Username,
+    [Parameter()][securestring] $SecurePassword
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.18
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_connection = $tsRequest.AppendChild($xml.CreateElement("connection"))
+    if ($ServerAddress) {
+        $el_connection.SetAttribute("serverAddress", $ServerAddress)
+    }
+    if ($ServerPort) {
+        $el_connection.SetAttribute("serverPort", $ServerPort)
+    }
+    if ($Username) {
+        $el_connection.SetAttribute("userName", $Username)
+    }
+    if ($SecurePassword) {
+        $private:PlainPassword = (New-Object System.Net.NetworkCredential("", $SecurePassword)).Password
+        $el_connection.SetAttribute("password", $private:PlainPassword)
+    }
+    $uri = Get-TableauRequestUri -Endpoint VirtualConnection -Param $VirtualConnectionId/connections/$ConnectionId/modify
+    if ($PSCmdlet.ShouldProcess($ConnectionId)) {
+        $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
+        return $response.tsResponse.virtualConnectionConnections.connection
     }
 }
 

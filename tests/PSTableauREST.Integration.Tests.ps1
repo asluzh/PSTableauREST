@@ -7,7 +7,6 @@ BeforeDiscovery {
 }
 BeforeAll {
     # Requires -Modules Assert
-    # Import-Module Assert
     Get-Module -Name $ModuleName -All | Remove-Module -Force -ErrorAction Ignore
     Import-Module ./$ModuleName -Force
     . ./scripts/SecretStore.Functions.ps1
@@ -2798,6 +2797,25 @@ Describe "Integration Tests for <ModuleName>" -Tag Integration -ForEach $ConfigF
                 $results.content_items | Should -Not -BeOfType Array
                 Write-Verbose ("{0} usage stats" -f $results.content_items.Length)
                 # Write-Verbose ($results | ConvertTo-Json -Compress -Depth 10)
+            }
+        }
+        Context "Virtual Connection Methods" -Tag VirtualConnection {
+            It "List virtual connections on <ConfigFile.server>" -Skip {
+                if ($ConfigFile.tableau_cloud) {
+                    # TODO create a virtual connection on Tableau Cloud for testing
+                    $vconn = Get-TableauVirtualConnection
+                    $vconn | Should -Not -BeNullOrEmpty
+                }
+            }
+            It "Get/update virtual connection database connections on <ConfigFile.server>" -Skip {
+                if ($ConfigFile.tableau_cloud) {
+                    $vconnId = Get-TableauVirtualConnection | Select-Object -First 1 -ExpandProperty id
+                    $connections = Get-TableauVirtualConnection -VirtualConnectionId $vconnId
+                    ($connections | Measure-Object).Count | Should -BeGreaterThan 0
+                    $connectionId = $connections | Select-Object -First 1 -ExpandProperty id
+                    $result = Set-TableauVirtualConnection -VirtualConnectionId $vconnId -ConnectionId $connectionId -ServerAddress tableau.com
+                    $result | Should -Not -BeNullOrEmpty
+                }
             }
         }
         Context "Metadata Methods" -Tag Metadata {

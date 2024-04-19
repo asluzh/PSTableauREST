@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.6.5'
+ModuleVersion = '0.7.0'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -89,8 +89,8 @@ FunctionsToExport = @(
 'Add-TableauUserToGroup', 'Remove-TableauUserFromGroup', 'Get-TableauUsersInGroup', 'Get-TableauGroupsForUser',
 'Import-TableauUsersCsv', 'Remove-TableauUsersCsv',
 # new group set methods - API 3.22
-'Get-TableauGroupSet','New-TableauGroupSet','Set-TableauGroupSet','Remove-TableauGroupSet',
-'Add-TableauGroupToGroupSet','Remove-TableauGroupFromGroupSet',
+'Get-TableauGroupSet', 'New-TableauGroupSet', 'Set-TableauGroupSet', 'Remove-TableauGroupSet',
+'Add-TableauGroupToGroupSet', 'Remove-TableauGroupFromGroupSet',
 ### Publishing methods
 'Send-TableauFileUpload',
 ### Workbooks methods
@@ -133,9 +133,9 @@ FunctionsToExport = @(
 'Get-TableauServerSettingsExtension', 'Set-TableauServerSettingsExtension',
 'Get-TableauSiteSettingsExtension', 'Set-TableauSiteSettingsExtension',
 ### Dashboard Extensions Settings methods - introduced in API 3.11, retired in API 3.21
-'Get-TableauServerSettingsBlockedExtension','Add-TableauServerSettingsBlockedExtension','Remove-TableauServerSettingsBlockedExtension',
-'Get-TableauSiteSettingsAllowedExtension','Set-TableauSiteSettingsAllowedExtension',
-'Add-TableauSiteSettingsAllowedExtension','Remove-TableauSiteSettingsAllowedExtension',
+'Get-TableauServerSettingsBlockedExtension', 'Add-TableauServerSettingsBlockedExtension', 'Remove-TableauServerSettingsBlockedExtension',
+'Get-TableauSiteSettingsAllowedExtension', 'Set-TableauSiteSettingsAllowedExtension',
+'Add-TableauSiteSettingsAllowedExtension', 'Remove-TableauSiteSettingsAllowedExtension',
 ### Analytics Extensions Settings methods - introduced in API 3.11
 'Get-TableauAnalyticsExtension', 'Set-TableauAnalyticsExtension',
 'New-TableauAnalyticsExtension', 'Remove-TableauAnalyticsExtension',
@@ -146,15 +146,15 @@ FunctionsToExport = @(
 'Get-TableauConnectedAppSecret', 'New-TableauConnectedAppSecret', 'Remove-TableauConnectedAppSecret',
 'Get-TableauConnectedAppEAS', 'Set-TableauConnectedAppEAS',
 'New-TableauConnectedAppEAS', 'Remove-TableauConnectedAppEAS',
-
 ### Notifications methods
 'Get-TableauDataAlert', 'New-TableauDataAlert', 'Set-TableauDataAlert', 'Remove-TableauDataAlert',
 'Add-TableauDataAlertUser', 'Remove-TableauDataAlertUser',
 'Get-TableauWebhook', 'New-TableauWebhook', 'Set-TableauWebhook', 'Remove-TableauWebhook',
-'Test-TableauWebhook','Get-TableauSiteSettingsNotification','Set-TableauSiteSettingsNotification',
-
+'Test-TableauWebhook', 'Get-TableauSiteSettingsNotification', 'Set-TableauSiteSettingsNotification',
 ### Content Exploration methods
-'Get-TableauContentSuggestion','Get-TableauContentSearch','Get-TableauContentUsage',
+'Get-TableauContentSuggestion', 'Get-TableauContentSearch', 'Get-TableauContentUsage'
+### Virtual Connections methods
+'Get-TableauVirtualConnection', 'Set-TableauVirtualConnection'
 
 ### Ask Data Lens methods - retired in API 3.22
 ### Metrics methods - retired in API 3.22
@@ -174,11 +174,6 @@ FunctionsToExport = @(
 # List Identity Stores
 # Configure Identity Store
 # Delete Identity Store
-
-### Virtual Connections methods
-# List Virtual Connections
-# List Virtual Connection Database Connections
-# Update Virtual Connection Database Connections
 
 ### Metadata methods - introduced in API API 3.5
 'Get-TableauDatabase', 'Get-TableauTable', 'Get-TableauTableColumn', 'Get-TableauMetadataObject'
@@ -283,34 +278,35 @@ CmdletsToExport = @()
 # VariablesToExport = @()
 
 # Aliases to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no aliases to export.
-AliasesToExport = @('Login-TableauServer','Logout-TableauServer',
-'Update-TableauSiteSettingsEmbedding','Add-TableauFileUpload',
-'Update-TableauActiveDirectoryDomain','Update-TableauSite',
-'Query-TableauProject','Update-TableauProject',
-'Query-TableauUser','Add-TableauUser','Update-TableauUser',
-'Query-TableauGroup','Add-TableauGroup','Update-TableauGroup',
-'Add-TableauGroupSet','Update-TableauGroupSet',
-'Query-TableauWorkbook','Update-TableauWorkbook',
-'Query-TableauWorkbooksForUser','Update-TableauWorkbookConnection',
-'Download-TableauWorkbook','Upload-TableauWorkbook','Download-TableauWorkbookToFormat',
-'Query-TableauDatasource','Update-TableauDatasource',
-'Update-TableauDatasourceConnection','Download-TableauDatasource','Upload-TableauDatasource',
-'Query-TableauView','Download-TableauViewImage','Download-TableauViewToFormat',
+AliasesToExport = @('Login-TableauServer', 'Logout-TableauServer',
+'Update-TableauSiteSettingsEmbedding', 'Add-TableauFileUpload',
+'Update-TableauActiveDirectoryDomain', 'Update-TableauSite',
+'Query-TableauProject', 'Update-TableauProject',
+'Query-TableauUser', 'Add-TableauUser', 'Update-TableauUser',
+'Query-TableauGroup', 'Add-TableauGroup', 'Update-TableauGroup',
+'Add-TableauGroupSet', 'Update-TableauGroupSet',
+'Query-TableauWorkbook', 'Update-TableauWorkbook',
+'Query-TableauWorkbooksForUser', 'Update-TableauWorkbookConnection',
+'Download-TableauWorkbook', 'Upload-TableauWorkbook', 'Download-TableauWorkbookToFormat',
+'Query-TableauDatasource', 'Update-TableauDatasource',
+'Update-TableauDatasourceConnection', 'Download-TableauDatasource', 'Upload-TableauDatasource',
+'Query-TableauView', 'Download-TableauViewImage', 'Download-TableauViewToFormat',
 'Unhide-TableauViewRecommendation',
-'Query-TableauCustomView','Update-TableauCustomView','Download-TableauCustomViewImage',
-'Query-TableauFlow','Update-TableauFlow','Query-TableauFlowsForUser',
-'Download-TableauFlow','Upload-TableauFlow','Update-TableauFlowConnection',
-'Run-TableauFlow','Query-TableauFlowRun','Cancel-TableauFlowRun','Update-TableauSchedule',
-'Query-TableauJob','Cancel-TableauJob', 'Run-TableauTask',
-'Create-TableauContentExtract','Add-TableauCloudExtractRefreshTask','Update-TableauCloudExtractRefreshTask',
-'Add-TableauSubscription','Update-TableauSubscription',
-'Update-TableauServerSettingsExtension','Update-TableauSiteSettingsExtension',
-'Update-TableauAnalyticsExtension','Add-TableauAnalyticsExtension','Update-TableauAnalyticsExtensionState',
-'Update-TableauConnectedApp','Add-TableauConnectedApp','Add-TableauConnectedAppSecret',
-'Update-TableauConnectedAppEAS','Add-TableauConnectedAppEAS',
-'Query-TableauDataAlert','Add-TableauDataAlert','Update-TableauDataAlert',
-'Query-TableauWebhook','Add-TableauWebhook','Update-TableauWebhook','Update-TableauSiteSettingsNotification',
-'Run-TableauMetadataGraphQL','Query-TableauMetadata')
+'Query-TableauCustomView', 'Update-TableauCustomView', 'Download-TableauCustomViewImage',
+'Query-TableauFlow', 'Update-TableauFlow', 'Query-TableauFlowsForUser',
+'Download-TableauFlow', 'Upload-TableauFlow', 'Update-TableauFlowConnection',
+'Run-TableauFlow', 'Query-TableauFlowRun', 'Cancel-TableauFlowRun', 'Update-TableauSchedule',
+'Query-TableauJob', 'Cancel-TableauJob', 'Run-TableauTask',
+'Create-TableauContentExtract', 'Add-TableauCloudExtractRefreshTask', 'Update-TableauCloudExtractRefreshTask',
+'Add-TableauSubscription', 'Update-TableauSubscription',
+'Update-TableauServerSettingsExtension', 'Update-TableauSiteSettingsExtension',
+'Update-TableauAnalyticsExtension', 'Add-TableauAnalyticsExtension', 'Update-TableauAnalyticsExtensionState',
+'Update-TableauConnectedApp', 'Add-TableauConnectedApp', 'Add-TableauConnectedAppSecret',
+'Update-TableauConnectedAppEAS', 'Add-TableauConnectedAppEAS',
+'Query-TableauDataAlert', 'Add-TableauDataAlert', 'Update-TableauDataAlert',
+'Query-TableauWebhook', 'Add-TableauWebhook', 'Update-TableauWebhook', 'Update-TableauSiteSettingsNotification',
+'Query-TableauVirtualConnection', 'Update-TableauVirtualConnection',
+'Run-TableauMetadataGraphQL', 'Query-TableauMetadata')
 
 # DSC resources to export from this module
 # DscResourcesToExport = @()
@@ -327,7 +323,7 @@ PrivateData = @{
     PSData = @{
 
         # Tags applied to this module. These help with module discovery in online galleries.
-        Tags = @('tableau','tableauserver','rest','restapi')
+        Tags = @('tableau', 'tableauserver', 'rest', 'restapi')
 
         # A URL to the license for this module.
         LicenseUri = 'https://github.com/asluzh/PSTableauREST/blob/main/LICENSE'
