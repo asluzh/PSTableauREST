@@ -28,7 +28,9 @@ if ($Item) {
     $CommandList = @($Item)
 } else {
     $CommandList = $Module.ExportedFunctions.Keys
-    $CommandList += $Module.ExportedCmdlets.Keys
+    foreach ($cmdlet in $Module.ExportedCmdlets.Keys) {
+        $script:CommandList += $cmdlet
+    }
 }
 
 foreach ($Command in $CommandList) {

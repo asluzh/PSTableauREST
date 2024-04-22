@@ -80,7 +80,9 @@ Describe "Module Help" -Tag Module {
     BeforeDiscovery {
         $Module = Get-Module $ModuleName
         $script:CommandList = $Module.ExportedFunctions.Keys
-        $script:CommandList += $Module.ExportedCmdlets.Keys
+        foreach ($cmdlet in $Module.ExportedCmdlets.Keys) {
+            $script:CommandList += $cmdlet
+        }
     }
     Context "Module <ModuleName> contains help for all functions" -ForEach $CommandList {
         BeforeEach {
