@@ -128,7 +128,7 @@ Expand ValidateSet to add support for more Endpoints.
 #>
 [OutputType([string])]
 Param(
-    [Parameter(Mandatory)][ValidateSet('Versionless','Auth','Site','Session','Domain',
+    [Parameter(Mandatory)][ValidateSet('Versionless','Auth','OIDC','Site','Session','Domain',
         'Setting','ServerSetting','ConnectedApp','EAS','VirtualConnection',
         'Project','User','Group','Groupset','Workbook','Datasource','View','Flow',
         'FileUpload','Recommendation','CustomView','Favorite','OrderFavorite',
@@ -176,6 +176,13 @@ Param(
             'EAS' {
                 $uri += "sites/$script:TableauSiteId/connected-apps/external-authorization-servers"
                 if ($Param) { $uri += "/$Param" }
+            }
+            'OIDC' {
+                if ($Param -eq 'remove') {
+                    $uri += "sites/$script:TableauSiteId/disable-oidc-configuration"
+                } else {
+                    $uri += "sites/$script:TableauSiteId/site-oidc-configuration"
+                }
             }
             'GraphQL' {
                 $uri = "$script:TableauServerUrl/api/metadata/graphql"
@@ -717,6 +724,229 @@ Param(
     if ($PSCmdlet.ShouldProcess($DomainId)) {
         $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Domain) -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
         return $response.tsResponse.domain
+    }
+}
+
+### OpenID Connect Methods - introduced in API 3.22
+function Get-TableauOIDConnectConfig {
+<#
+.SYNOPSIS
+Get OpenID Connect Configuration
+
+.DESCRIPTION
+Get details about the Tableau Cloud site's OpenID Connect (OIDC) configuration.
+Tableau site admins privileges are required to call this method.
+
+.EXAMPLE
+$config = Get-TableauOIDConnectConfig
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_openid_connect.htm#create_openid_connect_configuration1
+#>
+[OutputType([PSCustomObject])]
+Param()
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.22
+    $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint OIDC) -Method Get
+    return $response.tsResponse.siteOIDCConfiguration
+}
+
+function Set-TableauOIDConnectConfig {
+<#
+.SYNOPSIS
+Create OpenID Connect Configuration
+or
+Update OpenID Connect Configuration
+
+.DESCRIPTION
+Create the Tableau Cloud site's OpenID Connect (OIDC) configuration.
+or
+Update the Tableau Cloud site's OpenID Connect (OIDC) configuration.
+(uses the same API endpoint)
+Tableau site admins privileges are required to call this method.
+
+.PARAMETER Enabled
+Controls whether the configuration is enabled or not. Value can be "true" or "false".
+
+.PARAMETER ClientId
+The client ID from your IdP. For example, "0oa111usf1gpUkVUt0h1".
+
+.PARAMETER ClientSecret
+The client secret from your IdP.
+
+.PARAMETER AuthorizationEndpoint
+Use the authorization endpoint from your IdP. To find the value, enter the configuration URL in a browser and obtain the user information endpoint
+(authorization_endpoint) from the details that are returned. For example, "https://myidp.com/oauth2/v1/authorize".
+
+.PARAMETER TokenEndpoint
+Use the token endpoint from your IdP. To find the value, enter the configuration URL in a browser and obtain the token endpoint (token_endpoint)
+from the details that are returned. For example, "https://myidp.com/oauth2/v1/token".
+
+.PARAMETER UserinfoEndpoint
+Use the user information endpoint from your IdP. To find the value, enter the configuration URL in a browser and obtain the user information endpoint
+(userinfo_endpoint) from the details that are returned. For example, "https://myidp.com/oauth2/v1/userinfo".
+
+.PARAMETER JwksUri
+Use the JWK set URI from your IdP. To find the value, enter the configuration URL in a browser and obtain the JWK set URI endpoint (jwks_uri)
+from the details that are returned. For example, "https://myidp.com/oauth2/v1/keys".
+
+.PARAMETER EndSessionEndpoint
+(Optional) If single logout (SLO) is enabled for the site, which is done through Tableau Cloud site UI, you can specify the configuration URL
+or the end session endpoint from your IdP. For example, "https://myidp.com/oauth2/v1/logout".
+
+.PARAMETER AllowEmbeddedAuthentication
+(Optional) Controls how users authenticate when accessing embedded views. Value can be "true" or "false".
+Default value is "false", which authenticates users in a separate pop-up window. When set to "true",
+users authenticate using an inline frame (IFrame), which is less secure.
+
+.PARAMETER Prompt
+(Optional) Specifies whether the user is prompted for re-authentication and consent. For example, "login, consent".
+
+.PARAMETER CustomScope
+(Optional) Specifies a custom scope user-related value that you can use to query the IdP. For example, "openid, email, profile".
+
+.PARAMETER ClientAuthentication
+(Optional) Token endpoint authentication method. Value can be "client_secret_basic" or "client_secret_post". Default value is "client_secret_basic".
+
+.PARAMETER EssentialAcrValues
+(Optional) List of essential Authentication Context Reference Class values used for authentication. For example, "phr".
+
+.PARAMETER VoluntaryAcrValues
+(Optional) List of voluntary Authentication Context Reference Class values used for authentication.
+
+.PARAMETER EmailMapping
+(Optional) Claim for retrieving email from the OIDC token. Default value is "email".
+
+.PARAMETER FirstNameMapping
+(Optional) Claim for retrieving first name from the OIDC token. Default value is "given_name".
+You can use this attribute to retrieve the user’s display name when useFullName attribute is set to "false".
+
+.PARAMETER LastNameMapping
+(Optional) Claim for retrieving last name from the OIDC token. Default value is "family_name".
+You can use this attribute to retrieve the user’s display name when useFullName attribute is set to "false".
+
+.PARAMETER FullNameMapping
+(Optional) Claim for retrieving name from the OIDC token. Default value is "name".
+You can use this attribute to retrieve the user’s display name when useFullName attribute is set to "true".
+
+.PARAMETER UseFullName
+(Optional) Controls what is used as the display name. Value can be "true" or "false".
+Default value is "false", which uses first name (firstNameMapping attribute) and last name (lastNameMapping attribute) as the user display name.
+When set to "true", full name (fullNameMapping attribute) is used as the user display name.
+
+.EXAMPLE
+$config = Set-TableauOIDConnectConfig -Enabled true -ClientId '0oa111usf1gpUkVUt0h1' -ClientSecret 'abcde' -AuthorizationEndpoint 'https://myidp.com/oauth2/v1/authorize' -TokenEndpoint 'https://myidp.com/oauth2/v1/token' -UserinfoEndpoint 'https://myidp.com/oauth2/v1/userinfo' -JwksUri 'https://myidp.com/oauth2/v1/keys'
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_openid_connect.htm#create_openid_connect_configuration
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_openid_connect.htm#update_openid_connect_configuration
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[Alias('New-TableauOIDConnectConfig')]
+[Alias('Update-TableauOIDConnectConfig')]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][ValidateSet('true','false')][string] $Enabled,
+    [Parameter(Mandatory)][string] $ClientId,
+    [Parameter(Mandatory)][string] $ClientSecret,
+    [Parameter(Mandatory)][string] $AuthorizationEndpoint,
+    [Parameter(Mandatory)][string] $TokenEndpoint,
+    [Parameter(Mandatory)][string] $UserinfoEndpoint,
+    [Parameter(Mandatory)][string] $JwksUri,
+    [Parameter()][string] $EndSessionEndpoint,
+    [Parameter()][ValidateSet('true','false')][string] $AllowEmbeddedAuthentication,
+    [Parameter()][string] $Prompt,
+    [Parameter()][string] $CustomScope,
+    [Parameter()][ValidateSet('client_secret_basic','client_secret_post')][string] $ClientAuthentication,
+    [Parameter()][string] $EssentialAcrValues,
+    [Parameter()][string] $VoluntaryAcrValues,
+    [Parameter()][string] $EmailMapping,
+    [Parameter()][string] $FirstNameMapping,
+    [Parameter()][string] $LastNameMapping,
+    [Parameter()][string] $FullNameMapping,
+    [Parameter()][ValidateSet('true','false')][string] $UseFullName
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.22
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_oidc = $tsRequest.AppendChild($xml.CreateElement("siteOIDCConfiguration"))
+    $el_oidc.SetAttribute("enabled", $Enabled)
+    $el_oidc.SetAttribute("clientId", $ClientId)
+    $el_oidc.SetAttribute("clientSecret", $ClientSecret)
+    $el_oidc.SetAttribute("authorizationEndpoint", $AuthorizationEndpoint)
+    $el_oidc.SetAttribute("tokenEndpoint", $TokenEndpoint)
+    $el_oidc.SetAttribute("userinfoEndpoint", $UserinfoEndpoint)
+    $el_oidc.SetAttribute("jwksUri", $JwksUri)
+    if ($EndSessionEndpoint) {
+        $el_oidc.SetAttribute("endSessionEndpoint", $EndSessionEndpoint)
+    }
+    if ($AllowEmbeddedAuthentication) {
+        $el_oidc.SetAttribute("allowEmbeddedAuthentication", $AllowEmbeddedAuthentication)
+    }
+    if ($Prompt) {
+        $el_oidc.SetAttribute("prompt", $Prompt)
+    }
+    if ($CustomScope) {
+        $el_oidc.SetAttribute("customScope", $CustomScope)
+    }
+    if ($ClientAuthentication) {
+        $el_oidc.SetAttribute("clientAuthentication", $ClientAuthentication)
+    }
+    if ($EssentialAcrValues) {
+        $el_oidc.SetAttribute("essentialAcrValues", $EssentialAcrValues)
+    }
+    if ($VoluntaryAcrValues) {
+        $el_oidc.SetAttribute("voluntaryAcrValues", $VoluntaryAcrValues)
+    }
+    if ($EmailMapping) {
+        $el_oidc.SetAttribute("emailMapping", $EmailMapping)
+    }
+    if ($FirstNameMapping) {
+        $el_oidc.SetAttribute("firstNameMapping", $FirstNameMapping)
+    }
+    if ($LastNameMapping) {
+        $el_oidc.SetAttribute("lastNameMapping", $LastNameMapping)
+    }
+    if ($FullNameMapping) {
+        $el_oidc.SetAttribute("fullNameMapping", $FullNameMapping)
+    }
+    if ($UseFullName) {
+        $el_oidc.SetAttribute("useFullName", $UseFullName)
+    }
+    if ($PSCmdlet.ShouldProcess('site-oidc-configuration')) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint OIDC) -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
+        return $response.tsResponse.siteOIDCConfiguration
+    }
+}
+
+function Remove-TableauOIDConnectConfig {
+<#
+.SYNOPSIS
+Remove OpenID Connect Configuration
+
+.DESCRIPTION
+Disable and clear the Tableau Cloud site's OpenID Connect (OIDC) configuration.
+Tableau site admins privileges are required to call this method.
+Important: Before removing the OIDC configuration,
+make sure that users who are set to authenticate with OIDC are set to use a different authentication type.
+Users who are not set with a different authentication type before removing the OIDC configuration will not be able to sign in to Tableau Cloud.
+
+.EXAMPLE
+$result = Remove-TableauOIDConnectConfig
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_openid_connect.htm#remove_openid_connect_configuration
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param()
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.22
+    if ($PSCmdlet.ShouldProcess('site-oidc-configuration')) {
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint OIDC -Param remove) -Method Put -ContentType 'application/xml'
     }
 }
 

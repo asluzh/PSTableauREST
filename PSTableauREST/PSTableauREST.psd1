@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.7.1'
+ModuleVersion = '0.7.2'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -77,6 +77,8 @@ FunctionsToExport = @(
 ### Authentication / Server methods
 'Get-TableauServerInfo', 'Connect-TableauServer', 'Switch-TableauSite', 'Disconnect-TableauServer', 'Revoke-TableauServerAdminPAT', 'Get-TableauCurrentUserId',
 'Get-TableauSession', 'Remove-TableauSession', 'Get-TableauActiveDirectoryDomain', 'Set-TableauActiveDirectoryDomain',
+### OpenID Connect Methods - introduced in API 3.22
+'Get-TableauOIDConnectConfig', 'Set-TableauOIDConnectConfig', 'Remove-TableauOIDConnectConfig',
 ### Site methods
 'Get-TableauSite', 'New-TableauSite', 'Set-TableauSite', 'Remove-TableauSite',
 'Get-TableauRecentlyViewedContent', 'Get-TableauSiteSettingsEmbedding', 'Set-TableauSiteSettingsEmbedding',
@@ -260,12 +262,6 @@ FunctionsToExport = @(
 # - Get a specified batch of subscriptions to a metric
 # - Create subscriptions for a batch of users or groups to a metric
 # - Get a count of followers for a specified batch of subscriptions to a metric
-
-### OpenID Connect Methods - introduced in API 3.22
-# Create OpenID Connect Configuration
-# Get OpenID Connect Configuration
-# Remove OpenID Connect Configuration
-# Update OpenID Connect Configuration
 )
 # see also: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_whats_new.htm#added-in-rest-api-315-for-tableau-server-20221-and-tableau-cloud
 
@@ -279,6 +275,7 @@ CmdletsToExport = @()
 AliasesToExport = @('Login-TableauServer', 'Logout-TableauServer',
 'Update-TableauSiteSettingsEmbedding', 'Update-TableauSiteSettingsMobile',
 'Update-TableauActiveDirectoryDomain', 'Update-TableauSite',
+'New-TableauOIDConnectConfig', 'Update-TableauOIDConnectConfig',
 'Query-TableauProject', 'Update-TableauProject',
 'Query-TableauUser', 'Add-TableauUser', 'Update-TableauUser',
 'Query-TableauGroup', 'Add-TableauGroup', 'Update-TableauGroup',
