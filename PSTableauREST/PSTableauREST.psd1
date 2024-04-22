@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.7.0'
+ModuleVersion = '0.7.1'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -140,6 +140,9 @@ FunctionsToExport = @(
 'Get-TableauAnalyticsExtension', 'Set-TableauAnalyticsExtension',
 'New-TableauAnalyticsExtension', 'Remove-TableauAnalyticsExtension',
 'Get-TableauAnalyticsExtensionState', 'Set-TableauAnalyticsExtensionState',
+### Mobile Settings Methods - introduced in API 3.19
+'Get-TableauServerSettingsMobile',
+'Get-TableauSiteSettingsMobile', 'Set-TableauSiteSettingsMobile',
 ### Connected App methods
 'Get-TableauConnectedApp', 'Set-TableauConnectedApp',
 'New-TableauConnectedApp', 'Remove-TableauConnectedApp',
@@ -152,9 +155,9 @@ FunctionsToExport = @(
 'Get-TableauWebhook', 'New-TableauWebhook', 'Set-TableauWebhook', 'Remove-TableauWebhook',
 'Test-TableauWebhook', 'Get-TableauSiteSettingsNotification', 'Set-TableauSiteSettingsNotification',
 ### Content Exploration methods
-'Get-TableauContentSuggestion', 'Get-TableauContentSearch', 'Get-TableauContentUsage'
+'Get-TableauContentSuggestion', 'Get-TableauContentSearch', 'Get-TableauContentUsage',
 ### Virtual Connections methods
-'Get-TableauVirtualConnection', 'Set-TableauVirtualConnection'
+'Get-TableauVirtualConnection', 'Set-TableauVirtualConnection',
 
 ### Ask Data Lens methods - retired in API 3.22
 ### Metrics methods - retired in API 3.22
@@ -258,11 +261,6 @@ FunctionsToExport = @(
 # - Create subscriptions for a batch of users or groups to a metric
 # - Get a count of followers for a specified batch of subscriptions to a metric
 
-### Mobile Settings Methods - introduced in API 3.19
-# Get Mobile Security Settings for Server
-# Get Mobile Security Settings for Site
-# Update Mobile Security Settings for Site
-
 ### OpenID Connect Methods - introduced in API 3.22
 # Create OpenID Connect Configuration
 # Get OpenID Connect Configuration
@@ -279,7 +277,7 @@ CmdletsToExport = @()
 
 # Aliases to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no aliases to export.
 AliasesToExport = @('Login-TableauServer', 'Logout-TableauServer',
-'Update-TableauSiteSettingsEmbedding', 'Add-TableauFileUpload',
+'Update-TableauSiteSettingsEmbedding', 'Update-TableauSiteSettingsMobile',
 'Update-TableauActiveDirectoryDomain', 'Update-TableauSite',
 'Query-TableauProject', 'Update-TableauProject',
 'Query-TableauUser', 'Add-TableauUser', 'Update-TableauUser',
@@ -291,7 +289,7 @@ AliasesToExport = @('Login-TableauServer', 'Logout-TableauServer',
 'Query-TableauDatasource', 'Update-TableauDatasource',
 'Update-TableauDatasourceConnection', 'Download-TableauDatasource', 'Upload-TableauDatasource',
 'Query-TableauView', 'Download-TableauViewImage', 'Download-TableauViewToFormat',
-'Unhide-TableauViewRecommendation',
+'Add-TableauFileUpload', 'Unhide-TableauViewRecommendation',
 'Query-TableauCustomView', 'Update-TableauCustomView', 'Download-TableauCustomViewImage',
 'Query-TableauFlow', 'Update-TableauFlow', 'Query-TableauFlowsForUser',
 'Download-TableauFlow', 'Upload-TableauFlow', 'Update-TableauFlowConnection',

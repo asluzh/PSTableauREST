@@ -9683,6 +9683,87 @@ Param(
     }
 }
 
+### Mobile Settings Methods - introduced in API 3.19
+function Get-TableauServerSettingsMobile {
+<#
+.SYNOPSIS
+Get Mobile Security Settings for Server
+
+.DESCRIPTION
+Gets the mobile security settings for the server.
+This method can only be called by server administrators.
+
+.EXAMPLE
+$settings = Get-TableauServerSettingsMobile
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_mobile_settings.htm#get_mobile_security_settings_for_server
+#>
+[OutputType([PSCustomObject])]
+Param()
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.19
+    $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ServerSetting -Param mobilesecuritysettings) -Method Get
+    return $response.tsResponse.mobileSecuritySettingsList.mobileSecuritySettings
+}
+
+function Get-TableauSiteSettingsMobile {
+<#
+.SYNOPSIS
+Get Mobile Security Settings for Site
+
+.DESCRIPTION
+Gets the mobile security settings for the specified site.
+This method can only be called by site or server administrators.
+
+.EXAMPLE
+$settings = Get-TableauSiteSettingsMobile
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_mobile_settings.htm#get_mobile_security_settings_for_site
+#>
+[OutputType([PSCustomObject])]
+Param()
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.18
+    $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Setting -Param mobilesecuritysettings) -Method Get
+    return $response.tsResponse.mobileSecuritySettingsList.mobileSecuritySettings
+}
+
+function Set-TableauSiteSettingsMobile {
+<#
+.SYNOPSIS
+Update Mobile Security Settings for Site
+
+.DESCRIPTION
+Updates the mobile security sections for a specified site.
+This method can only be called by server administrators.
+
+.PARAMETER Settings
+List of mobile security settings, each as a hashtable for each individual settings params, corresponding to the input json element (mobileSecuritySettings).
+
+.EXAMPLE
+$settings = Set-TableauSiteSettingsMobile -Settings @{name='mobile.security.jailbroken_device';enabled='true';iosConfig=@{valueList=@('true');severity='warn'};androidConfig=@{valueList=@('false');severity='critical'}}
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_mobile_settings.htm#Update_mobile_security_settings_for_site
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauSiteSettingsMobile')]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][hashtable[]] $Settings
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.18
+    $jsonBody = $Settings | ConvertTo-Json -Compress -Depth 4
+    # Write-Debug $jsonBody
+    if ($PSCmdlet.ShouldProcess("Mobile Security Settings")) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint ServerSetting -Param mobilesecuritysettings) -Body $jsonBody -Method Put -ContentType 'application/json'
+        return $response.tsResponse.mobileSecuritySettingsList.mobileSecuritySettings
+    }
+}
+
 ### Connected App methods
 function Get-TableauConnectedApp {
 <#
