@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.7.2'
+ModuleVersion = '0.7.3'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -160,9 +160,13 @@ FunctionsToExport = @(
 'Get-TableauContentSuggestion', 'Get-TableauContentSearch', 'Get-TableauContentUsage',
 ### Virtual Connections methods
 'Get-TableauVirtualConnection', 'Set-TableauVirtualConnection',
-
 ### Ask Data Lens methods - retired in API 3.22
 ### Metrics methods - retired in API 3.22
+### Tableau Pulse methods - introduced in API 3.21
+'Get-TableauPulseDefinition', 'Set-TableauPulseDefinition', 'New-TableauPulseDefinition', 'Remove-TableauPulseDefinition',
+# 'Get-TableauPulseMetric', 'Set-TableauPulseMetric', 'New-TableauPulseMetric', 'Remove-TableauPulseMetric',
+# 'Get-TableauPulseSubscription', 'New-TableauPulseSubscription', 'Remove-TableauPulseSubscription',
+# 'New-TableauPulseInsights'
 
 ### Identity Pools methods - introduced in API 3.19
 # List Authentication Configurations
@@ -239,7 +243,6 @@ FunctionsToExport = @(
 # Update labelValue
 # Update Table
 
-### Tableau Pulse methods - introduced in API 3.21
 # Metric definitions
 # - Create, update, and delete metric definitions
 # - Get a list of metric definitions for a site

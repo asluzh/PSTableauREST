@@ -11385,8 +11385,6 @@ Param(
         $uriRequest.Query = $uriParam.ToString()
         $response = Invoke-TableauRestMethod -Uri $uriRequest.Uri.OriginalString -Method Get # -ContentType 'application/json'
         $response.hits.items
-        # Write-Debug $response.hits.total
-        # Write-Debug $response.hits.next
         $pageIndex++
     } until ($null -eq $response.hits.next -or -not $All)
 }
@@ -11600,6 +11598,277 @@ Param(
     if ($PSCmdlet.ShouldProcess($ConnectionId)) {
         $response = Invoke-TableauRestMethod -Uri $uri -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
         return $response.tsResponse.virtualConnectionConnections.connection
+    }
+}
+
+# 'Get-TableauPulseMetric', 'Set-TableauPulseMetric', 'New-TableauPulseMetric', 'Remove-TableauPulseMetric',
+# 'Get-TableauPulseSubscription', 'New-TableauPulseSubscription', 'Remove-TableauPulseSubscription',
+# 'New-TableauPulseInsights'
+### Tableau Pulse methods - introduced in API 3.21
+function Get-TableauPulseDefinition {
+<#
+.SYNOPSIS
+Batch list metric definitions
+or
+Get metric definition
+or
+List metric definitions
+
+.DESCRIPTION
+Lists the metric definitions configured for a site or, optionally, the details and definition for a specific metric.
+or
+Gets a batch of metric definitions and metrics available on a site.
+or
+Gets a metric definition and optionally metrics it contains.
+This method returns a PSCustomObject from JSON - see online help for more details.
+
+.PARAMETER DefinitionId
+(Optional) The LUID(s) of the metric definition.
+If one definition ID is provided, Get metric definition is called.
+If more than one definition ID is provided, Batch get metric definition is called.
+Otherwise, List metric definitions is called.
+
+.EXAMPLE
+$defs = Get-TableauPulseDefinition
+
+.EXAMPLE
+$def = Get-TableauPulseDefinition -DefinitionId $id
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_BatchGetDefinitions
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_GetDefinition
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_ListDefinitions
+
+.NOTES
+A metric definition specifies the metadata for all related metrics created using the definition.
+This includes the data source, measure, time dimension, and which data source dimensions can be filtered by users
+or programmatically to create related metrics.
+Example: A metric definition might specify that the data source is the Superstore sales database, and that the measure
+to focus on is the aggregation "sum of sales". It could define the filterable dimensions as region and product line,
+that the time dimension for analysis is order date, and that the favorable direction is for the metric to increase.
+#>
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory,ParameterSetName='GetDefinitions')][string[]] $DefinitionId,
+    [Parameter()][ValidateSet('unspecified','basic','full','default')][string] $DefinitionViewType,
+    [Parameter()][int] $NumberOfMetrics,
+    [Parameter(ParameterSetName='ListDefinitions')][string[]] $Filter,
+    [Parameter(ParameterSetName='ListDefinitions')][string[]] $OrderBy,
+    [Parameter(ParameterSetName='ListDefinitions')][string] $MetricId,
+    [Parameter(ParameterSetName='ListDefinitions')][ValidateRange(1,100)][int] $PageSize
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.21
+    $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
+    switch ($DefinitionViewType) {
+        'unspecified' {
+            $uriParam.Add("view", 'DEFINITION_VIEW_UNSPECIFIED')
+        }
+        'basic' {
+            $uriParam.Add("view", 'DEFINITION_VIEW_BASIC')
+        }
+        'full' {
+            if (-not $NumberOfMetrics) {
+                throw "Number of metrics is required for DEFINITION_VIEW_FULL"
+            }
+            $uriParam.Add("view", 'DEFINITION_VIEW_FULL')
+        }
+        'default' {
+            $uriParam.Add("view", 'DEFINITION_VIEW_DEFAULT')
+        }
+    }
+    if ($NumberOfMetrics) {
+        $uriParam.Add("number_of_metrics", $NumberOfMetrics)
+    }
+    if ($DefinitionId) {
+        if ($DefinitionId.Length -gt 1) {
+            $uri = Get-TableauRequestUri -Endpoint Versionless -Param pulse/definitions:batchGet
+            $uriParam.Add("definition_ids", $DefinitionId -join ',')
+        } else {
+            $uri = Get-TableauRequestUri -Endpoint Versionless -Param pulse/definitions/$DefinitionId
+        }
+        $uriRequest = [System.UriBuilder]$uri
+        $uriRequest.Query = $uriParam.ToString()
+        $response = Invoke-TableauRestMethod -Uri $uriRequest.Uri.OriginalString -Method Get # -ContentType 'application/json'
+        if ($DefinitionId.Length -gt 1) {
+            return $response.definitions
+        } else {
+            return $response.definition
+        }
+    } else {
+        if ($PageSize) {
+            $uriParam.Add("page_size", $PageSize)
+        }
+        if ($Filter) {
+            $uriParam.Add("filter", $Filter -join ',')
+        }
+        if ($OrderBy) {
+            $uriParam.Add("order_by", $OrderBy -join ',')
+        }
+        if ($MetricId) {
+            $uriParam.Add("metric_id", $MetricId)
+        }
+        do {
+            $uri = Get-TableauRequestUri -Endpoint Versionless -Param pulse/definitions
+            $uriRequest = [System.UriBuilder]$uri
+            $uriRequest.Query = $uriParam.ToString()
+            # Write-Debug $uriRequest.Uri.OriginalString
+            $response = Invoke-TableauRestMethod -Uri $uriRequest.Uri.OriginalString -Method Get # -ContentType 'application/json'
+            $response.definitions
+            if ($response.next_page_token) {
+                $uriParam.Remove("page_token")
+                $uriParam.Add("page_token", $response.next_page_token)
+            }
+            # Write-Debug $response.total_available
+            # Write-Debug $response.offset
+            # Write-Debug $response.next_page_token
+        } until (-not $response.next_page_token)
+    }
+}
+
+function Set-TableauPulseDefinition {
+<#
+.SYNOPSIS
+Update metric definition
+
+.DESCRIPTION
+Updates a metric definition.
+This method returns a PSCustomObject from JSON - see online help for more details.
+
+.PARAMETER DefinitionId
+The LUID(s) of the metric definition.
+
+.EXAMPLE
+$def = Set-TableauPulseDefinition -DefinitionId $id
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_UpdateDefinition
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $DefinitionId,
+    [Parameter()][string] $Name,
+    [Parameter()][string] $Description,
+    [Parameter()][hashtable] $Specification,
+    [Parameter()][hashtable] $ExtensionOptions,
+    [Parameter()][hashtable] $RepresentationOptions,
+    [Parameter()][hashtable] $InsightsOptions
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.21
+    $request = @{
+        definition_id=$DefinitionId;
+    }
+    if ($Name) {
+        $request.name = $Name
+    }
+    if ($Description) {
+        $request.description = $Description
+    }
+    if ($Specification) {
+        $request.specification = $Specification
+    }
+    if ($ExtensionOptions) {
+        $request.extension_options = $ExtensionOptions
+    }
+    if ($RepresentationOptions) {
+        $request.representation_options = $RepresentationOptions
+    }
+    if ($InsightsOptions) {
+        $request.insights_options = $InsightsOptions
+    }
+    $jsonBody = $request | ConvertTo-Json -Compress -Depth 4
+    Write-Debug $jsonBody
+    if ($PSCmdlet.ShouldProcess($DefinitionId)) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param pulse/definitions/$DefinitionId) -Body $jsonBody -Method Patch -ContentType 'application/json'
+        return $response.definition
+    }
+}
+
+function New-TableauPulseDefinition {
+<#
+.SYNOPSIS
+Create metric definition
+
+.DESCRIPTION
+Creates a metric definition.
+This method returns a PSCustomObject from JSON - see online help for more details.
+
+.EXAMPLE
+$def = New-TableauPulseDefinition -DefinitionId $id
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_UpdateDefinition
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $Name,
+    [Parameter()][string] $Description,
+    [Parameter()][hashtable] $Specification,
+    [Parameter()][hashtable] $ExtensionOptions,
+    [Parameter()][hashtable] $RepresentationOptions,
+    [Parameter()][hashtable] $InsightsOptions
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.21
+    $request = @{
+        name=$Name;
+    }
+    if ($Description) {
+        $request.description = $Description
+    }
+    if ($Specification) {
+        $request.specification = $Specification
+    }
+    if ($ExtensionOptions) {
+        $request.extension_options = $ExtensionOptions
+    }
+    if ($RepresentationOptions) {
+        $request.representation_options = $RepresentationOptions
+    }
+    if ($InsightsOptions) {
+        $request.insights_options = $InsightsOptions
+    }
+    $jsonBody = $request | ConvertTo-Json -Compress -Depth 4
+    Write-Debug $jsonBody
+    if ($PSCmdlet.ShouldProcess($Name)) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param pulse/definitions) -Body $jsonBody -Method Post -ContentType 'application/json'
+        return $response.definition
+    }
+}
+
+function Remove-TableauPulseDefinition {
+<#
+.SYNOPSIS
+Delete metric definition
+
+.DESCRIPTION
+Deletes a metric definition.
+
+.PARAMETER DefinitionId
+The LUID(s) of the metric definition.
+
+.EXAMPLE
+$result = Remove-TableauPulseDefinition -DefinitionId $id
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_DeleteDefinition
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $DefinitionId
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.21
+    if ($PSCmdlet.ShouldProcess($DefinitionId)) {
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param pulse/definitions/$DefinitionId) -Method Delete
     }
 }
 

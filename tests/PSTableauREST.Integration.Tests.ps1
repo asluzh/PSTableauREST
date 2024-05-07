@@ -10,9 +10,9 @@ BeforeAll {
     Get-Module -Name $ModuleName -All | Remove-Module -Force -ErrorAction Ignore
     Import-Module ./$ModuleName -Force
     . ./scripts/SecretStore.Functions.ps1
-    # InModuleScope $ModuleName { $script:VerbosePreference = 'Continue' } # display verbose output of module functions
     $script:VerbosePreference = 'Continue' # display verbose output of the tests
     InModuleScope $ModuleName { $script:DebugPreference = 'Continue' } # display debug output of the module
+    # InModuleScope $ModuleName { $script:VerbosePreference = 'Continue' } # display verbose output of module functions
     # InModuleScope $ModuleName { $script:ProgressPreference = 'SilentlyContinue' } # suppress progress for upload/download operations
     # see also: https://stackoverflow.com/questions/18770723/hide-progress-of-invoke-webrequest
 }
@@ -2805,7 +2805,7 @@ Describe "Integration Tests for <ModuleName>" -Tag Integration -ForEach $ConfigF
                     $vconn = Get-TableauVirtualConnection
                     $vconn | Should -Not -BeNullOrEmpty
                 } else {
-                    Set-ItResult -Skipped -Because "testing not implemented yet"
+                    Set-ItResult -Skipped -Because "testing not implemented yet for Tableau Server"
                 }
             }
             It "Get/update virtual connection database connections on <ConfigFile.server>" {
@@ -2818,7 +2818,75 @@ Describe "Integration Tests for <ModuleName>" -Tag Integration -ForEach $ConfigF
                     $result = Set-TableauVirtualConnection -VirtualConnectionId $vconnId -ConnectionId $connection.connectionId -ServerAddress $connection.server -ServerPort $connection.port
                     $result | Should -Not -BeNullOrEmpty
                 } else {
-                    Set-ItResult -Skipped -Because "testing not implemented yet"
+                    Set-ItResult -Skipped -Because "testing not implemented yet for Tableau Server"
+                }
+            }
+        }
+        Context "Tableau Pulse Methods" -Tag Pulse {
+            It "List Pulse metric definitions on <ConfigFile.server>" {
+                if ($ConfigFile.tableau_cloud) {
+                    $defs = Get-TableauPulseDefinition
+                    $defs | Should -Not -BeNullOrEmpty
+                    $defs = Get-TableauPulseDefinition -PageSize 1
+                    $defs | Should -Not -BeNullOrEmpty
+                    # Write-Verbose ($defs | ConvertTo-Json -Compress -Depth 5)
+                } else {
+                    Set-ItResult -Skipped -Because "feature not available for Tableau Server"
+                }
+            }
+            It "Get/batchGet Pulse metric definition on <ConfigFile.server>" {
+                if ($ConfigFile.tableau_cloud) {
+                    $defs = Get-TableauPulseDefinition
+                    $def1 = $defs[0].metadata.id
+                    $def2 = $defs[1].metadata.id
+                    $def = Get-TableauPulseDefinition -DefinitionId $def1
+                    $def | Should -Not -BeNullOrEmpty
+                    $def.length | Should -Be 1
+                    $def = Get-TableauPulseDefinition -DefinitionId $def1,$def2
+                    $def | Should -Not -BeNullOrEmpty
+                    $def.length | Should -Be 2
+                    Write-Verbose ($def | ConvertTo-Json -Compress -Depth 5)
+                    # $script:testPulseDefId = $def1
+                } else {
+                    Set-ItResult -Skipped -Because "feature not available for Tableau Server"
+                }
+            }
+            It "Create Pulse metric definition on <ConfigFile.server>" {
+                if ($ConfigFile.tableau_cloud) {
+                    # TODO
+                    $def = New-TableauPulseDefinition -Name QuantityTest -Description "Quantity test measure def" -Specification @{datasource=@{id="0d821908-043a-4ac7-a2ac-b99495d7b606"};basic_specification=@{measure=@{field="Quantity";aggregation="AGGREGATION_SUM"};time_dimension=@{field="New Order Date"};filters=@()};viz_state_specification=@{viz_state_string=""};is_running_total=$true} -RepresentationOptions @{type="NUMBER_FORMAT_TYPE_NUMBER";number_units=@{singular_noun="";plural_noun=""};sentiment_type="SENTIMENT_TYPE_UP_IS_GOOD";row_level_id_field=@{identifier_col="";identifier_label=""};row_level_entity_names=@{entity_name_singular="";entity_name_plural=""}} -ExtensionOptions @{allowed_dimensions=@("Category","Sub-Category","Product Name");allowed_granularities=@("GRANULARITY_UNSPECIFIED")} -InsightsOptions @{show_insights=$true;settings=@(@{type="INSIGHT_TYPE_RISKY_MONOPOLY";disabled=$false},@{type="INSIGHT_TYPE_TOP_DRIVERS";disabled=$false},@{type="INSIGHT_TYPE_CURRENT_TREND";disabled=$false},@{type="INSIGHT_TYPE_BOTTOM_CONTRIBUTORS";disabled=$false},@{type="INSIGHT_TYPE_TOP_DETRACTORS";disabled=$false},@{type="INSIGHT_TYPE_NEW_TREND";disabled=$false})}
+                    $def | Should -Not -BeNullOrEmpty
+                    $script:testPulseDefId = $def.metadata.id
+                } else {
+                    Set-ItResult -Skipped -Because "feature not available for Tableau Server"
+                }
+            }
+            It "Update Pulse metric definition on <ConfigFile.server>" {
+                if ($ConfigFile.tableau_cloud) {
+                    if ($testPulseDefId) {
+                        $def = Get-TableauPulseDefinition -DefinitionId $testPulseDefId
+                        $def | Should -Not -BeNullOrEmpty
+                        # Write-Verbose ($def | ConvertTo-Json -Compress -Depth 5)
+                        # TODO
+                        $result = Set-TableauPulseDefinition -DefinitionId $testPulseDefId -Name "test" -Description "test2" -Specification ($def.specification | ConvertTo-Json -Depth 5 | ConvertFrom-Json -AsHashTable) -ExtensionOptions ($def.extension_options | ConvertTo-Json -Depth 5 | ConvertFrom-Json -AsHashTable) -RepresentationOptions ($def.representation_options | ConvertTo-Json -Depth 5 | ConvertFrom-Json -AsHashTable) -InsightsOptions ($def.insights_options | ConvertTo-Json -Depth 5 | ConvertFrom-Json -AsHashTable)
+                        $result | Should -Not -BeNullOrEmpty
+                    } else {
+                        Set-ItResult -Skipped -Because "Test Pulse Definition Id is not set"
+                    }
+                } else {
+                    Set-ItResult -Skipped -Because "feature not available for Tableau Server"
+                }
+            }
+            It "Remove Pulse metric definition on <ConfigFile.server>" {
+                if ($ConfigFile.tableau_cloud) {
+                    if ($testPulseDefId) {
+                        $result = Remove-TableauPulseDefinition -DefinitionId $testPulseDefId
+                        $result | Should -Not -BeNullOrEmpty
+                    } else {
+                        Set-ItResult -Skipped -Because "Test Pulse Definition Id is not set"
+                    }
+                } else {
+                    Set-ItResult -Skipped -Because "feature not available for Tableau Server"
                 }
             }
         }
