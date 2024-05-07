@@ -11628,6 +11628,28 @@ If one definition ID is provided, Get metric definition is called.
 If more than one definition ID is provided, Batch get metric definition is called.
 Otherwise, List metric definitions is called.
 
+.PARAMETER DefinitionViewType
+(Optional) Specifies the range of metrics to return for a definition.
+unspecified - N/A
+basic       - Return only the specified metric definition. This type is returned when the parameter is omitted.
+full        - Return the metric definition and the specified number of metrics.
+default     - Return the metric definition and the default metric.
+
+.PARAMETER NumberOfMetrics
+(Required if view is DEFINITION_VIEW_FULL) The number of metrics to return.
+
+.PARAMETER Filter
+(Optional) An expression to filter the response using one or multiple attributes.
+
+.PARAMETER OrderBy
+(Optional) The sorting method for items returned, based on the popularity of the item.
+
+.PARAMETER MetricId
+(Optional) If a metric LUID is specified, only return the definition that is related to the metric, and the details of the metric.
+
+.PARAMETER PageSize
+(Optional) Specifies the number of results in a paged response.
+
 .EXAMPLE
 $defs = Get-TableauPulseDefinition
 
@@ -11742,6 +11764,33 @@ This method returns a PSCustomObject from JSON - see online help for more detail
 .PARAMETER DefinitionId
 The LUID(s) of the metric definition.
 
+.PARAMETER Name
+(Optional) The new name of the metric definition.
+
+.PARAMETER Description
+(Optional) The new description of the metric definition.
+
+.PARAMETER Specification
+(Optional) The specification of the metric definition, as hashtable.
+Should include keys: datasource (id), basic_specification (measure, time_dimension, filters), viz_state_specification (viz_state_string),
+is_running_total (true/false).
+Please check API documentation for full list of items.
+
+.PARAMETER ExtensionOptions
+(Optional) The extension options of the metric definition, as hashtable.
+Should include keys: allowed_dimensions (as list), allowed_granularities (enum, default: "GRANULARITY_UNSPECIFIED")
+Please check API documentation for full list of items.
+
+.PARAMETER RepresentationOptions
+(Optional) The representation options of the metric definition, as hashtable.
+Should include keys: type (enum, default: "NUMBER_FORMAT_TYPE_UNSPECIFIED"), number_units (singular_noun, plural_noun),
+sentiment_type (e.g. "SENTIMENT_TYPE_UP_IS_GOOD"), row_level_id_field, row_level_entity_names.
+Please check API documentation for full list of items.
+
+.PARAMETER InsightsOptions
+(Optional) The insights options of the metric definition, as hashtable.
+Please check API documentation for full list of items.
+
 .EXAMPLE
 $def = Set-TableauPulseDefinition -DefinitionId $id
 
@@ -11798,6 +11847,33 @@ Create metric definition
 .DESCRIPTION
 Creates a metric definition.
 This method returns a PSCustomObject from JSON - see online help for more details.
+
+.PARAMETER Name
+The name of the metric definition.
+
+.PARAMETER Description
+(Optional) The description of the metric definition.
+
+.PARAMETER Specification
+(Optional) The specification of the metric definition, as hashtable.
+Should include keys: datasource (id), basic_specification (measure, time_dimension, filters), viz_state_specification (viz_state_string),
+is_running_total (true/false).
+Please check API documentation for full list of items.
+
+.PARAMETER ExtensionOptions
+(Optional) The extension options of the metric definition, as hashtable.
+Should include keys: allowed_dimensions (as list), allowed_granularities (enum, default: "GRANULARITY_UNSPECIFIED")
+Please check API documentation for full list of items.
+
+.PARAMETER RepresentationOptions
+(Optional) The representation options of the metric definition, as hashtable.
+Should include keys: type (enum, default: "NUMBER_FORMAT_TYPE_UNSPECIFIED"), number_units (singular_noun, plural_noun),
+sentiment_type (e.g. "SENTIMENT_TYPE_UP_IS_GOOD"), row_level_id_field, row_level_entity_names.
+Please check API documentation for full list of items.
+
+.PARAMETER InsightsOptions
+(Optional) The insights options of the metric definition, as hashtable.
+Please check API documentation for full list of items.
 
 .EXAMPLE
 $def = New-TableauPulseDefinition -DefinitionId $id
