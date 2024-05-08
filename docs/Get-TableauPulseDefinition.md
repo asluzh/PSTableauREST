@@ -1,11 +1,11 @@
 # Get-TableauPulseDefinition
 
 ## SYNOPSIS
+List metric definitions
+or
 Batch list metric definitions
 or
 Get metric definition
-or
-List metric definitions
 
 ## SYNTAX
 
@@ -191,9 +191,9 @@ that the time dimension for analysis is order date, and that the favorable direc
 
 ## RELATED LINKS
 
+[https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_ListDefinitions](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_ListDefinitions)
+
 [https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_BatchGetDefinitions](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_BatchGetDefinitions)
 
 [https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_GetDefinition](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_GetDefinition)
-
-[https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_ListDefinitions](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_ListDefinitions)
 

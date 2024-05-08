@@ -20,7 +20,7 @@ This method returns a PSCustomObject from JSON - see online help for more detail
 
 ### EXAMPLE 1
 ```
-$def = Set-TableauPulseDefinition -DefinitionId $id
+$def = Set-TableauPulseDefinition -DefinitionId $def -Name "Quantity1" -Specification @{...} -ExtensionOptions @{...} -RepresentationOptions @{...} -InsightsOptions @{...}
 ```
 
 ## PARAMETERS
@@ -74,7 +74,7 @@ Accept wildcard characters: False
 (Optional) The specification of the metric definition, as hashtable.
 Should include keys: datasource (id), basic_specification (measure, time_dimension, filters), viz_state_specification (viz_state_string),
 is_running_total (true/false).
-Please check API documentation for full list of items.
+Please check API documentation for full schema of item definition.
 
 ```yaml
 Type: Hashtable
@@ -91,7 +91,7 @@ Accept wildcard characters: False
 ### -ExtensionOptions
 (Optional) The extension options of the metric definition, as hashtable.
 Should include keys: allowed_dimensions (as list), allowed_granularities (enum, default: "GRANULARITY_UNSPECIFIED")
-Please check API documentation for full list of items.
+Please check API documentation for full schema of item definition.
 
 ```yaml
 Type: Hashtable
@@ -110,7 +110,7 @@ Accept wildcard characters: False
 Should include keys: type (enum, default: "NUMBER_FORMAT_TYPE_UNSPECIFIED"), number_units (singular_noun, plural_noun),
 sentiment_type (e.g.
 "SENTIMENT_TYPE_UP_IS_GOOD"), row_level_id_field, row_level_entity_names.
-Please check API documentation for full list of items.
+Please check API documentation for full schema of item definition.
 
 ```yaml
 Type: Hashtable
@@ -126,7 +126,7 @@ Accept wildcard characters: False
 
 ### -InsightsOptions
 (Optional) The insights options of the metric definition, as hashtable.
-Please check API documentation for full list of items.
+Please check API documentation for full schema of item definition.
 
 ```yaml
 Type: Hashtable

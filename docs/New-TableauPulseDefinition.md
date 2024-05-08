@@ -6,7 +6,7 @@ Create metric definition
 ## SYNTAX
 
 ```
-New-TableauPulseDefinition [-Name] <String> [[-Description] <String>] [[-Specification] <Hashtable>]
+New-TableauPulseDefinition [-Name] <String> [[-Description] <String>] [-Specification] <Hashtable>
  [[-ExtensionOptions] <Hashtable>] [[-RepresentationOptions] <Hashtable>] [[-InsightsOptions] <Hashtable>]
  [-ProgressAction <ActionPreference>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
@@ -19,7 +19,7 @@ This method returns a PSCustomObject from JSON - see online help for more detail
 
 ### EXAMPLE 1
 ```
-$def = New-TableauPulseDefinition -DefinitionId $id
+$def = New-TableauPulseDefinition -Name Sales -Description "Sales metric definition" -Specification @{datasource=@{id="..."};basic_specification=@{measure=@{field="Sales";aggregation="AGGREGATION_SUM"};time_dimension=@{field="Order Date"};filters=@()};viz_state_specification=@{viz_state_string=""};is_running_total=$true} -RepresentationOptions @{type="NUMBER_FORMAT_TYPE_NUMBER";number_units=@{singular_noun="Sales";plural_noun="Sales"};sentiment_type="SENTIMENT_TYPE_UP_IS_GOOD";row_level_id_field=@{identifier_col="";identifier_label=""};row_level_entity_names=@{entity_name_singular="";entity_name_plural=""}} -ExtensionOptions @{allowed_dimensions=@("Category");allowed_granularities=@("GRANULARITY_UNSPECIFIED")} -InsightsOptions @{show_insights=$true;settings=@()}
 ```
 
 ## PARAMETERS
@@ -55,17 +55,17 @@ Accept wildcard characters: False
 ```
 
 ### -Specification
-(Optional) The specification of the metric definition, as hashtable.
+The specification of the metric definition, as hashtable.
 Should include keys: datasource (id), basic_specification (measure, time_dimension, filters), viz_state_specification (viz_state_string),
 is_running_total (true/false).
-Please check API documentation for full list of items.
+Please check API documentation for full schema of item definition.
 
 ```yaml
 Type: Hashtable
 Parameter Sets: (All)
 Aliases:
 
-Required: False
+Required: True
 Position: 3
 Default value: None
 Accept pipeline input: False
@@ -75,7 +75,7 @@ Accept wildcard characters: False
 ### -ExtensionOptions
 (Optional) The extension options of the metric definition, as hashtable.
 Should include keys: allowed_dimensions (as list), allowed_granularities (enum, default: "GRANULARITY_UNSPECIFIED")
-Please check API documentation for full list of items.
+Please check API documentation for full schema of item definition.
 
 ```yaml
 Type: Hashtable
@@ -94,7 +94,7 @@ Accept wildcard characters: False
 Should include keys: type (enum, default: "NUMBER_FORMAT_TYPE_UNSPECIFIED"), number_units (singular_noun, plural_noun),
 sentiment_type (e.g.
 "SENTIMENT_TYPE_UP_IS_GOOD"), row_level_id_field, row_level_entity_names.
-Please check API documentation for full list of items.
+Please check API documentation for full schema of item definition.
 
 ```yaml
 Type: Hashtable
@@ -110,7 +110,7 @@ Accept wildcard characters: False
 
 ### -InsightsOptions
 (Optional) The insights options of the metric definition, as hashtable.
-Please check API documentation for full list of items.
+Please check API documentation for full schema of item definition.
 
 ```yaml
 Type: Hashtable
@@ -182,5 +182,5 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## RELATED LINKS
 
-[https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_UpdateDefinition](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_UpdateDefinition)
+[https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_CreateDefinition](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_CreateDefinition)
 

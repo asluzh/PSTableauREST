@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.7.3'
+ModuleVersion = '0.7.4'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -164,7 +164,7 @@ FunctionsToExport = @(
 ### Metrics methods - retired in API 3.22
 ### Tableau Pulse methods - introduced in API 3.21
 'Get-TableauPulseDefinition', 'Set-TableauPulseDefinition', 'New-TableauPulseDefinition', 'Remove-TableauPulseDefinition',
-# 'Get-TableauPulseMetric', 'Set-TableauPulseMetric', 'New-TableauPulseMetric', 'Remove-TableauPulseMetric',
+'Get-TableauPulseMetric', 'Set-TableauPulseMetric', 'New-TableauPulseMetric', 'Remove-TableauPulseMetric',
 # 'Get-TableauPulseSubscription', 'New-TableauPulseSubscription', 'Remove-TableauPulseSubscription',
 # 'New-TableauPulseInsights'
 
@@ -304,6 +304,8 @@ AliasesToExport = @('Login-TableauServer', 'Logout-TableauServer',
 'Query-TableauDataAlert', 'Add-TableauDataAlert', 'Update-TableauDataAlert',
 'Query-TableauWebhook', 'Add-TableauWebhook', 'Update-TableauWebhook', 'Update-TableauSiteSettingsNotification',
 'Query-TableauVirtualConnection', 'Update-TableauVirtualConnection',
+'Add-TableauPulseDefinition', 'Update-TableauPulseDefinition',
+'Add-TableauPulseMetric', 'Update-TableauPulseMetric',
 'Run-TableauMetadataGraphQL', 'Query-TableauMetadata')
 
 # DSC resources to export from this module

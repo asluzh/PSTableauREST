@@ -11601,18 +11601,17 @@ Param(
     }
 }
 
-# 'Get-TableauPulseMetric', 'Set-TableauPulseMetric', 'New-TableauPulseMetric', 'Remove-TableauPulseMetric',
 # 'Get-TableauPulseSubscription', 'New-TableauPulseSubscription', 'Remove-TableauPulseSubscription',
 # 'New-TableauPulseInsights'
 ### Tableau Pulse methods - introduced in API 3.21
 function Get-TableauPulseDefinition {
 <#
 .SYNOPSIS
+List metric definitions
+or
 Batch list metric definitions
 or
 Get metric definition
-or
-List metric definitions
 
 .DESCRIPTION
 Lists the metric definitions configured for a site or, optionally, the details and definition for a specific metric.
@@ -11657,13 +11656,13 @@ $defs = Get-TableauPulseDefinition
 $def = Get-TableauPulseDefinition -DefinitionId $id
 
 .LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_ListDefinitions
+
+.LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_BatchGetDefinitions
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_GetDefinition
-
-.LINK
-https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_ListDefinitions
 
 .NOTES
 A metric definition specifies the metadata for all related metrics created using the definition.
@@ -11774,30 +11773,31 @@ The LUID(s) of the metric definition.
 (Optional) The specification of the metric definition, as hashtable.
 Should include keys: datasource (id), basic_specification (measure, time_dimension, filters), viz_state_specification (viz_state_string),
 is_running_total (true/false).
-Please check API documentation for full list of items.
+Please check API documentation for full schema of item definition.
 
 .PARAMETER ExtensionOptions
 (Optional) The extension options of the metric definition, as hashtable.
 Should include keys: allowed_dimensions (as list), allowed_granularities (enum, default: "GRANULARITY_UNSPECIFIED")
-Please check API documentation for full list of items.
+Please check API documentation for full schema of item definition.
 
 .PARAMETER RepresentationOptions
 (Optional) The representation options of the metric definition, as hashtable.
 Should include keys: type (enum, default: "NUMBER_FORMAT_TYPE_UNSPECIFIED"), number_units (singular_noun, plural_noun),
 sentiment_type (e.g. "SENTIMENT_TYPE_UP_IS_GOOD"), row_level_id_field, row_level_entity_names.
-Please check API documentation for full list of items.
+Please check API documentation for full schema of item definition.
 
 .PARAMETER InsightsOptions
 (Optional) The insights options of the metric definition, as hashtable.
-Please check API documentation for full list of items.
+Please check API documentation for full schema of item definition.
 
 .EXAMPLE
-$def = Set-TableauPulseDefinition -DefinitionId $id
+$def = Set-TableauPulseDefinition -DefinitionId $def -Name "Quantity1" -Specification @{...} -ExtensionOptions @{...} -RepresentationOptions @{...} -InsightsOptions @{...}
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_UpdateDefinition
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauPulseDefinition')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $DefinitionId,
@@ -11855,38 +11855,39 @@ The name of the metric definition.
 (Optional) The description of the metric definition.
 
 .PARAMETER Specification
-(Optional) The specification of the metric definition, as hashtable.
+The specification of the metric definition, as hashtable.
 Should include keys: datasource (id), basic_specification (measure, time_dimension, filters), viz_state_specification (viz_state_string),
 is_running_total (true/false).
-Please check API documentation for full list of items.
+Please check API documentation for full schema of item definition.
 
 .PARAMETER ExtensionOptions
 (Optional) The extension options of the metric definition, as hashtable.
 Should include keys: allowed_dimensions (as list), allowed_granularities (enum, default: "GRANULARITY_UNSPECIFIED")
-Please check API documentation for full list of items.
+Please check API documentation for full schema of item definition.
 
 .PARAMETER RepresentationOptions
 (Optional) The representation options of the metric definition, as hashtable.
 Should include keys: type (enum, default: "NUMBER_FORMAT_TYPE_UNSPECIFIED"), number_units (singular_noun, plural_noun),
 sentiment_type (e.g. "SENTIMENT_TYPE_UP_IS_GOOD"), row_level_id_field, row_level_entity_names.
-Please check API documentation for full list of items.
+Please check API documentation for full schema of item definition.
 
 .PARAMETER InsightsOptions
 (Optional) The insights options of the metric definition, as hashtable.
-Please check API documentation for full list of items.
+Please check API documentation for full schema of item definition.
 
 .EXAMPLE
-$def = New-TableauPulseDefinition -DefinitionId $id
+$def = New-TableauPulseDefinition -Name Sales -Description "Sales metric definition" -Specification @{datasource=@{id="..."};basic_specification=@{measure=@{field="Sales";aggregation="AGGREGATION_SUM"};time_dimension=@{field="Order Date"};filters=@()};viz_state_specification=@{viz_state_string=""};is_running_total=$true} -RepresentationOptions @{type="NUMBER_FORMAT_TYPE_NUMBER";number_units=@{singular_noun="Sales";plural_noun="Sales"};sentiment_type="SENTIMENT_TYPE_UP_IS_GOOD";row_level_id_field=@{identifier_col="";identifier_label=""};row_level_entity_names=@{entity_name_singular="";entity_name_plural=""}} -ExtensionOptions @{allowed_dimensions=@("Category");allowed_granularities=@("GRANULARITY_UNSPECIFIED")} -InsightsOptions @{show_insights=$true;settings=@()}
 
 .LINK
-https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_UpdateDefinition
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_CreateDefinition
 #>
 [CmdletBinding(SupportsShouldProcess)]
+[Alias('Add-TableauPulseDefinition')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $Name,
     [Parameter()][string] $Description,
-    [Parameter()][hashtable] $Specification,
+    [Parameter(Mandatory)][hashtable] $Specification,
     [Parameter()][hashtable] $ExtensionOptions,
     [Parameter()][hashtable] $RepresentationOptions,
     [Parameter()][hashtable] $InsightsOptions
@@ -11945,6 +11946,266 @@ Param(
     Assert-TableauRestVersion -AtLeast 3.21
     if ($PSCmdlet.ShouldProcess($DefinitionId)) {
         Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param pulse/definitions/$DefinitionId) -Method Delete
+    }
+}
+
+function Get-TableauPulseMetric {
+<#
+.SYNOPSIS
+List metrics in definition
+or
+Batch list metrics
+or
+Get metric
+
+.DESCRIPTION
+Lists the metrics contained in a metric definition.
+or
+Gets a batch of metrics from a definition, specified in a comma delimited list.
+or
+Gets the details of the specified metric.
+This method returns a PSCustomObject from JSON - see online help for more details.
+
+.PARAMETER DefinitionId
+(Optional) The LUID of the metric definition.
+If definition ID is provided, List metrics in definition is called.
+Otherwise, Batch list metrics or Get metric is called.
+
+.PARAMETER MetricId
+(Optional) The LUID(s) of the metric.
+If one metric ID is provided, Get metric is called.
+If more than one definition ID is provided, Batch list metrics is called.
+
+.PARAMETER SortByName
+(Optional) Switch parameter, when provided, the output metrics are sorted by name.
+
+.PARAMETER OrderBy
+(Optional) The sorting method for items returned, based on the popularity of the item.
+
+.PARAMETER Filter
+(Optional) An expression to filter the response using one or multiple attributes.
+
+.PARAMETER PageSize
+(Optional) Specifies the number of results in a paged response.
+
+.EXAMPLE
+$defs = Get-TableauPulseMetric
+
+.EXAMPLE
+$def = Get-TableauPulseMetric -MetricId $id
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_ListMetrics
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_BatchGetMetrics
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_GetMetric
+
+.NOTES
+A metric is the interactive object that users follow and receive updates on.
+It specifies the values to give the filterable dimensions of the metric's definition and the measurement time period of the metric.
+Example: A user or REST request could filter the metric, and its automatically generated insights, based on the West region and product line sold.
+The insight provided might call out that discounted sales have risen sharply in a region between last quarter and the current one.
+#>
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory,ParameterSetName='ListMetrics')][string] $DefinitionId,
+    [Parameter(Mandatory,ParameterSetName='GetMetrics')][string[]] $MetricId,
+    [Parameter()][switch] $SortByName,
+    [Parameter(ParameterSetName='ListMetrics')][string[]] $OrderBy,
+    [Parameter(ParameterSetName='ListMetrics')][string[]] $Filter,
+    [Parameter(ParameterSetName='ListMetrics')][ValidateRange(1,100)][int] $PageSize
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.21
+    $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
+    if ($MetricId) {
+        if ($MetricId.Length -gt 1) {
+            $uri = Get-TableauRequestUri -Endpoint Versionless -Param pulse/metrics:batchGet
+            $uriParam.Add("metric_ids", $MetricId -join ',')
+            if ($SortByName) {
+                $uriParam.Add("enable_sorting", $true)
+            }
+        } else {
+            $uri = Get-TableauRequestUri -Endpoint Versionless -Param pulse/metrics/$MetricId
+        }
+        $uriRequest = [System.UriBuilder]$uri
+        $uriRequest.Query = $uriParam.ToString()
+        $response = Invoke-TableauRestMethod -Uri $uriRequest.Uri.OriginalString -Method Get # -ContentType 'application/json'
+        if ($MetricId.Length -gt 1) {
+            return $response.metrics
+        } else {
+            return $response.metric
+        }
+    } else {
+        if ($PageSize) {
+            $uriParam.Add("page_size", $PageSize)
+        }
+        if ($Filter) {
+            $uriParam.Add("filter", $Filter -join ',')
+        }
+        if ($OrderBy) {
+            $uriParam.Add("order_by", $OrderBy -join ',')
+        }
+        if ($SortByName) {
+            $uriParam.Add("enable_sorting", $true)
+        }
+        do {
+            $uri = Get-TableauRequestUri -Endpoint Versionless -Param pulse/definitions/$DefinitionId/metrics
+            $uriRequest = [System.UriBuilder]$uri
+            $uriRequest.Query = $uriParam.ToString()
+            # Write-Debug $uriRequest.Uri.OriginalString
+            $response = Invoke-TableauRestMethod -Uri $uriRequest.Uri.OriginalString -Method Get # -ContentType 'application/json'
+            $response.definitions
+            if ($response.next_page_token) {
+                $uriParam.Remove("page_token")
+                $uriParam.Add("page_token", $response.next_page_token)
+            }
+            # Write-Debug $response.total_available
+            # Write-Debug $response.offset
+            # Write-Debug $response.next_page_token
+        } until (-not $response.next_page_token)
+    }
+}
+
+function Set-TableauPulseMetric {
+<#
+.SYNOPSIS
+Update metric
+
+.DESCRIPTION
+Updates the specification of a metric.
+This method returns a PSCustomObject from JSON - see online help for more details.
+
+.PARAMETER MetricId
+The LUID(s) of the metric.
+
+.PARAMETER Specification
+The specification of the metric, as hashtable.
+Should include keys: filters (as list), measurement_period (granularity, range), comparison (comparison: "TIME_COMPARISON_UNSPECIFIED").
+Please check API documentation for full schema of item definition.
+
+.EXAMPLE
+$def = Set-TableauPulseMetric -MetricId $id -Specification $spec
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_UpdateMetric
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauPulseMetric')]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $MetricId,
+    [Parameter(Mandatory)][hashtable] $Specification
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.21
+    $request = @{
+        metric_id=$MetricId;
+        specification=$Specification
+    }
+    $jsonBody = $request | ConvertTo-Json -Compress -Depth 4
+    Write-Debug $jsonBody
+    if ($PSCmdlet.ShouldProcess($MetricId)) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param pulse/metrics/$MetricId) -Body $jsonBody -Method Patch -ContentType 'application/json'
+        return $response.metric
+    }
+}
+
+function New-TableauPulseMetric {
+<#
+.SYNOPSIS
+Create metric
+or
+Get or create metric
+
+.DESCRIPTION
+Creates a metric.
+This method returns a PSCustomObject from JSON - see online help for more details.
+Alternatively, if the switch parameter is supplied, calls Get or create metric:
+Returns the details of a metric in a definition if it exists, or creates a new metric if it does not.
+The method then returns the response object with two properties:
+- metric
+- is_metric_created (true if a new metric was created, or false if it already existed).
+
+.PARAMETER DefinitionId
+The LUID(s) of the metric definition.
+
+.PARAMETER Specification
+The specification of the metric, as hashtable.
+Should include keys: filters (as list), measurement_period (granularity, range), comparison (comparison: "TIME_COMPARISON_UNSPECIFIED").
+Please check API documentation for full schema of item definition.
+
+.PARAMETER GetOrCreate
+(Optional) Switch, if provided the Get or create metric method is called.
+
+.EXAMPLE
+$def = New-TableauPulseMetric -DefinitionId $def -Specification $spec
+
+.EXAMPLE
+$def = New-TableauPulseMetric -DefinitionId $def -Specification $spec -GetOrCreate
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_CreateMetric
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/TAG/index.html#tag/Pulse-Methods/operation/MetricQueryService_GetOrCreateMetric
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[Alias('Add-TableauPulseMetric')]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $DefinitionId,
+    [Parameter(Mandatory)][hashtable] $Specification,
+    [Parameter()][switch] $GetOrCreate
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.21
+    $request = @{
+        definition_id=$DefinitionId;
+        specification=$Specification
+    }
+    $jsonBody = $request | ConvertTo-Json -Compress -Depth 4
+    Write-Debug $jsonBody
+    if ($PSCmdlet.ShouldProcess($DefinitionId)) {
+        if ($GetOrCreate) {
+            $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param pulse/metrics:getOrCreate) -Body $jsonBody -Method Post -ContentType 'application/json'
+            return $response
+        } else {
+            $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param pulse/metrics) -Body $jsonBody -Method Post -ContentType 'application/json'
+            return $response.metric
+        }
+    }
+}
+
+function Remove-TableauPulseMetric {
+<#
+.SYNOPSIS
+Delete metric
+
+.DESCRIPTION
+Deletes a metric.
+
+.PARAMETER MetricId
+The LUID(s) of the metric.
+
+.EXAMPLE
+$result = Remove-TableauPulseMetric -MetricId $id
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#MetricQueryService_DeleteMetric
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $MetricId
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.21
+    if ($PSCmdlet.ShouldProcess($DefinitionId)) {
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param pulse/metrics/$MetricId) -Method Delete
     }
 }
 
