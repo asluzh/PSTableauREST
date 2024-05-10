@@ -11601,8 +11601,6 @@ Param(
     }
 }
 
-# 'Get-TableauPulseSubscription', 'New-TableauPulseSubscription', 'Remove-TableauPulseSubscription',
-# 'New-TableauPulseInsights'
 ### Tableau Pulse methods - introduced in API 3.21
 function Get-TableauPulseDefinition {
 <#
@@ -11705,7 +11703,7 @@ Param(
     if ($NumberOfMetrics) {
         $uriParam.Add("number_of_metrics", $NumberOfMetrics)
     }
-    if ($DefinitionId) {
+    if ($DefinitionId) { # Get metric definition / Batch list metric definitions
         if ($DefinitionId.Length -gt 1) {
             $uri = Get-TableauRequestUri -Endpoint Versionless -Param pulse/definitions:batchGet
             $uriParam.Add("definition_ids", $DefinitionId -join ',')
@@ -11720,7 +11718,7 @@ Param(
         } else {
             return $response.definition
         }
-    } else {
+    } else { # List metric definitions
         if ($PageSize) {
             $uriParam.Add("page_size", $PageSize)
         }
@@ -12021,7 +12019,7 @@ Param(
     Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.21
     $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
-    if ($MetricId) {
+    if ($MetricId) { # Get metric / Batch list metrics
         if ($MetricId.Length -gt 1) {
             $uri = Get-TableauRequestUri -Endpoint Versionless -Param pulse/metrics:batchGet
             $uriParam.Add("metric_ids", $MetricId -join ',')
@@ -12039,7 +12037,7 @@ Param(
         } else {
             return $response.metric
         }
-    } else {
+    } else { # List metrics in definition
         if ($PageSize) {
             $uriParam.Add("page_size", $PageSize)
         }
@@ -12058,14 +12056,11 @@ Param(
             $uriRequest.Query = $uriParam.ToString()
             # Write-Debug $uriRequest.Uri.OriginalString
             $response = Invoke-TableauRestMethod -Uri $uriRequest.Uri.OriginalString -Method Get # -ContentType 'application/json'
-            $response.definitions
+            $response.metrics
             if ($response.next_page_token) {
                 $uriParam.Remove("page_token")
                 $uriParam.Add("page_token", $response.next_page_token)
             }
-            # Write-Debug $response.total_available
-            # Write-Debug $response.offset
-            # Write-Debug $response.next_page_token
         } until (-not $response.next_page_token)
     }
 }
@@ -12204,9 +12199,260 @@ Param(
 )
     Assert-TableauAuthToken
     Assert-TableauRestVersion -AtLeast 3.21
-    if ($PSCmdlet.ShouldProcess($DefinitionId)) {
+    if ($PSCmdlet.ShouldProcess($MetricId)) {
         Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param pulse/metrics/$MetricId) -Method Delete
     }
+}
+
+function Get-TableauPulseSubscription {
+<#
+.SYNOPSIS
+List subscriptions
+or
+Batch get subscriptions
+or
+Get subscription
+
+.DESCRIPTION
+Lists the subscriptions to a specified metric and/or for a specified user.
+or
+Gets a batch of subscriptions, specified in a comma delimited list of subscriptions LUIDs.
+or
+Gets the number of unique users subscribed to a set of metrics specified in a comma separated list of metric LUIDs.
+or
+Gets a specified subscription to a metric.
+This method returns a PSCustomObject from JSON - see online help for more details.
+
+.PARAMETER SubscriptionId
+The LUID of the subscriptions.
+If more than one subscription ID is supplied, the batchGet method is called.
+
+.PARAMETER MetricId
+(Optional) The LUID of a metric whose subscriptions will be returned.
+
+.PARAMETER UserId
+(Optional) The LUID of a user whose subscriptions will be returned.
+
+.PARAMETER PageSize
+(Optional) Specifies the number of results in a paged response.
+
+.EXAMPLE
+$subs = Get-TableauPulseSubscription
+
+.EXAMPLE
+$subs = Get-TableauPulseSubscription -MetricId $mid
+
+.EXAMPLE
+$sub = Get-TableauPulseSubscription -SubscriptionId $sid
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#PulseSubscriptionService_ListSubscriptions
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#PulseSubscriptionService_BatchGetSubscriptions
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#PulseSubscriptionService_GetSubscription
+
+.NOTES
+A user who follows (has a subscription to) a metric can receive digests via email or Slack.
+Digests can also be viewed in the Metrics home page in the Tableau UI.
+#>
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory,ParameterSetName='GetSubscription')][string[]] $SubscriptionId,
+    [Parameter(ParameterSetName='ListSubscriptions')][string] $MetricId,
+    [Parameter(ParameterSetName='ListSubscriptions')][string] $UserId,
+    [Parameter(ParameterSetName='ListSubscriptions')][ValidateRange(1,100)][int] $PageSize
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.21
+    $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
+    if ($SubscriptionId) { # Get subscription / Batch get subscriptions
+        if ($SubscriptionId.Length -gt 1) {
+            $uri = Get-TableauRequestUri -Endpoint Versionless -Param pulse/subscriptions:batchGet
+            $uriParam.Add("subscription_ids", $SubscriptionId -join ',')
+        } else {
+            $uri = Get-TableauRequestUri -Endpoint Versionless -Param pulse/subscriptions/$SubscriptionId
+        }
+        $uriRequest = [System.UriBuilder]$uri
+        $uriRequest.Query = $uriParam.ToString()
+        $response = Invoke-TableauRestMethod -Uri $uriRequest.Uri.OriginalString -Method Get # -ContentType 'application/json'
+        if ($SubscriptionId.Length -gt 1) {
+            return $response.subscriptions
+        } else {
+            return $response.subscription
+        }
+    } else { # List subscriptions
+        if ($PageSize) {
+            $uriParam.Add("page_size", $PageSize)
+        }
+        if ($MetricId) {
+            $uriParam.Add("metric_id", $MetricId)
+        }
+        if ($UserId) {
+            $uriParam.Add("user_id", $UserId)
+        }
+        do {
+            $uri = Get-TableauRequestUri -Endpoint Versionless -Param pulse/subscriptions
+            $uriRequest = [System.UriBuilder]$uri
+            $uriRequest.Query = $uriParam.ToString()
+            # Write-Debug $uriRequest.Uri.OriginalString
+            $response = Invoke-TableauRestMethod -Uri $uriRequest.Uri.OriginalString -Method Get # -ContentType 'application/json'
+            $response.subscriptions
+            if ($response.next_page_token) {
+                $uriParam.Remove("page_token")
+                $uriParam.Add("page_token", $response.next_page_token)
+            }
+        } until (-not $response.next_page_token)
+    }
+}
+
+function New-TableauPulseSubscription {
+<#
+.SYNOPSIS
+Create subscription
+or
+Batch create subscriptions
+
+.DESCRIPTION
+Creates a subscription to a specified metric for a specified user or group.
+This method returns a PSCustomObject from JSON - see online help for more details.
+If more than one user and/or group id is provide, the method Batch create subscriptions is called instead,
+which allows adding multiple subscriptions.
+
+.PARAMETER MetricId
+The LUID of the metric a subscription is being created to.
+
+.PARAMETER UserId
+(Optional) The LUID(s) of a user being subscribed to a metric.
+
+.PARAMETER GroupId
+(Optional) The LUID(s) of a group being subscribed to a metric.
+
+.EXAMPLE
+$def = New-TableauPulseSubscription -MetricId $mid -UserId $uid
+
+.EXAMPLE
+$def = New-TableauPulseSubscription -MetricId $mid -GroupId $gid1,gid2
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#PulseSubscriptionService_CreateSubscription
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#PulseSubscriptionService_BatchCreateSubscriptions
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[Alias('Add-TableauPulseSubscription')]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $MetricId,
+    [Parameter()][string[]] $UserId,
+    [Parameter()][string[]] $GroupId
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.21
+    $request = @{
+        metric_id=$MetricId
+    }
+    $batchCreate = $false
+    if ($UserId -and $UserId.Length -eq 1 -and -not $GroupId) {
+        $request.follower = @{user_id = $UserId}
+    } elseif ($GroupId -and $GroupId.Length -eq 1 -and -not $UserId) {
+        $request.follower = @{group_id = $GroupId}
+    } else {
+        $batchCreate = $true
+        $request.followers = @()
+        if ($UserId) {
+            foreach ($uid in $UserId) {
+                $request.followers.Add(@{user_id=$uid})
+            }
+        }
+        if ($GroupId) {
+            foreach ($gid in $GroupId) {
+                $request.followers.Add(@{group_id=$gid})
+            }
+        }
+    }
+    $jsonBody = $request | ConvertTo-Json -Compress -Depth 4
+    Write-Debug $jsonBody
+    if ($PSCmdlet.ShouldProcess($MetricId)) {
+        if ($batchCreate) {
+            $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param pulse/subscriptions:batchCreate) -Body $jsonBody -Method Post -ContentType 'application/json'
+            return $response.subscriptions
+        } else {
+            $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param pulse/subscriptions) -Body $jsonBody -Method Post -ContentType 'application/json'
+            return $response.subscription
+        }
+    }
+}
+
+function Remove-TableauPulseSubscription {
+<#
+.SYNOPSIS
+Delete subscription
+
+.DESCRIPTION
+Deletes a specified subscription to a metric.
+
+.PARAMETER SubscriptionId
+The LUID(s) of the subscription.
+
+.EXAMPLE
+$result = Remove-TableauPulseSubscription -SubscriptionId $id
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#PulseSubscriptionService_DeleteSubscription
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $SubscriptionId
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.21
+    if ($PSCmdlet.ShouldProcess($SubscriptionId)) {
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param pulse/subscriptions/$SubscriptionId) -Method Delete
+    }
+}
+
+function Get-TableauPulseSubscriberCount {
+<#
+.SYNOPSIS
+Batch get subscriber counts
+
+.DESCRIPTION
+Gets the number of unique users subscribed to a set of metrics specified in a comma separated list of metric LUIDs.
+This method returns a PSCustomObject from JSON - see online help for more details.
+
+.PARAMETER MetricId
+(Optional) The metrics to get follower counts for, formatted as a comma separated list of LUIDs.
+If no LUIDs are specified, the follower count for all metrics in a definition will be returned.
+
+.EXAMPLE
+$defs = Get-TableauPulseSubscriberCount
+
+.EXAMPLE
+$def = Get-TableauPulseSubscriberCount -MetricId $id
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#PulseSubscriptionService_BatchGetMetricFollowerCounts
+#>
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter()][string[]] $MetricId
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.21
+    $uriParam = [System.Web.HttpUtility]::ParseQueryString([String]::Empty)
+    $uri = Get-TableauRequestUri -Endpoint Versionless -Param pulse/subscriptions:batchGetMetricFollowerCounts
+    if ($MetricId) {
+        $uriParam.Add("metric_ids", $MetricId -join ',')
+    }
+    $uriRequest = [System.UriBuilder]$uri
+    $uriRequest.Query = $uriParam.ToString()
+    $response = Invoke-TableauRestMethod -Uri $uriRequest.Uri.OriginalString -Method Get # -ContentType 'application/json'
+    return $response.follower_counts
 }
 
 ### Metadata methods
