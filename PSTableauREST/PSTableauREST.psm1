@@ -9251,11 +9251,14 @@ Param(
             $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Setting -Param extensions) -Body $xml.OuterXml -Method Put -ContentType 'application/xml'
             return $response.tsResponse.extensionsSiteSettings
         }
-    } else {
+    } else { # legacy API
         Assert-TableauRestVersion -AtLeast 3.11
+        if (-not $AllowSandboxed) {
+            $AllowSandboxed = 'true'; # override to true, this parameter is required in legacy API
+        }
         $options = @{
             extensions_enabled=$Enabled;
-            allow_sandboxed = $AllowSandboxed ? $AllowSandboxed : 'true'; # this parameter is required in legacy API
+            allow_sandboxed = $AllowSandboxed
         }
         if ($SafeListLegacyAPI) {
             $options.safe_list_items = $SafeListLegacyAPI
