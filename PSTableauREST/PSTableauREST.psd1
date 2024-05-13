@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.7.5'
+ModuleVersion = '0.7.6'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -166,8 +166,7 @@ FunctionsToExport = @(
 'Get-TableauPulseDefinition', 'Set-TableauPulseDefinition', 'New-TableauPulseDefinition', 'Remove-TableauPulseDefinition',
 'Get-TableauPulseMetric', 'Set-TableauPulseMetric', 'New-TableauPulseMetric', 'Remove-TableauPulseMetric',
 'Get-TableauPulseSubscription', 'New-TableauPulseSubscription', 'Remove-TableauPulseSubscription',
-'Get-TableauPulseSubscriberCount'
-# 'New-TableauPulseInsights'
+'Get-TableauPulseSubscriberCount', 'New-TableauPulseInsightBundle'
 
 ### Identity Pools methods - introduced in API 3.19
 # List Authentication Configurations
@@ -307,7 +306,7 @@ AliasesToExport = @('Login-TableauServer', 'Logout-TableauServer',
 'Query-TableauVirtualConnection', 'Update-TableauVirtualConnection',
 'Add-TableauPulseDefinition', 'Update-TableauPulseDefinition',
 'Add-TableauPulseMetric', 'Update-TableauPulseMetric',
-'Add-TableauPulseSubscription',
+'Add-TableauPulseSubscription', 'Create-TableauPulseInsightBundle'
 'Run-TableauMetadataGraphQL', 'Query-TableauMetadata')
 
 # DSC resources to export from this module

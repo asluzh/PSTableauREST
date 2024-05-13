@@ -12458,6 +12458,148 @@ Param(
     return $response.follower_counts
 }
 
+function New-TableauPulseInsightBundle {
+<#
+.SYNOPSIS
+Generate current metric value / detail / springboard insight bundle
+
+.DESCRIPTION
+Generates a bundle the current aggregated value for each metric.
+or
+Generates a detail insight bundle.
+or
+Generates a springboard insight bundle.
+This method returns a PSCustomObject from JSON - see online help for more details.
+
+.PARAMETER Type
+The type of the insight bundle: ban, detail or springboard.
+
+.PARAMETER MetricName
+The name of the metric.
+
+.PARAMETER MetricId
+The LUID of the metric.
+
+.PARAMETER DefinitionId
+The LUID of the metric definition.
+
+.PARAMETER Version
+(Optional) The version of the bundle type to request. Default is 0.
+
+.PARAMETER OutputFormat
+(Optional) Determines the type of markup to return for the insight text (text or html).
+Default is unspecified.
+
+.PARAMETER Timestamp
+(Optional) If specified, the date/time to use as current for insight analysis. If empty the current date/time is used.
+The format should be "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DD" or empty. If no time is specified, then midnight ("00:00:00") is used.
+
+.PARAMETER Timezone
+(Optional) The time zone to use for insight analysis. If empty, UTC is used.
+
+.PARAMETER Definition
+(Optional) The metric definition, as hashtable.
+Should include keys: datasource (id), basic_specification (measure, time_dimension, filters), viz_state_specification (viz_state_string),
+is_running_total (true/false).
+Please check API documentation for full schema of item definition.
+
+.PARAMETER Specification
+(Optional) The specification of the metric definition, as hashtable.
+Should include keys: filters (as list), measurement_period (granularity, range), comparison (comparison: "TIME_COMPARISON_UNSPECIFIED").
+Please check API documentation for full schema of item definition.
+
+.PARAMETER ExtensionOptions
+(Optional) The extension options of the metric definition, as hashtable.
+Should include keys: allowed_dimensions (as list), allowed_granularities (enum, default: "GRANULARITY_UNSPECIFIED")
+Please check API documentation for full schema of item definition.
+
+.PARAMETER RepresentationOptions
+(Optional) The representation options of the metric definition, as hashtable.
+Should include keys: type (enum, default: "NUMBER_FORMAT_TYPE_UNSPECIFIED"), number_units (singular_noun, plural_noun),
+sentiment_type (e.g. "SENTIMENT_TYPE_UP_IS_GOOD"), row_level_id_field, row_level_entity_names.
+Please check API documentation for full schema of item definition.
+
+.PARAMETER InsightsOptions
+(Optional) The insights options of the metric definition, as hashtable.
+Please check API documentation for full schema of item definition.
+
+.EXAMPLE
+$result = New-TableauPulseInsightBundle -MetricName Sales -MetricId $mid -DefinitionId $id -Definition @{...} -Specification @{...} -RepresentationOptions @{...} -ExtensionOptions @{...} -InsightsOptions @{show_insights=$true;settings=@()}
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#PulseInsightsService_GenerateInsightBundleBAN
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#PulseInsightsService_GenerateInsightBundleDetail
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_pulse.htm#PulseInsightsService_GenerateInsightBundleSpringboard
+
+.NOTES
+An insight is a data-driven observation about a metric.Tableau automatically generates and ranks insights by usefulness.
+An insight bundle is a collection of insights for a metric That can be configured to include various elements.
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[Alias('Create-TableauPulseInsightBundle')]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][ValidateSet('ban','detail','springboard')][string] $Type,
+    [Parameter(Mandatory)][string] $MetricName,
+    [Parameter(Mandatory)][string] $MetricId,
+    [Parameter(Mandatory)][string] $DefinitionId,
+    [Parameter()][int] $Version = 0,
+    [Parameter()][ValidateSet('unspecified','html','text')][string] $OutputFormat = 'unspecified',
+    [Parameter()][string] $Timestamp = '',
+    [Parameter()][string] $Timezone = '',
+    [Parameter()][hashtable] $Definition,
+    [Parameter()][hashtable] $Specification,
+    [Parameter()][hashtable] $ExtensionOptions,
+    [Parameter()][hashtable] $RepresentationOptions,
+    [Parameter()][hashtable] $InsightsOptions
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.21
+    $request = @{
+        bundle_request=@{
+            version=$Version;
+            options=@{
+                output_format=('OUTPUT_FORMAT_'+$OutputFormat.ToUpper());
+                now=$Timestamp;
+                time_zone=$Timezone
+            };
+            input=@{
+                metadata=@{
+                    name=$MetricName;
+                    metric_id=$MetricId;
+                    definition_id=$DefinitionId
+                };
+                metric=@{}
+            }
+        }
+    }
+    if ($Definition) {
+        $request.bundle_request.input.metric.definition = $Specification
+    }
+    if ($Specification) {
+        $request.bundle_request.input.metric.metric_specification = $Specification
+    }
+    if ($ExtensionOptions) {
+        $request.bundle_request.input.metric.extension_options = $ExtensionOptions
+    }
+    if ($RepresentationOptions) {
+        $request.bundle_request.input.metric.representation_options = $RepresentationOptions
+    }
+    if ($InsightsOptions) {
+        $request.bundle_request.input.metric.insights_options = $InsightsOptions
+    }
+    $jsonBody = $request | ConvertTo-Json -Compress -Depth 5
+    Write-Debug $jsonBody
+    if ($PSCmdlet.ShouldProcess("$Type, metric: $MetricName, metric id: $MetricId, definition id: $DefinitionId")) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param pulse/insights/$Type) -Body $jsonBody -Method Post -ContentType 'application/json'
+        return $response.bundle_response
+    }
+}
+
 ### Metadata methods
 function Get-TableauDatabase {
 <#
