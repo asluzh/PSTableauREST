@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.7.6'
+ModuleVersion = '0.7.7'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -167,12 +167,8 @@ FunctionsToExport = @(
 'Get-TableauPulseMetric', 'Set-TableauPulseMetric', 'New-TableauPulseMetric', 'Remove-TableauPulseMetric',
 'Get-TableauPulseSubscription', 'New-TableauPulseSubscription', 'Remove-TableauPulseSubscription',
 'Get-TableauPulseSubscriberCount', 'New-TableauPulseInsightBundle'
-
 ### Identity Pools methods - introduced in API 3.19
-# List Authentication Configurations
-# Create Authentication Configuration
-# Update Authentication Configuration
-# Delete Authentication Configuration
+'Get-TableauAuthConfiguration', 'Set-TableauAuthConfiguration', 'New-TableauAuthConfiguration', 'Remove-TableauAuthConfiguration',
 # List Identity Pools
 # Get Identity Pool
 # Create Identity Pool
@@ -242,29 +238,6 @@ FunctionsToExport = @(
 # Update Labels
 # Update labelValue
 # Update Table
-
-# Metric definitions
-# - Create, update, and delete metric definitions
-# - Get a list of metric definitions for a site
-# - Get a list of metrics for a metric definition
-# - Get a specified batch of metric definitions
-# Metrics
-# - Get the details of a metric
-# - Get a metric if it exists or create it if it doesn't
-# - Create, update, and delete a metric
-# - Get a specified batch of metrics
-# Metric Insights
-# - Generate a basic insight bundle for a metric
-# - Generate a springboard insight bundle for a metric
-# - Generate a detail insight bundle for a metric
-# Metric Subscriptions
-# - Get the details of a subscription to a metric
-# - Get a list of subscriptions to a metric for a user
-# - Create or delete a subscription to a metric
-# - Update the followers of a metric
-# - Get a specified batch of subscriptions to a metric
-# - Create subscriptions for a batch of users or groups to a metric
-# - Get a count of followers for a specified batch of subscriptions to a metric
 )
 # see also: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_whats_new.htm#added-in-rest-api-315-for-tableau-server-20221-and-tableau-cloud
 
@@ -307,6 +280,7 @@ AliasesToExport = @('Login-TableauServer', 'Logout-TableauServer',
 'Add-TableauPulseDefinition', 'Update-TableauPulseDefinition',
 'Add-TableauPulseMetric', 'Update-TableauPulseMetric',
 'Add-TableauPulseSubscription', 'Create-TableauPulseInsightBundle'
+'Add-TableauAuthConfiguration', 'Update-TableauAuthConfiguration',
 'Run-TableauMetadataGraphQL', 'Query-TableauMetadata')
 
 # DSC resources to export from this module

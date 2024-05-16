@@ -12600,6 +12600,331 @@ Param(
     }
 }
 
+### Identity Pools methods - introduced in API 3.19
+function Get-TableauAuthConfiguration {
+<#
+.SYNOPSIS
+List Authentication Configurations
+
+.DESCRIPTION
+List information about all authentication instances.
+This method can only be called by users with server administrator permissions.
+This method returns a PSCustomObject from JSON - see online help for more details.
+
+.EXAMPLE
+$instances = Get-TableauAuthConfiguration
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_identity_pools.htm#AuthnService_ListAuthConfigurations
+#>
+[OutputType([PSCustomObject])]
+Param()
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.19
+    $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param authn-service/auth-configurations) -Method Get # -ContentType 'application/json'
+    return $response.instances
+}
+
+function Set-TableauAuthConfiguration {
+<#
+.SYNOPSIS
+Update Authentication Configuration
+
+.DESCRIPTION
+Update an authentication instance.
+This method can only be called by users with server administrator permissions.
+This method returns a PSCustomObject from JSON - see online help for more details.
+
+.PARAMETER InstanceId
+Authentication instance ID.
+
+.PARAMETER ClientId
+Provider client ID that the IdP has assigned to Tableau Server.
+
+.PARAMETER ClientSecret
+Provider client secret. This is a token that is used by Tableau Server to verify the authenticity of the response from the IdP.
+This value should be kept securely.
+
+.PARAMETER ConfigUrl
+Provider configuration URL. Specifies the location of the provider configuration discovery document that contains OpenID provider metadata.
+
+.PARAMETER CustomScope
+(Optional) Custom scope user-related value to query the IdP.
+
+.PARAMETER IdClaim
+(Optional) Claim for retrieving user ID from the OIDC token. Default value is 'sub'.
+
+.PARAMETER UsernameClaim
+(Optional) Claim for retrieving username from the OIDC token. Default value is 'email'.
+
+.PARAMETER ClientAuthentication
+(Optional) Token endpoint authentication method. Default value is 'CLIENT_SECRET_BASIC'.
+
+.PARAMETER IframedIdpEnabled
+(Optional) Boolean, allows the identity provider (IdP) to authenticate inside of an iFrame.
+The IdP must disable clickjack protection to allow iFrame presentation. Default value is 'false'.
+
+.PARAMETER EssentialAcrValues
+(Optional) List of essential Authentication Context Reference Class values used for authentication.
+
+.PARAMETER VoluntaryAcrValues
+(Optional) List of voluntary Authentication Context Reference Class values used for authentication.
+
+.PARAMETER Prompt
+(Optional) Prompts the user for reauthentication and consent.
+
+.PARAMETER ConnectionTimeout
+(Optional) Integer, wait time (in seconds) for connecting to the IdP.
+
+.PARAMETER ReadTimeout
+(Optional) Integer, wait time (in seconds) for data from the IdP.
+
+.PARAMETER IgnoreDomain
+(Optional) Set value to 'true' only if the following are true: you are using email addresses as usernames in Tableau Server,
+you have provisioned users in the IdP with multiple domains, and you want to ignore the domain name portion of the email claim from the IdP.
+Default value is 'false'.
+
+.PARAMETER IgnoreJwk
+(Optional) Set value to 'true' if the IdP does not support JWK validation. Default value is 'false'.
+
+.EXAMPLE
+$oidc = Set-TableauAuthConfiguration -InstanceId $id -ClientId $cid -ClientSecret $secret -ConfigUrl $url -IdClaim $claim -UsernameClaim $userclaim
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_identity_pools.htm#AuthnService_UpdateAuthConfiguration
+
+.NOTES
+The request body must specify all the required and desired parameters, not jus the parameters you want to update.
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauAuthConfiguration')]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $InstanceId,
+    [Parameter(Mandatory)][string] $ClientId,
+    [Parameter(Mandatory)][string] $ClientSecret,
+    [Parameter(Mandatory)][string] $ConfigUrl,
+    [Parameter()][string] $CustomScope,
+    [Parameter()][string] $IdClaim = 'sub',
+    [Parameter()][string] $UsernameClaim = 'email',
+    [Parameter()][ValidateSet('client_secret_basic','client_secret_post')][string] $ClientAuthentication = 'client_secret_basic',
+    [Parameter()][ValidateSet('true','false')][string] $IframedIdpEnabled = 'false',
+    [Parameter()][string] $EssentialAcrValues,
+    [Parameter()][string] $VoluntaryAcrValues,
+    [Parameter()][string] $Prompt,
+    [Parameter()][int] $ConnectionTimeout,
+    [Parameter()][int] $ReadTimeout,
+    [Parameter()][ValidateSet('true','false')][string] $IgnoreDomain,
+    [Parameter()][ValidateSet('true','false')][string] $IgnoreJwk
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.19
+    $request = @{
+        id=$InstanceId;
+        auth_type='OIDC';
+        iframed_idp_enabled=$IframedIdpEnabled;
+        oidc=@{
+            client_id=$ClientId;
+            client_secret=$ClientSecret;
+            config_url=$ConfigUrl;
+            id_claim=$IdClaim;
+            username_claim=$UsernameClaim;
+            client_authentication=$ClientAuthentication
+        }
+    }
+    if ($CustomScope) {
+        $request.oidc.custom_scope = $CustomScope
+    }
+    if ($EssentialAcrValues) {
+        $request.oidc.essential_acr_values = $EssentialAcrValues
+    }
+    if ($VoluntaryAcrValues) {
+        $request.oidc.voluntary_acr_values = $VoluntaryAcrValues
+    }
+    if ($Prompt) {
+        $request.oidc.prompt = $Prompt
+    }
+    if ($ConnectionTimeout) {
+        $request.oidc.connection_timeout = $ConnectionTimeout
+    }
+    if ($ReadTimeout) {
+        $request.oidc.read_timeout = $ReadTimeout
+    }
+    if ($IgnoreDomain) {
+        $request.oidc.ignore_domain = $IgnoreDomain
+    }
+    if ($IgnoreJwk) {
+        $request.oidc.ignore_jwk = $IgnoreJwk
+    }
+    $jsonBody = $request | ConvertTo-Json -Compress -Depth 4
+    Write-Debug $jsonBody
+    if ($PSCmdlet.ShouldProcess($DefinitionId)) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param authn-service/auth-configurations/$InstanceId) -Body $jsonBody -Method Put -ContentType 'application/json'
+        return $response.auth_configuration
+    }
+}
+
+function New-TableauAuthConfiguration {
+<#
+.SYNOPSIS
+Create Authentication Configuration
+
+.DESCRIPTION
+Create an instance of OpenID Connect (OIDC) authentication.
+This method can only be called by users with server administrator permissions.
+This method returns a PSCustomObject from JSON - see online help for more details.
+
+.PARAMETER ClientId
+Provider client ID that the IdP has assigned to Tableau Server.
+
+.PARAMETER ClientSecret
+Provider client secret. This is a token that is used by Tableau Server to verify the authenticity of the response from the IdP.
+This value should be kept securely.
+
+.PARAMETER ConfigUrl
+Provider configuration URL. Specifies the location of the provider configuration discovery document that contains OpenID provider metadata.
+
+.PARAMETER CustomScope
+(Optional) Custom scope user-related value to query the IdP.
+
+.PARAMETER IdClaim
+(Optional) Claim for retrieving user ID from the OIDC token. Default value is 'sub'.
+
+.PARAMETER UsernameClaim
+(Optional) Claim for retrieving username from the OIDC token. Default value is 'email'.
+
+.PARAMETER ClientAuthentication
+(Optional) Token endpoint authentication method. Default value is 'CLIENT_SECRET_BASIC'.
+
+.PARAMETER IframedIdpEnabled
+(Optional) Boolean, allows the identity provider (IdP) to authenticate inside of an iFrame.
+The IdP must disable clickjack protection to allow iFrame presentation. Default value is 'false'.
+
+.PARAMETER EssentialAcrValues
+(Optional) List of essential Authentication Context Reference Class values used for authentication.
+
+.PARAMETER VoluntaryAcrValues
+(Optional) List of voluntary Authentication Context Reference Class values used for authentication.
+
+.PARAMETER Prompt
+(Optional) Prompts the user for reauthentication and consent.
+
+.PARAMETER ConnectionTimeout
+(Optional) Integer, wait time (in seconds) for connecting to the IdP.
+
+.PARAMETER ReadTimeout
+(Optional) Integer, wait time (in seconds) for data from the IdP.
+
+.PARAMETER IgnoreDomain
+(Optional) Set value to 'true' only if the following are true: you are using email addresses as usernames in Tableau Server,
+you have provisioned users in the IdP with multiple domains, and you want to ignore the domain name portion of the email claim from the IdP.
+Default value is 'false'.
+
+.PARAMETER IgnoreJwk
+(Optional) Set value to 'true' if the IdP does not support JWK validation. Default value is 'false'.
+
+.EXAMPLE
+$oidc = New-TableauAuthConfiguration -ClientId $cid -ClientSecret $secret -ConfigUrl $url -IdClaim $claim -UsernameClaim $userclaim
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_identity_pools.htm#AuthnService_RegisterAuthConfiguration
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[Alias('Add-TableauAuthConfiguration')]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $ClientId,
+    [Parameter(Mandatory)][string] $ClientSecret,
+    [Parameter(Mandatory)][string] $ConfigUrl,
+    [Parameter()][string] $CustomScope,
+    [Parameter()][string] $IdClaim = 'sub',
+    [Parameter()][string] $UsernameClaim = 'email',
+    [Parameter()][ValidateSet('client_secret_basic','client_secret_post')][string] $ClientAuthentication = 'client_secret_basic',
+    [Parameter()][ValidateSet('true','false')][string] $IframedIdpEnabled = 'false',
+    [Parameter()][string] $EssentialAcrValues,
+    [Parameter()][string] $VoluntaryAcrValues,
+    [Parameter()][string] $Prompt,
+    [Parameter()][int] $ConnectionTimeout,
+    [Parameter()][int] $ReadTimeout,
+    [Parameter()][ValidateSet('true','false')][string] $IgnoreDomain,
+    [Parameter()][ValidateSet('true','false')][string] $IgnoreJwk
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.19
+    $request = @{
+        auth_type='OIDC';
+        iframed_idp_enabled=$IframedIdpEnabled;
+        oidc=@{
+            client_id=$ClientId;
+            client_secret=$ClientSecret;
+            config_url=$ConfigUrl;
+            id_claim=$IdClaim;
+            username_claim=$UsernameClaim;
+            client_authentication=$ClientAuthentication
+        }
+    }
+    if ($CustomScope) {
+        $request.oidc.custom_scope = $CustomScope
+    }
+    if ($EssentialAcrValues) {
+        $request.oidc.essential_acr_values = $EssentialAcrValues
+    }
+    if ($VoluntaryAcrValues) {
+        $request.oidc.voluntary_acr_values = $VoluntaryAcrValues
+    }
+    if ($Prompt) {
+        $request.oidc.prompt = $Prompt
+    }
+    if ($ConnectionTimeout) {
+        $request.oidc.connection_timeout = $ConnectionTimeout
+    }
+    if ($ReadTimeout) {
+        $request.oidc.read_timeout = $ReadTimeout
+    }
+    if ($IgnoreDomain) {
+        $request.oidc.ignore_domain = $IgnoreDomain
+    }
+    if ($IgnoreJwk) {
+        $request.oidc.ignore_jwk = $IgnoreJwk
+    }
+    $jsonBody = $request | ConvertTo-Json -Compress -Depth 4
+    Write-Debug $jsonBody
+    if ($PSCmdlet.ShouldProcess($ClientId)) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param authn-service/auth-configurations) -Body $jsonBody -Method Post -ContentType 'application/json'
+        return $response.auth_configuration
+    }
+}
+
+function Remove-TableauAuthConfiguration {
+<#
+.SYNOPSIS
+Delete Authentication Configuration
+
+.DESCRIPTION
+Delete an authentication instance.
+This method can only be called by users with server administrator permissions.
+
+.PARAMETER InstanceId
+Authentication instance ID.
+
+.EXAMPLE
+$result = Remove-TableauAuthConfiguration -InstanceId $id
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_identity_pools.htm#AuthnService_DeleteAuthConfiguration
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $InstanceId
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.19
+    if ($PSCmdlet.ShouldProcess($InstanceId)) {
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param authn-service/auth-configurations/$InstanceId) -Method Delete
+    }
+}
+
 ### Metadata methods
 function Get-TableauDatabase {
 <#
