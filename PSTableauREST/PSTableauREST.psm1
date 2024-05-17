@@ -12540,7 +12540,7 @@ An insight is a data-driven observation about a metric.Tableau automatically gen
 An insight bundle is a collection of insights for a metric That can be configured to include various elements.
 #>
 [CmdletBinding(SupportsShouldProcess)]
-[Alias('Create-TableauPulseInsightBundle')]
+[Alias('Generate-TableauPulseInsightBundle')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][ValidateSet('ban','detail','springboard')][string] $Type,
@@ -12608,7 +12608,7 @@ List Authentication Configurations
 
 .DESCRIPTION
 List information about all authentication instances.
-This method can only be called by users with server administrator permissions.
+This method can only be called by server administrators.
 This method returns a PSCustomObject from JSON - see online help for more details.
 
 .EXAMPLE
@@ -12632,7 +12632,7 @@ Update Authentication Configuration
 
 .DESCRIPTION
 Update an authentication instance.
-This method can only be called by users with server administrator permissions.
+This method can only be called by server administrators.
 This method returns a PSCustomObject from JSON - see online help for more details.
 
 .PARAMETER InstanceId
@@ -12771,7 +12771,7 @@ Create Authentication Configuration
 
 .DESCRIPTION
 Create an instance of OpenID Connect (OIDC) authentication.
-This method can only be called by users with server administrator permissions.
+This method can only be called by server administrators.
 This method returns a PSCustomObject from JSON - see online help for more details.
 
 .PARAMETER ClientId
@@ -12830,7 +12830,7 @@ $oidc = New-TableauAuthConfiguration -ClientId $cid -ClientSecret $secret -Confi
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_identity_pools.htm#AuthnService_RegisterAuthConfiguration
 #>
 [CmdletBinding(SupportsShouldProcess)]
-[Alias('Add-TableauAuthConfiguration')]
+[Alias('Register-TableauAuthConfiguration')]
 [OutputType([PSCustomObject])]
 Param(
     [Parameter(Mandatory)][string] $ClientId,
@@ -12902,7 +12902,7 @@ Delete Authentication Configuration
 
 .DESCRIPTION
 Delete an authentication instance.
-This method can only be called by users with server administrator permissions.
+This method can only be called by server administrators.
 
 .PARAMETER InstanceId
 Authentication instance ID.
@@ -12922,6 +12922,313 @@ Param(
     Assert-TableauRestVersion -AtLeast 3.19
     if ($PSCmdlet.ShouldProcess($InstanceId)) {
         Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param authn-service/auth-configurations/$InstanceId) -Method Delete
+    }
+}
+
+function Get-TableauIdentityPool {
+<#
+.SYNOPSIS
+List Identity Pools
+or
+Get Identity Pool
+
+.DESCRIPTION
+List all identity pools.
+or
+Get information about an identity pool.
+This method can only be called by server administrators.
+This method returns a PSCustomObject from JSON - see online help for more details.
+
+.PARAMETER IdentityPoolId
+Identity pool ID.
+If this parameter is not provided, List Identity Pools is called.
+
+.EXAMPLE
+$pools = Get-TableauIdentityPool
+
+.EXAMPLE
+$pool = Get-TableauIdentityPool -IdentityPoolId $uuid
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_identity_pools.htm#AuthnService_ListIdentityPools
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_identity_pools.htm#AuthnService_FindIdentityPoolByUuid
+#>
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter()][string] $IdentityPoolId
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.19
+    if ($IdentityPoolId) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param authn-service/identity-pools/$IdentityPoolId) -Method Get # -ContentType 'application/json'
+        return $response.pool
+    } else {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param authn-service/identity-pools) -Method Get # -ContentType 'application/json'
+        return $response.pools
+    }
+}
+
+function Set-TableauIdentityPool {
+<#
+.SYNOPSIS
+Update Identity Pool
+
+.DESCRIPTION
+Update information about an identity pool.
+This method can only be called by server administrators.
+This method returns a PSCustomObject from JSON - see online help for more details.
+
+.PARAMETER IdentityPoolId
+Identity pool ID.
+
+.PARAMETER Name
+(Optional) The new identity pool name. Must be unique. This name is visible on the Tableau Server landing page when users sign in.
+
+.PARAMETER Enabled
+(Optional) Identity pool is enabled by default.
+
+.PARAMETER Description
+(Optional) Identity pool description displayed to users when they sign in.
+
+.EXAMPLE
+$result = Set-TableauIdentityPool -IdentityPoolId $uuid -Name 'NewIDP'
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_identity_pools.htm#AuthnService_UpdateIdentityPool
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[Alias('Update-TableauIdentityPool')]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $IdentityPoolId,
+    [Parameter()][string] $Name,
+    [Parameter()][ValidateSet('true','false')][string] $Enabled,
+    [Parameter()][string] $Description
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.19
+    $request = @{
+        uuid=$IdentityPoolId;
+    }
+    if ($Name) {
+        $request.name = $Name
+    }
+    if ($Enabled) {
+        $request.is_enabled = $Enabled
+    }
+    if ($Description) {
+        $request.description = $Description
+    }
+    $jsonBody = $request | ConvertTo-Json -Compress -Depth 4
+    Write-Debug $jsonBody
+    if ($PSCmdlet.ShouldProcess($IdentityPoolId)) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param authn-service/identity-pools/$IdentityPoolId) -Body $jsonBody -Method Put -ContentType 'application/json'
+        return $response.pool
+    }
+}
+
+function New-TableauIdentityPool {
+<#
+.SYNOPSIS
+Create Identity Pool
+
+.DESCRIPTION
+Create an identity pool.
+This method can only be called by server administrators.
+This method returns a PSCustomObject from JSON - see online help for more details.
+
+.PARAMETER Name
+Identity pool name. Must be unique. This name is visible on the Tableau Server landing page when users sign in.
+
+.PARAMETER IdentityStoreInstance
+ID of the identity store instance to configure with this identity pool.
+
+.PARAMETER AuthTypeInstance
+ID of the authentication instance to configure with this identity pool.
+
+.PARAMETER Enabled
+(Optional) Identity pool is enabled by default.
+
+.PARAMETER Description
+(Optional) Identity pool description displayed to users when they sign in.
+
+.EXAMPLE
+$result = New-TableauIdentityPool -Name 'IDP' -IdentityStoreInstance 0 -AuthTypeInstance 0
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_identity_pools.htm#AuthnService_RegisterIdentityPool
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[Alias('Register-TableauIdentityPool')]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $Name,
+    [Parameter(Mandatory)][int] $IdentityStoreInstance,
+    [Parameter(Mandatory)][int] $AuthTypeInstance,
+    [Parameter()][ValidateSet('true','false')][string] $Enabled,
+    [Parameter()][string] $Description
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.19
+    $request = @{
+        name=$Name;
+        identity_store_instance=$IdentityStoreInstance;
+        auth_type_instance=$AuthTypeInstance;
+    }
+    if ($Enabled) {
+        $request.is_enabled = $Enabled
+    }
+    if ($Description) {
+        $request.description = $Description
+    }
+    $jsonBody = $request | ConvertTo-Json -Compress -Depth 4
+    Write-Debug $jsonBody
+    if ($PSCmdlet.ShouldProcess($Name)) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param authn-service/identity-pools) -Body $jsonBody -Method Post -ContentType 'application/json'
+        return $response.pool
+    }
+}
+
+function Remove-TableauIdentityPool {
+<#
+.SYNOPSIS
+Delete Identity Pool
+
+.DESCRIPTION
+Delete an identity pool.
+This method can only be called by server administrators.
+
+.PARAMETER IdentityPoolId
+Identity pool ID.
+
+.EXAMPLE
+$result = Remove-TableauIdentityPool -IdentityPoolId $uuid
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_identity_pools.htm#AuthnService_DeleteIdentityPool
+
+.NOTES
+Important: In Tableau Server, move users to another identity pool before deleting an identity pool.
+Users will no longer be able to sign in to Tableau Server unless they are a member of an identity pool.
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $IdentityPoolId
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.19
+    if ($PSCmdlet.ShouldProcess($IdentityPoolId)) {
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param authn-service/identity-pools/$IdentityPoolId) -Method Delete
+    }
+}
+
+function Add-TableauUserToIdentityPool {
+<#
+.SYNOPSIS
+Add User to Identity Pool
+
+.DESCRIPTION
+Add a user to a specified identity pool.
+This enables the user to sign in to Tableau Server using the specified identity pool. This method is not available for Tableau Cloud.
+This method can only be called by server administrators.
+
+.PARAMETER UserId
+The LUID of the user to add.
+
+.PARAMETER IdentityPoolId
+The ID of the identity pool to add the user to.
+You can get the identity pool ID by calling Get-TableauIdentityPool
+
+.PARAMETER Username
+(Optional) The name of the user to add.
+
+.PARAMETER SiteRole
+(Optional) Site role of the user.
+
+.PARAMETER AuthConfigurationId
+(Optional) The authentication configuration instance configured for the identity pool you want to add the user to.
+You can get the authentication configuration instance by calling Get-TableauAuthConfiguration
+
+.PARAMETER IdentityId
+The identifier for the user you want to add. Identifiers are only used for identity matching purposes.
+For more information about identifiers, look for Usernames and Identifiers in Tableau in the Tableau Server Help.
+
+.EXAMPLE
+$user = Add-TableauUserToIdentityPool -UserId $userId -IdentityPoolId $uuid
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_identity_pools.htm#add_user_to_idpool
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $UserId,
+    [Parameter(Mandatory)][string] $IdentityPoolId,
+    [Parameter()][string] $Username,
+    [Parameter()][ValidateSet('Creator','Explorer','ExplorerCanPublish','ServerAdministrator','SiteAdministratorExplorer','SiteAdministratorCreator','Viewer','ReadOnly','Unlicensed')][string] $SiteRole,
+    [Parameter()][string] $AuthConfigurationId,
+    [Parameter()][string] $IdentityId
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.19
+    $xml = New-Object System.Xml.XmlDocument
+    $tsRequest = $xml.AppendChild($xml.CreateElement("tsRequest"))
+    $el_user = $tsRequest.AppendChild($xml.CreateElement("user"))
+    $el_user.SetAttribute("id", $UserId)
+    $el_user.SetAttribute("identityPoolUuid", $IdentityPoolId)
+    if ($Username) {
+        $el_user.SetAttribute("name", $Username)
+    }
+    if ($SiteRole) {
+        $el_user.SetAttribute("siteRole", $SiteRole)
+    }
+    if ($AuthConfigurationId) {
+        $el_user.SetAttribute("authSetting", $AuthConfigurationId)
+    }
+    if ($IdentityId) {
+        $el_user.SetAttribute("identityUuid", $IdentityId)
+    }
+    if ($PSCmdlet.ShouldProcess("user:$UserId, idpool:$IdentityPoolId")) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint User -Param identityPool) -Body $xml.OuterXml -Method Post
+        return $response.tsResponse.user
+    }
+}
+
+function Remove-TableauUserFromIdentityPool {
+<#
+.SYNOPSIS
+Remove User from Identity Pool
+
+.DESCRIPTION
+Remove a user from a specified identity pool.
+This method can only be called by server administrators.
+
+.PARAMETER UserId
+The LUID of the user to remove.
+
+.PARAMETER IdentityPoolId
+The ID of the identity pool to remove the user from.
+You can get the identity pool ID by calling Get-TableauIdentityPool
+
+.EXAMPLE
+$response = Remove-TableauUserFromIdentityPool -UserId $userId -IdentityPoolId $uuid
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_identity_pools.htm#remove_user_from_idpool
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $UserId,
+    [Parameter(Mandatory)][string] $IdentityPoolId
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.19
+    if ($PSCmdlet.ShouldProcess("user:$UserId, idpool:$IdentityPoolId")) {
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint User -Param $UserId/identityPool/$IdentityPoolId) -Method Delete
     }
 }
 

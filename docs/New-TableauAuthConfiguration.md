@@ -15,7 +15,7 @@ New-TableauAuthConfiguration [-ClientId] <String> [-ClientSecret] <String> [-Con
 
 ## DESCRIPTION
 Create an instance of OpenID Connect (OIDC) authentication.
-This method can only be called by users with server administrator permissions.
+This method can only be called by server administrators.
 This method returns a PSCustomObject from JSON - see online help for more details.
 
 ## EXAMPLES

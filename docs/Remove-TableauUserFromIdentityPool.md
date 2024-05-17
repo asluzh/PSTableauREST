@@ -1,30 +1,30 @@
-# Remove-TableauAuthConfiguration
+# Remove-TableauUserFromIdentityPool
 
 ## SYNOPSIS
-Delete Authentication Configuration
+Remove User from Identity Pool
 
 ## SYNTAX
 
 ```
-Remove-TableauAuthConfiguration [-InstanceId] <String> [-ProgressAction <ActionPreference>] [-WhatIf]
- [-Confirm] [<CommonParameters>]
+Remove-TableauUserFromIdentityPool [-UserId] <String> [-IdentityPoolId] <String>
+ [-ProgressAction <ActionPreference>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
-Delete an authentication instance.
+Remove a user from a specified identity pool.
 This method can only be called by server administrators.
 
 ## EXAMPLES
 
 ### EXAMPLE 1
 ```
-$result = Remove-TableauAuthConfiguration -InstanceId $id
+$response = Remove-TableauUserFromIdentityPool -UserId $userId -IdentityPoolId $uuid
 ```
 
 ## PARAMETERS
 
-### -InstanceId
-Authentication instance ID.
+### -UserId
+The LUID of the user to remove.
 
 ```yaml
 Type: String
@@ -33,6 +33,22 @@ Aliases:
 
 Required: True
 Position: 1
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -IdentityPoolId
+The ID of the identity pool to remove the user from.
+You can get the identity pool ID by calling Get-TableauIdentityPool
+
+```yaml
+Type: String
+Parameter Sets: (All)
+Aliases:
+
+Required: True
+Position: 2
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -96,5 +112,5 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## RELATED LINKS
 
-[https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_identity_pools.htm#AuthnService_DeleteAuthConfiguration](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_identity_pools.htm#AuthnService_DeleteAuthConfiguration)
+[https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_identity_pools.htm#remove_user_from_idpool](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_identity_pools.htm#remove_user_from_idpool)
 

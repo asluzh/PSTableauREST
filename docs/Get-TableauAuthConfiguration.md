@@ -11,7 +11,7 @@ Get-TableauAuthConfiguration
 
 ## DESCRIPTION
 List information about all authentication instances.
-This method can only be called by users with server administrator permissions.
+This method can only be called by server administrators.
 This method returns a PSCustomObject from JSON - see online help for more details.
 
 ## EXAMPLES

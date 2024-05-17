@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.7.7'
+ModuleVersion = '0.7.8'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -169,13 +169,8 @@ FunctionsToExport = @(
 'Get-TableauPulseSubscriberCount', 'New-TableauPulseInsightBundle'
 ### Identity Pools methods - introduced in API 3.19
 'Get-TableauAuthConfiguration', 'Set-TableauAuthConfiguration', 'New-TableauAuthConfiguration', 'Remove-TableauAuthConfiguration',
-# List Identity Pools
-# Get Identity Pool
-# Create Identity Pool
-# Update Identity Pool
-# Delete Identity Pool
-# Add User to Identity Pool
-# Remove User from Identity Pool
+'Get-TableauIdentityPool', 'Set-TableauIdentityPool', 'New-TableauIdentityPool', 'Remove-TableauIdentityPool',
+'Add-TableauUserToIdentityPool', 'Remove-TableauUserFromIdentityPool',
 # List Identity Stores
 # Configure Identity Store
 # Delete Identity Store
@@ -279,8 +274,9 @@ AliasesToExport = @('Login-TableauServer', 'Logout-TableauServer',
 'Query-TableauVirtualConnection', 'Update-TableauVirtualConnection',
 'Add-TableauPulseDefinition', 'Update-TableauPulseDefinition',
 'Add-TableauPulseMetric', 'Update-TableauPulseMetric',
-'Add-TableauPulseSubscription', 'Create-TableauPulseInsightBundle'
-'Add-TableauAuthConfiguration', 'Update-TableauAuthConfiguration',
+'Add-TableauPulseSubscription', 'Generate-TableauPulseInsightBundle'
+'Register-TableauAuthConfiguration', 'Update-TableauAuthConfiguration',
+'Register-TableauIdentityPool', 'Update-TableauIdentityPool',
 'Run-TableauMetadataGraphQL', 'Query-TableauMetadata')
 
 # DSC resources to export from this module

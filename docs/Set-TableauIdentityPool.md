@@ -1,30 +1,31 @@
-# Remove-TableauAuthConfiguration
+# Set-TableauIdentityPool
 
 ## SYNOPSIS
-Delete Authentication Configuration
+Update Identity Pool
 
 ## SYNTAX
 
 ```
-Remove-TableauAuthConfiguration [-InstanceId] <String> [-ProgressAction <ActionPreference>] [-WhatIf]
- [-Confirm] [<CommonParameters>]
+Set-TableauIdentityPool [-IdentityPoolId] <String> [[-Name] <String>] [[-Enabled] <String>]
+ [[-Description] <String>] [-ProgressAction <ActionPreference>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
-Delete an authentication instance.
+Update information about an identity pool.
 This method can only be called by server administrators.
+This method returns a PSCustomObject from JSON - see online help for more details.
 
 ## EXAMPLES
 
 ### EXAMPLE 1
 ```
-$result = Remove-TableauAuthConfiguration -InstanceId $id
+$result = Set-TableauIdentityPool -IdentityPoolId $uuid -Name 'NewIDP'
 ```
 
 ## PARAMETERS
 
-### -InstanceId
-Authentication instance ID.
+### -IdentityPoolId
+Identity pool ID.
 
 ```yaml
 Type: String
@@ -33,6 +34,53 @@ Aliases:
 
 Required: True
 Position: 1
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Name
+(Optional) The new identity pool name.
+Must be unique.
+This name is visible on the Tableau Server landing page when users sign in.
+
+```yaml
+Type: String
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: 2
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Enabled
+(Optional) Identity pool is enabled by default.
+
+```yaml
+Type: String
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: 3
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Description
+(Optional) Identity pool description displayed to users when they sign in.
+
+```yaml
+Type: String
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: 4
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -96,5 +144,5 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## RELATED LINKS
 
-[https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_identity_pools.htm#AuthnService_DeleteAuthConfiguration](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_identity_pools.htm#AuthnService_DeleteAuthConfiguration)
+[https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_identity_pools.htm#AuthnService_UpdateIdentityPool](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_identity_pools.htm#AuthnService_UpdateIdentityPool)
 

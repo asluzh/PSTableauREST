@@ -16,7 +16,7 @@ Set-TableauAuthConfiguration [-InstanceId] <String> [-ClientId] <String> [-Clien
 
 ## DESCRIPTION
 Update an authentication instance.
-This method can only be called by users with server administrator permissions.
+This method can only be called by server administrators.
 This method returns a PSCustomObject from JSON - see online help for more details.
 
 ## EXAMPLES
