@@ -13232,6 +13232,111 @@ Param(
     }
 }
 
+function Get-TableauIdentityStore {
+<#
+.SYNOPSIS
+List Identity Stores
+
+.DESCRIPTION
+List information about all identity store instances used to provision users.
+This method can only be called by server administrators.
+This method returns a PSCustomObject from JSON - see online help for more details.
+
+.EXAMPLE
+$stores = Get-TableauIdentityStore
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_identity_pools.htm#AuthnService_ListIdentityStoresTAG
+#>
+[OutputType([PSCustomObject])]
+Param()
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.19
+    $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param authn-service/identity-stores) -Method Get # -ContentType 'application/json'
+    return $response.instances
+}
+
+function New-TableauIdentityStore {
+<#
+.SYNOPSIS
+Configure Identity Store
+
+.DESCRIPTION
+Configure a new local identity store to provision users.
+This method can only be called by server administrators.
+This method returns a PSCustomObject from JSON - see online help for more details.
+
+.PARAMETER Name
+The new identity pool name. Must be unique. This name is visible on the Tableau Server landing page when users sign in.
+
+.PARAMETER Type
+Identity store type used to provision users. Use 0 to configure a new local identity store.
+Note: Creating a new identity store of type Active Directory or LDAP is not supported.
+
+.PARAMETER DisplayName
+(Optional) Identity store display name.
+
+.EXAMPLE
+$result = Set-TableauIdentityStore -Name $name
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_identity_pools.htm#AuthnService_RegisterIdentityStoreTAG
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[Alias('Register-TableauIdentityStore')]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $Name,
+    [Parameter()][string] $Type = '0',
+    [Parameter()][string] $DisplayName
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.19
+    $request = @{
+        type=$Type;
+        name=$Name;
+    }
+    if ($DisplayName) {
+        $request.display_name = $DisplayName
+    }
+    $jsonBody = $request | ConvertTo-Json -Compress -Depth 4
+    # Write-Debug $jsonBody
+    if ($PSCmdlet.ShouldProcess($Name)) {
+        $response = Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param authn-service/identity-stores) -Body $jsonBody -Method Post -ContentType 'application/json'
+        return $response.store_instance
+    }
+}
+
+function Remove-TableauIdentityStore {
+<#
+.SYNOPSIS
+Delete Identity Store
+
+.DESCRIPTION
+Delete an identity store.
+This method can only be called by server administrators.
+
+.PARAMETER IdentityStoreId
+Identity store ID.
+
+.EXAMPLE
+$result = Remove-TableauIdentityStore -IdentityStoreId $uuid
+
+.LINK
+https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_identity_pools.htm#AuthnService_DeleteIdentityStoreTAG
+#>
+[CmdletBinding(SupportsShouldProcess)]
+[OutputType([PSCustomObject])]
+Param(
+    [Parameter(Mandatory)][string] $IdentityStoreId
+)
+    Assert-TableauAuthToken
+    Assert-TableauRestVersion -AtLeast 3.19
+    if ($PSCmdlet.ShouldProcess($IdentityStoreId)) {
+        Invoke-TableauRestMethod -Uri (Get-TableauRequestUri -Endpoint Versionless -Param authn-service/identity-stores/$IdentityStoreId) -Method Delete
+    }
+}
+
 ### Metadata methods
 function Get-TableauDatabase {
 <#

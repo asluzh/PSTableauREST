@@ -12,7 +12,7 @@
 RootModule = 'PSTableauREST.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.7.8'
+ModuleVersion = '0.7.9'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -171,9 +171,7 @@ FunctionsToExport = @(
 'Get-TableauAuthConfiguration', 'Set-TableauAuthConfiguration', 'New-TableauAuthConfiguration', 'Remove-TableauAuthConfiguration',
 'Get-TableauIdentityPool', 'Set-TableauIdentityPool', 'New-TableauIdentityPool', 'Remove-TableauIdentityPool',
 'Add-TableauUserToIdentityPool', 'Remove-TableauUserFromIdentityPool',
-# List Identity Stores
-# Configure Identity Store
-# Delete Identity Store
+'Get-TableauIdentityStore', 'New-TableauIdentityStore', 'Remove-TableauIdentityStore',
 
 ### Metadata methods - introduced in API API 3.5
 'Get-TableauDatabase', 'Get-TableauTable', 'Get-TableauTableColumn', 'Get-TableauMetadataObject'
@@ -277,6 +275,7 @@ AliasesToExport = @('Login-TableauServer', 'Logout-TableauServer',
 'Add-TableauPulseSubscription', 'Generate-TableauPulseInsightBundle'
 'Register-TableauAuthConfiguration', 'Update-TableauAuthConfiguration',
 'Register-TableauIdentityPool', 'Update-TableauIdentityPool',
+'Register-TableauIdentityStore',
 'Run-TableauMetadataGraphQL', 'Query-TableauMetadata')
 
 # DSC resources to export from this module
