@@ -90,6 +90,8 @@ FunctionsToExport = @(
 'Get-TableauGroup', 'New-TableauGroup', 'Set-TableauGroup', 'Remove-TableauGroup',
 'Add-TableauUserToGroup', 'Remove-TableauUserFromGroup', 'Get-TableauUsersInGroup', 'Get-TableauGroupsForUser',
 'Import-TableauUsersCsv', 'Remove-TableauUsersCsv',
+# TODO Download User Credentials - API 3.24
+# TODO Upload User Credentials - API 3.24
 # new group set methods - API 3.22
 'Get-TableauGroupSet', 'New-TableauGroupSet', 'Set-TableauGroupSet', 'Remove-TableauGroupSet',
 'Add-TableauGroupToGroupSet', 'Remove-TableauGroupFromGroupSet',
@@ -99,9 +101,13 @@ FunctionsToExport = @(
 'Get-TableauWorkbook', 'Get-TableauWorkbooksForUser', 'Export-TableauWorkbook', 'Publish-TableauWorkbook', 'Set-TableauWorkbook', 'Remove-TableauWorkbook',
 'Get-TableauWorkbookDowngradeInfo', 'Export-TableauWorkbookToFormat',
 'Get-TableauWorkbookConnection', 'Set-TableauWorkbookConnection', 'Update-TableauWorkbookNow',
+# TODO Download Workbook Encrypted Keychain - API 3.24
+# TODO Upload Workbook Encrypted Keychain - API 3.24
 ### Datasources methods
 'Get-TableauDatasource', 'Export-TableauDatasource', 'Publish-TableauDatasource', 'Set-TableauDatasource', 'Remove-TableauDatasource',
 'Get-TableauDatasourceConnection', 'Set-TableauDatasourceConnection', 'Update-TableauDatasourceNow', 'Update-TableauHyperData',
+# TODO Download Data Source Encrypted Keychain - API 3.24
+# TODO Upload Data Source Encrypted Keychain - API 3.24
 ### Views methods
 'Get-TableauView', 'Export-TableauViewImage', 'Export-TableauViewToFormat', 'Get-TableauViewUrl',
 'Get-TableauViewRecommendation', 'Hide-TableauViewRecommendation', 'Show-TableauViewRecommendation',
@@ -114,6 +120,9 @@ FunctionsToExport = @(
 'Get-TableauContentPermission', 'Set-TableauContentPermission', 'Add-TableauContentPermission', 'Remove-TableauContentPermission',
 'ConvertTo-TableauPermissionTable',
 'Get-TableauDefaultPermission', 'Set-TableauDefaultPermission', 'Remove-TableauDefaultPermission',
+# TODO
+# Replace Project's Default Permissions - API 3.23
+# Replace Content Permissions - API 3.23
 # List/Add/Delete Ask Data Lens Permissions - retired in API 3.22
 ### Tags methods
 'Add-TableauContentTag', 'Remove-TableauContentTag',
@@ -160,6 +169,21 @@ FunctionsToExport = @(
 'Get-TableauContentSuggestion', 'Get-TableauContentSearch', 'Get-TableauContentUsage',
 ### Virtual Connections methods
 'Get-TableauVirtualConnection', 'Set-TableauVirtualConnection',
+# TODO
+# Add Tags to Virtual Connection - API 3.23
+# Add Virtual Connection Permissions - API 3.23
+# Delete Tag from Virtual Connection - API 3.23
+# Delete Virtual Connection
+# Delete Virtual Connection Permission - API 3.23
+# Download Virtual Connection
+# Download Virtual Connection Revision
+# List Virtual Connection Revisions
+# List Virtual Connections
+# List Virtual Connection Database Connections
+# Publish Virtual Connection
+# List Virtual Connection Permissions - API 3.23
+# Update Virtual Connection
+# Update Virtual Connection Database Connections
 ### Ask Data Lens methods - retired in API 3.22
 ### Metrics methods - retired in API 3.22
 ### Tableau Pulse methods - introduced in API 3.21
@@ -167,6 +191,7 @@ FunctionsToExport = @(
 'Get-TableauPulseMetric', 'Set-TableauPulseMetric', 'New-TableauPulseMetric', 'Remove-TableauPulseMetric',
 'Get-TableauPulseSubscription', 'New-TableauPulseSubscription', 'Remove-TableauPulseSubscription',
 'Get-TableauPulseSubscriberCount', 'New-TableauPulseInsightBundle'
+# TODO Get site entitlements - API 3.23
 ### Identity Pools methods - introduced in API 3.19
 'Get-TableauAuthConfiguration', 'Set-TableauAuthConfiguration', 'New-TableauAuthConfiguration', 'Remove-TableauAuthConfiguration',
 'Get-TableauIdentityPool', 'Set-TableauIdentityPool', 'New-TableauIdentityPool', 'Remove-TableauIdentityPool',
@@ -175,26 +200,19 @@ FunctionsToExport = @(
 
 ### Metadata methods - introduced in API API 3.5
 'Get-TableauDatabase', 'Get-TableauTable', 'Get-TableauTableColumn', 'Get-TableauMetadataObject'
-# Query Data Quality Warning by ID
-# Query Data Quality Warning by Content
-# Query Data Quality Certification by ID
-# Query Data Quality Certifications by Content
-# Query Quality Warning Trigger
-# Query All Quality Warning Triggers by Content
-# Query Database Permissions
-# Query Default Database Permissions
-# Query Table Permissions
+# TODO
 # Add Database Permissions
 # Add Default Database Permissions
 # Add Data Quality Warning - API 3.9
 # Batch Add or Update Data Quality Warnings
 # Batch Add or Update Data Quality Certifications
-# Add (or Update) Quality Warning Trigger
+# Add or Update Monitoring Quality Warning on Content
 # Add Table Permissions
 # Add Tags to Column - API 3.9
 # Add Tags to Database - API 3.9
 # Add Tags to Table - API 3.9
 # Batch Add Tags - API 3.9
+# Create Label Category - API 3.21
 # Create or Update labelValue
 # Delete Database Permissions
 # Delete Default Database Permissions
@@ -205,31 +223,49 @@ FunctionsToExport = @(
 # Delete Data Quality Certifications by Content
 # Delete Quality Warning Trigger by ID
 # Delete Quality Warning Triggers by Content
-# Delete Label
-# Delete Labels
+# Delete Label - API 3.23
+# Delete Labels - API 3.23
 # Delete labelValue
 # Delete Table Permissions
 # Delete Tag from Column - API 3.9
 # Delete Tag from Database - API 3.9
 # Delete Tag from Table - API 3.9
 # Batch Delete Tags - API 3.9
-# Get Label
-# Get Labels
+# Get Label - API 3.23
+# Get Labels - API 3.23
 # Get labelValue
-# Get Databases and Tables from Connection
+# Get Metadata Suggestion - API 3.23
+# Get Databases and Tables from Connection - API 3.13
 # List labelValues on Site
+# List Label Categories on Site
 # Move Database
 # Move Table
+# Query Column in a Table
+# Query Columns in a Table
+# Query Database
+# Query Databases
+# List Database Permissions
+# List Default Database Permissions
+# Query Data Quality Warning by ID
+# Query Data Quality Warning by Content
+# Query Data Quality Certification by ID
+# Query Data Quality Certifications by Content
+# Query Quality Warning Trigger
+# Query All Quality Warning Triggers by Content
+# Query Table
+# Query Tables
+# List Table Permissions
 # Remove Column
 # Remove Database
 # Remove Table
 # Update Column
 # Update Database
 # Update Data Quality Warning
-# Update Quality Warning Trigger
-# Update Label
-# Update Labels
+# Update Monitoring Quality Warning
+# Update Label - API 3.23
+# Update Labels - API 3.23
 # Update labelValue
+# Update Label Category
 # Update Table
 )
 # see also: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_whats_new.htm#added-in-rest-api-315-for-tableau-server-20221-and-tableau-cloud

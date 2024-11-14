@@ -842,6 +842,9 @@ https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_openid_con
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_openid_connect.htm#update_openid_connect_configuration
+
+.NOTES
+TODO API 3.24 For the Create OpenID Connect Configuration method, include idpConfigurationName; for the Update OpenID Connect Configuration method, include the idpConfigurationId; for Remove OpenID Connect Configuration method, include the idpConfigurationId in the URI.
 #>
 [CmdletBinding(SupportsShouldProcess)]
 [Alias('New-TableauOIDConnectConfig')]
@@ -939,6 +942,9 @@ $result = Remove-TableauOIDConnectConfig
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_openid_connect.htm#remove_openid_connect_configuration
+
+.NOTES
+TODO API 3.24 For the Create OpenID Connect Configuration method, include idpConfigurationName; for the Update OpenID Connect Configuration method, include the idpConfigurationId; for Remove OpenID Connect Configuration method, include the idpConfigurationId in the URI.
 #>
 [CmdletBinding(SupportsShouldProcess)]
 [OutputType([PSCustomObject])]
@@ -1636,6 +1642,9 @@ $user = New-TableauUser -Name $userName -SiteRole Viewer
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#add_user_to_site
+
+.NOTES
+TODO API 3.24 For sites with multiple authentication types configured, include the idpConfigurationId when assigning an authentication type to a user. For more information, see Add User to Site or Update User methods.
 #>
 [CmdletBinding(SupportsShouldProcess)]
 [Alias('Add-TableauUser')]
@@ -1691,6 +1700,9 @@ $user = Set-TableauUser -UserId $userId -SiteRole Explorer -FullName "John Doe"
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_users_and_groups.htm#update_user
+
+.NOTES
+TODO API 3.24 For sites with multiple authentication types configured, include the idpConfigurationId when assigning an authentication type to a user. For more information, see Add User to Site or Update User methods.
 #>
 [CmdletBinding(SupportsShouldProcess)]
 [Alias('Update-TableauUser')]
@@ -4704,7 +4716,7 @@ Param(
 function Get-TableauCustomViewUserDefault {
 <#
 .SYNOPSIS
-List Users with Custom View as Default - Preview Release
+List Users with Custom View as Default (added in Tableau Server 2023.3 / REST API 3.21)
 
 .DESCRIPTION
 Gets the list of users whose default view is the specified custom view.
@@ -4733,7 +4745,7 @@ Param(
 function Set-TableauCustomViewUserDefault {
 <#
 .SYNOPSIS
-Set Custom View as Default for Users - Preview release
+Set Custom View as Default for Users (added in Tableau Server 2023.3 / REST API 3.21)
 
 .DESCRIPTION
 Sets the specified custom for as the default view for up to 100 specified users.
@@ -9254,7 +9266,7 @@ Param(
     } else { # legacy API
         Assert-TableauRestVersion -AtLeast 3.11
         if (-not $AllowSandboxed) {
-            $AllowSandboxed = 'true'; # override to true, this parameter is required in legacy API
+            $AllowSandboxed = 'true' # override to true, this parameter is required in legacy API
         }
         $options = @{
             extensions_enabled=$Enabled;
@@ -12616,6 +12628,9 @@ $instances = Get-TableauAuthConfiguration
 
 .LINK
 https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_identity_pools.htm#AuthnService_ListAuthConfigurations
+
+.NOTES
+TODO API 3.24 Use the List Authentication Configurations method to query the authentication configurations on the site and get the idpConfigurationId value for each authentication configuration.
 #>
 [OutputType([PSCustomObject])]
 Param()
