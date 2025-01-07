@@ -60,7 +60,6 @@ foreach ($ConfigFile in $ConfigFiles) {
             New-Item -ItemType Directory -Force -Path ($OutputDir + '/' + $p.Value) | Out-Null
         }
 
-        $projectStructure['7c27535e-4a22-4d2f-ad49-e12e06753c50']
         $workbooks = Get-TableauWorkbook
         Write-Host ("{0} workbook(s) found" -f $workbooks.Length)
         foreach ($wb in $workbooks) {

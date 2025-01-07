@@ -1,14 +1,14 @@
 BeforeDiscovery {
-    $script:ModuleName = (Split-Path -Leaf $PSCommandPath) -Replace ".Module.Tests.ps1"
+    $script:ModuleName = "PSTableauREST"
     $script:ConfigFiles = Get-ChildItem -Path "./tests/config" -Filter "test_*.json" | Resolve-Path -Relative
     $script:DatasourceFiles = Get-ChildItem -Path "./tests/assets/Datasources" -Recurse | Resolve-Path -Relative
     $script:WorkbookFiles = Get-ChildItem -Path "./tests/assets/Workbooks" -Recurse | Resolve-Path -Relative
     $script:FlowFiles = Get-ChildItem -Path "./tests/assets/Flows" -Recurse | Resolve-Path -Relative
 }
 BeforeAll {
-    # Requires -Modules Assert
     Get-Module -Name $ModuleName -All | Remove-Module -Force -ErrorAction Ignore
     Import-Module ./$ModuleName -Force
+    # Requires -Modules Assert
     . ./scripts/SecretStore.Functions.ps1
     $script:VerbosePreference = 'Continue' # display verbose output of the tests
     InModuleScope $ModuleName { $script:DebugPreference = 'Continue' } # display debug output of the module

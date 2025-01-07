@@ -1,9 +1,14 @@
 BeforeDiscovery {
+    $script:ModuleName = "PSTableauREST"
     $script:ConfigFiles = Get-ChildItem -Path "tests/config" -Filter "test_*.json" -Recurse
 }
 BeforeAll {
-    Import-Module ./PSTableauREST -Force
+    Get-Module -Name $ModuleName -All | Remove-Module -Force -ErrorAction Ignore
+    Import-Module ./$ModuleName -Force
+    # Requires -Modules Assert
     . ./scripts/SecretStore.Functions.ps1
+    # $script:VerbosePreference = 'Continue' # display verbose output of the tests
+    # InModuleScope $ModuleName { $script:DebugPreference = 'Continue' } # display debug output of the module
 }
 
 Describe "Unit Tests for PSTableauREST" -Tag Unit {
