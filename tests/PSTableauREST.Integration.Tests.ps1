@@ -29,7 +29,11 @@ Describe "Integration Tests for <ModuleName>" -Tag Integration -ForEach $ConfigF
     }
     Context "Auth Methods" -Tag Auth {
         It "Request auth sign-in for <ConfigFile.server>" {
-            $response = Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -Credential $ConfigFile.credential
+            if ($ConfigFile.username) {
+                $response = Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -Credential $ConfigFile.credential
+            } else {
+                $response = Connect-TableauServer -Server $ConfigFile.server -Site $ConfigFile.site -Credential $ConfigFile.pat_credential -PersonalAccessToken
+            }
             $response.user.id | Should -BeOfType String
         }
         It "Request switch site to <ConfigFile.switch_site> for <ConfigFile.server>" {
